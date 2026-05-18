@@ -2,6 +2,7 @@ const productUrl = "./outputs/product_quiz/金尊产品知识库题库.json";
 const roleUrl = "./outputs/role_quiz/岗位学习考核题库.json";
 const API_BASE = window.JZ_API_BASE || "";
 const CLOUD_ENABLED = Boolean(window.JZ_API_BASE);
+const ADMIN_PHONES = (window.JZ_ADMIN_PHONES || "").split(",").map((phone) => phone.replace(/\D/g, "")).filter(Boolean);
 const state = {
   allQuestions: [],
   filtered: [],
@@ -96,6 +97,22 @@ const userStore = {
     }
   },
 };
+
+const isAdminUser = (user = state.currentUser) => {
+  const phone = String(user?.phone || "").replace(/\D/g, "");
+  return Boolean(phone && ADMIN_PHONES.includes(phone));
+};
+
+function applyAdminAccess() {
+  const allowed = isAdminUser();
+  els.navTabs
+    .filter((tab) => tab.dataset.view === "admin")
+    .forEach((tab) => {
+      tab.classList.toggle("hidden", !allowed);
+      tab.setAttribute("aria-hidden", allowed ? "false" : "true");
+    });
+  if (!allowed && state.currentView === "admin") switchView("dashboard");
+}
 
 const userKey = (name) => {
   const phone = state.currentUser?.phone || "guest";
@@ -889,6 +906,12 @@ function renderRanking() {
 }
 
 function renderAdmin() {
+  if (!isAdminUser()) {
+    els.adminMetrics.innerHTML = `<div class="empty">无权限访问管理看板。</div>`;
+    els.adminUserTable.innerHTML = "";
+    els.adminWeakList.innerHTML = "";
+    return;
+  }
   const cloud = state.cloudStats;
   const users = cloud?.employees?.length
     ? cloud.employees.map((u) => ({ name: u["姓名"], phone: u["手机号"], role: u["岗位"] }))
@@ -995,6 +1018,9 @@ function exportMistakes() {
 }
 
 function switchView(view) {
+  if (view === "admin" && !isAdminUser()) {
+    view = "dashboard";
+  }
   state.currentView = view;
   els.navTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.view === view));
   Object.entries(els.views).forEach(([name, element]) => element.classList.toggle("active", name === view));
@@ -1022,6 +1048,7 @@ function renderAll() {
 }
 
 function renderUser() {
+  applyAdminAccess();
   if (!state.currentUser) {
     els.userName.textContent = "未登录";
     els.userMeta.textContent = "-";
@@ -1070,6 +1097,7 @@ function saveUserFromForm(event) {
   userStore.users = users;
   userStore.currentPhone = phone;
   state.currentUser = user;
+  applyAdminAccess();
   els.authError.textContent = "";
   showAuth(false);
   syncLater("login", { user });
@@ -1080,6 +1108,7 @@ function saveUserFromForm(event) {
 function logout() {
   userStore.currentPhone = "";
   state.currentUser = null;
+  applyAdminAccess();
   state.quiz = [];
   state.quizIndex = 0;
   state.score = 0;
@@ -1135,6 +1164,7 @@ async function init() {
     renderQuizSetup();
     initSlogan();
     bindEvents();
+    applyAdminAccess();
     await flushSyncQueue();
     await loadCloudStats();
     renderAll();
