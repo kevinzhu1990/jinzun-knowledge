@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>金尊知识库学习考核</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <section id="authView" class="auth-view">
+      <div class="auth-card">
+        <p class="eyebrow">Mobile Access</p>
+        <h1>手机号注册登录</h1>
+        <p class="auth-note">员工用姓名、手机号和岗位进入学习。当前版本会把学习记录保存在本机浏览器，并按手机号分开。</p>
+        <form id="authForm" class="auth-form">
+          <label>
+            姓名
+            <input id="authName" class="text-input" type="text" autocomplete="name" required placeholder="请输入姓名" />
+          </label>
+          <label>
+            手机号
+            <input id="authPhone" class="text-input" type="tel" inputmode="numeric" autocomplete="tel" required placeholder="请输入手机号" />
+          </label>
+          <label>
+            岗位
+            <select id="authRole" class="select">
+              <option value="运营">运营</option>
+              <option value="客服">客服</option>
+              <option value="美工">美工</option>
+              <option value="审单">审单</option>
+              <option value="仓储">仓储</option>
+              <option value="管理">管理</option>
+              <option value="新员工">新员工</option>
+            </select>
+          </label>
+          <p id="authError" class="form-error"></p>
+          <button class="primary-btn" type="submit">进入学习</button>
+        </form>
+      </div>
+    </section>
+
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">JZ</div>
+          <div>
+            <h1>金尊知识库</h1>
+            <p>学习 · 练习 · 考核</p>
+          </div>
+        </div>
+
+        <nav class="nav-tabs" aria-label="主导航">
+          <button class="nav-tab active" data-view="dashboard">总览</button>
+          <button class="nav-tab" data-view="ranking">排行</button>
+          <button class="nav-tab" data-view="learn">学习</button>
+          <button class="nav-tab" data-view="quiz">考核</button>
+          <button class="nav-tab" data-view="mistakes">错题</button>
+        </nav>
+
+        <div class="side-panel">
+          <p class="side-label">当前员工</p>
+          <div class="user-panel">
+            <strong id="userName">未登录</strong>
+            <span id="userMeta">-</span>
+            <button id="logoutBtn" class="text-btn" type="button">切换账号</button>
+          </div>
+        </div>
+
+        <div class="side-panel">
+          <p class="side-label">题库筛选</p>
+          <select id="bankSelect" class="select"></select>
+          <div class="mini-stats">
+            <div>
+              <span id="bankCount">0</span>
+              <small>当前题量</small>
+            </div>
+            <div>
+              <span id="mistakeCount">0</span>
+              <small>错题记录</small>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">New Employee Training</p>
+            <h2 id="pageTitle">学习总览</h2>
+          </div>
+          <div class="top-actions">
+            <input id="searchInput" class="search" type="search" placeholder="搜索货号、题目、产品名" />
+            <button id="resetBtn" class="icon-btn" title="清空本机学习记录">↺</button>
+          </div>
+        </header>
+
+        <section id="dashboardView" class="view active">
+          <div class="hero">
+            <div>
+              <p class="eyebrow">Training Center</p>
+              <h3 id="heroSlogan"></h3>
+              <div class="slogan-dots" id="sloganDots"></div>
+            </div>
+            <div class="score-ring">
+              <strong id="accuracyText">0%</strong>
+              <span>个人正确率</span>
+            </div>
+          </div>
+
+          <div id="bankCards" class="bank-grid"></div>
+        </section>
+
+        <section id="rankingView" class="view">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Leaderboard</p>
+              <h3>排行榜</h3>
+            </div>
+            <div class="rank-sort-btns">
+              <button class="rank-sort-btn active" data-sort="score">按分数</button>
+              <button class="rank-sort-btn" data-sort="time">按用时</button>
+            </div>
+          </div>
+          <div id="rankingList" class="ranking-list"></div>
+        </section>
+
+        <section id="learnView" class="view">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Learn</p>
+              <h3>学习题库</h3>
+            </div>
+            <span id="learnCount" class="pill">0 道题</span>
+          </div>
+          <div id="learnFilter" class="learn-filter"></div>
+          <div id="learnList" class="learn-list"></div>
+        </section>
+
+        <section id="quizView" class="view">
+          <div id="quizSetup" class="quiz-setup">
+            <div>
+              <p class="eyebrow">Quiz</p>
+              <h3>开始考核</h3>
+              <p>答题后显示解析，错题自动进入错题本。</p>
+            </div>
+            <div class="quiz-mode-tabs">
+              <button class="mode-tab active" data-mode="random">随机混合</button>
+              <button class="mode-tab" data-mode="product">产品题库</button>
+              <button class="mode-tab" data-mode="role">岗位考试</button>
+            </div>
+            <div id="modeRandom" class="mode-panel">
+              <p class="mode-desc">从全部题库随机抽取 50 题，涵盖月饼、年货、耗材及岗位知识。</p>
+            </div>
+            <div id="modeProduct" class="mode-panel hidden">
+              <label class="mode-label">
+                选择产品题库
+                <select id="productBankSelect" class="select"></select>
+              </label>
+              <p class="mode-desc">从所选产品题库中随机抽取 50 题。</p>
+            </div>
+            <div id="modeRole" class="mode-panel hidden">
+              <label class="mode-label">
+                选择岗位
+                <select id="roleBankSelect" class="select"></select>
+              </label>
+              <p class="mode-desc">岗位题不足 50 题时，自动从产品题库补充货品耗材题至 50 题。</p>
+            </div>
+            <div class="quiz-start-row">
+              <label class="mode-label">
+                抽题数量
+                <select id="quizSize" class="select quiz-size-select">
+                  <option value="10">10 题</option>
+                  <option value="20">20 题</option>
+                  <option value="30">30 题</option>
+                  <option value="50" selected>50 题</option>
+                  <option value="100">100 题</option>
+                </select>
+              </label>
+              <button id="startQuizBtn" class="primary-btn">开始答题</button>
+            </div>
+          </div>
+
+          <div id="quizRunner" class="quiz-runner hidden">
+            <div class="quiz-progress">
+              <span id="quizStep">第 1 题</span>
+              <div class="progress-track"><div id="progressBar"></div></div>
+              <span id="quizScore">0 分</span>
+            </div>
+            <div class="quiz-stats-bar">
+              <span class="quiz-stat-item" id="quizTimer">⏱ 00:00</span>
+              <span class="quiz-stat-item stat-wrong" id="quizWrongCount">✗ 错误 0 题</span>
+            </div>
+            <article id="quizCard" class="quiz-card"></article>
+          </div>
+
+          <div id="quizResult" class="result-card hidden"></div>
+        </section>
+
+        <section id="mistakesView" class="view">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Review</p>
+              <h3>错题本</h3>
+            </div>
+            <button id="clearMistakesBtn" class="secondary-btn">清空错题</button>
+          </div>
+          <div id="mistakeList" class="learn-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
