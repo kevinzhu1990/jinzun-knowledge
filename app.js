@@ -1,6 +1,7 @@
 const productUrl = "./outputs/product_quiz/金尊产品知识库题库.json";
 const roleUrl = "./outputs/role_quiz/岗位学习考核题库.json";
 const API_BASE = window.JZ_API_BASE || "";
+const CLOUD_ENABLED = Boolean(window.JZ_API_BASE);
 const state = {
   allQuestions: [],
   filtered: [],
@@ -256,6 +257,7 @@ const getUserMistakes = (phone) =>
   JSON.parse(localStorage.getItem(`jz_${phone}_mistakes`) || "[]");
 
 async function cloudRequest(action, payload) {
+  if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   const res = await fetch(`${API_BASE}/api/${action}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -292,6 +294,10 @@ async function flushSyncQueue() {
 }
 
 async function loadCloudStats() {
+  if (!CLOUD_ENABLED) {
+    state.cloudStats = null;
+    return;
+  }
   try {
     const res = await fetch(`${API_BASE}/api/stats`);
     const data = await res.json();
