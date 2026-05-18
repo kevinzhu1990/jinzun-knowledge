@@ -7,7 +7,7 @@ const dailyImageInputDir = "/Users/liangyanmei/Desktop/2026年糕点年货内配
 const mooncakeImageInputDir = "/Users/liangyanmei/Desktop/2025年内配图";
 const dailyImageAssetDir = "/Users/liangyanmei/Documents/公司知识库网站/assets/product-images/daily";
 const mooncakeImageAssetDir = "/Users/liangyanmei/Documents/公司知识库网站/assets/product-images/mooncake";
-const outputDir = "/Users/liangyanmei/Documents/公司知识库网站/outputs/product_quiz";
+const outputDir = path.resolve("outputs/product_quiz");
 const outputPath = path.join(outputDir, "金尊产品知识库题库.xlsx");
 const jsonOutputPath = path.join(outputDir, "金尊产品知识库题库.json");
 const retiredCodes = new Set(["2476", "2477", "2478", "2479", "2480", "2481", "2482", "2483", "2502", "2503"]);
@@ -92,11 +92,12 @@ const shuffle = (items, seedText) => {
   return arr;
 };
 
+const letters = ["A", "B", "C", "D"];
+
 const makeQuestion = ({ row, field, knowledgePoint, stem, answer, pool, difficulty = "基础" }) => {
   const distractors = pickDistractors(answer, pool, allValues(field));
   if (!answer || distractors.length < 3) return null;
   const options = shuffle([answer, ...distractors.slice(0, 3)], `${row.code}-${knowledgePoint}-${answer}`);
-  const letters = ["A", "B", "C", "D"];
   const correctLetter = letters[options.findIndex((option) => option === answer)];
   return {
     id: `P-${String(questions.length + 1).padStart(4, "0")}`,
@@ -340,6 +341,58 @@ questions.push(...visualQuestions);
 questions.forEach((question, index) => {
   question.id = `P-${String(index + 1).padStart(4, "0")}`;
 });
+
+
+const addScenarioQuestions = () => {
+  const productNames = unique(sourceRows.map((row) => row.name));
+  const productLines = unique(sourceRows.map((row) => row.productLine || row.category));
+  let scenarioIndex = 1;
+  for (const row of sourceRows.slice(0, 260)) {
+    const serviceOptions = shuffle([row.name, ...pickDistractors(row.name, productNames, productNames)], `${row.code}-客服推荐`).slice(0, 4);
+    questions.push({
+      id: `S-${String(scenarioIndex++).padStart(4, "0")}`,
+      bank: "业务场景题库",
+      category: row.category,
+      productLine: row.productLine,
+      code: row.code,
+      productName: row.name,
+      type: "单选题",
+      difficulty: "场景",
+      knowledgePoint: "客服推荐",
+      question: `客户想找“${row.productLine || row.category}”相关产品，客服优先推荐哪一款最准确？`,
+      optionA: serviceOptions[0], optionB: serviceOptions[1], optionC: serviceOptions[2], optionD: serviceOptions[3],
+      answer: letters[serviceOptions.findIndex((option) => option === row.name)],
+      answerText: row.name,
+      explanation: `题干需求指向 ${row.productLine || row.category}，应优先匹配产品 ${row.code} ${row.name}，避免推荐到不相关品类。`,
+      questionImage: "", optionAImage: "", optionBImage: "", optionCImage: "", optionDImage: "",
+      source: "金尊产品知识库/业务场景补充",
+      note: "",
+    });
+    const lineAnswer = row.productLine || row.category;
+    const lineOptions = shuffle([lineAnswer, ...pickDistractors(lineAnswer, productLines, productLines)], `${row.code}-运营活动`).slice(0, 4);
+    questions.push({
+      id: `S-${String(scenarioIndex++).padStart(4, "0")}`,
+      bank: "业务场景题库",
+      category: row.category,
+      productLine: row.productLine,
+      code: row.code,
+      productName: row.name,
+      type: "单选题",
+      difficulty: "场景",
+      knowledgePoint: "运营活动",
+      question: `运营做活动素材时，${row.code} 这款商品应归到哪个产品线，方便活动分组？`,
+      optionA: lineOptions[0], optionB: lineOptions[1], optionC: lineOptions[2], optionD: lineOptions[3],
+      answer: letters[lineOptions.findIndex((option) => option === lineAnswer)],
+      answerText: lineAnswer,
+      explanation: `${row.code}（${row.name}）属于 ${lineAnswer}，活动分组、关键词和页面素材应保持一致。`,
+      questionImage: "", optionAImage: "", optionBImage: "", optionCImage: "", optionDImage: "",
+      source: "金尊产品知识库/业务场景补充",
+      note: "",
+    });
+  }
+};
+
+addScenarioQuestions();
 
 const workbook = Workbook.create();
 const defaultSheet = workbook.worksheets.add("题库总表");

@@ -1,5 +1,6 @@
 const productUrl = "./outputs/product_quiz/金尊产品知识库题库.json";
 const roleUrl = "./outputs/role_quiz/岗位学习考核题库.json";
+const API_BASE = window.JZ_API_BASE || "";
 const state = {
   allQuestions: [],
   filtered: [],
@@ -14,6 +15,7 @@ const state = {
   quizWrong: 0,
   wrongDetails: [],
   currentUser: null,
+  cloudStats: null,
 };
 
 const els = {
@@ -252,6 +254,52 @@ const getUserRecords = (phone) =>
 
 const getUserMistakes = (phone) =>
   JSON.parse(localStorage.getItem(`jz_${phone}_mistakes`) || "[]");
+
+async function cloudRequest(action, payload) {
+  const res = await fetch(`${API_BASE}/api/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...payload, userAgent: navigator.userAgent }),
+  });
+  if (!res.ok) throw new Error(`云端同步失败：${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "云端同步失败");
+  return data;
+}
+
+async function syncLater(action, payload) {
+  try {
+    await cloudRequest(action, payload);
+  } catch (error) {
+    const queue = JSON.parse(localStorage.getItem("jz_sync_queue") || "[]");
+    queue.push({ action, payload, createdAt: new Date().toISOString(), error: error.message });
+    localStorage.setItem("jz_sync_queue", JSON.stringify(queue.slice(-300)));
+  }
+}
+
+async function flushSyncQueue() {
+  const queue = JSON.parse(localStorage.getItem("jz_sync_queue") || "[]");
+  if (!queue.length) return;
+  const remain = [];
+  for (const item of queue) {
+    try {
+      await cloudRequest(item.action, item.payload);
+    } catch (error) {
+      remain.push({ ...item, error: error.message });
+    }
+  }
+  localStorage.setItem("jz_sync_queue", JSON.stringify(remain.slice(-300)));
+}
+
+async function loadCloudStats() {
+  try {
+    const res = await fetch(`${API_BASE}/api/stats`);
+    const data = await res.json();
+    if (data.ok) state.cloudStats = data;
+  } catch {
+    state.cloudStats = null;
+  }
+}
 
 async function loadQuestions() {
   const [productRes, roleRes] = await Promise.all([fetch(productUrl), fetch(roleUrl)]);
@@ -636,8 +684,10 @@ function chooseAnswer(letter) {
 
 function saveMistake(question, selected) {
   const mistakes = storage.mistakes.filter((item) => item.id !== question.id);
-  mistakes.unshift({ ...question, selected, savedAt: new Date().toISOString() });
+  const item = { ...question, selected, savedAt: new Date().toISOString() };
+  mistakes.unshift(item);
   storage.mistakes = mistakes.slice(0, 300);
+  syncLater("mistakes", { user: state.currentUser, items: [item] });
 }
 
 function finishQuiz() {
@@ -702,6 +752,7 @@ function saveExamRecord(percent) {
     finishedAt: new Date().toISOString(),
   });
   storage.examRecords = records.slice(0, 100);
+  syncLater("exam", { user: state.currentUser, record: records[0] });
 }
 
 function renderMistakes() {
@@ -832,10 +883,20 @@ function renderRanking() {
 }
 
 function renderAdmin() {
-  const users = Object.values(userStore.users);
+  const cloud = state.cloudStats;
+  const users = cloud?.employees?.length
+    ? cloud.employees.map((u) => ({ name: u["姓名"], phone: u["手机号"], role: u["岗位"] }))
+    : Object.values(userStore.users);
   const rows = users.map((user) => {
-    const records = getUserRecords(user.phone);
-    const mistakes = getUserMistakes(user.phone);
+    const records = cloud?.exams?.length
+      ? cloud.exams.filter((r) => String(r["手机号"]) === String(user.phone)).map((r) => ({
+          percent: Number(r["分数"] || 0), score: Number(r["答对题数"] || 0), total: Number(r["总题数"] || 0),
+          wrong: Number(r["错题数"] || 0), duration: Number(r["用时秒"] || 0), bank: r["题库"], type: r["考核类型"], finishedAt: r["完成时间"],
+        }))
+      : getUserRecords(user.phone);
+    const mistakes = cloud?.mistakes?.length
+      ? cloud.mistakes.filter((r) => String(r["手机号"]) === String(user.phone)).map((r) => ({ knowledgePoint: r["知识点"], bank: r["题库"] }))
+      : getUserMistakes(user.phone);
     const best = records.reduce((acc, record) => (Number(record.percent) > Number(acc?.percent || -1) ? record : acc), null);
     const latest = records[0];
     return { user, records, mistakes, best, latest };
@@ -847,7 +908,7 @@ function renderAdmin() {
   const notExam = rows.filter((row) => !row.records.length).length;
 
   els.adminMetrics.innerHTML = `
-    <div class="summary-card"><span>员工数</span><strong>${users.length}</strong><small>本机已登录账号</small></div>
+    <div class="summary-card"><span>员工数</span><strong>${users.length}</strong><small>${cloud?.employees?.length ? "飞书云端数据" : "本机已登录账号"}</small></div>
     <div class="summary-card"><span>考试次数</span><strong>${allRecords.length}</strong><small>正式+练习记录</small></div>
     <div class="summary-card"><span>平均分</span><strong>${avg}</strong><small>全部考试记录</small></div>
     <div class="summary-card"><span>通过率</span><strong>${passRate}%</strong><small>80 分以上通过，未考 ${notExam} 人</small></div>
@@ -886,36 +947,44 @@ function renderAdmin() {
 }
 
 function exportRecords() {
-  const rows = Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).map((record) => ({
-    姓名: user.name,
-    手机号: user.phone,
-    岗位: user.role,
-    考核类型: record.type || "练习模式",
-    题库: record.bank,
-    分数: record.percent,
-    答对: record.score,
-    总题数: record.total,
-    错题数: record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
-    是否通过: Number(record.percent) >= 80 ? "是" : "否",
-    用时秒: record.duration,
-    完成时间: record.finishedAt,
-  })));
+  const rows = state.cloudStats?.exams?.length
+    ? state.cloudStats.exams.map((r) => ({
+        姓名: r["姓名"], 手机号: r["手机号"], 岗位: r["岗位"], 考核类型: r["考核类型"], 题库: r["题库"], 分数: r["分数"], 答对: r["答对题数"], 总题数: r["总题数"], 错题数: r["错题数"], 是否通过: r["是否通过"], 用时秒: r["用时秒"], 完成时间: r["完成时间"],
+      }))
+    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).map((record) => ({
+        姓名: user.name,
+        手机号: user.phone,
+        岗位: user.role,
+        考核类型: record.type || "练习模式",
+        题库: record.bank,
+        分数: record.percent,
+        答对: record.score,
+        总题数: record.total,
+        错题数: record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
+        是否通过: Number(record.percent) >= 80 ? "是" : "否",
+        用时秒: record.duration,
+        完成时间: record.finishedAt,
+      })));
   downloadText(`金尊考试记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "考核类型", "题库", "分数", "答对", "总题数", "错题数", "是否通过", "用时秒", "完成时间"], rows));
 }
 
 function exportMistakes() {
-  const rows = Object.values(userStore.users).flatMap((user) => getUserMistakes(user.phone).map((q) => ({
-    姓名: user.name,
-    手机号: user.phone,
-    岗位: user.role,
-    题库: q.bank,
-    知识点: q.knowledgePoint,
-    题目: q.question,
-    错选: q.selected,
-    正确答案: `${q.answer} ${q.answerText}`,
-    解析: q.explanation,
-    记录时间: q.savedAt,
-  })));
+  const rows = state.cloudStats?.mistakes?.length
+    ? state.cloudStats.mistakes.map((q) => ({
+        姓名: q["姓名"], 手机号: q["手机号"], 岗位: q["岗位"], 题库: q["题库"], 知识点: q["知识点"], 题目: q["题目"], 错选: q["错选答案"], 正确答案: q["正确答案"], 解析: q["解析"], 记录时间: q["出错时间"],
+      }))
+    : Object.values(userStore.users).flatMap((user) => getUserMistakes(user.phone).map((q) => ({
+        姓名: user.name,
+        手机号: user.phone,
+        岗位: user.role,
+        题库: q.bank,
+        知识点: q.knowledgePoint,
+        题目: q.question,
+        错选: q.selected,
+        正确答案: `${q.answer} ${q.answerText}`,
+        解析: q.explanation,
+        记录时间: q.savedAt,
+      })));
   downloadText(`金尊错题记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "题库", "知识点", "题目", "错选", "正确答案", "解析", "记录时间"], rows));
 }
 
@@ -931,7 +1000,10 @@ function switchView(view) {
   }
   if (view === "ranking") renderRanking();
   if (view === "mistakes") renderMistakes();
-  if (view === "admin") renderAdmin();
+  if (view === "admin") {
+    loadCloudStats().then(renderAdmin);
+    renderAdmin();
+  }
 }
 
 function renderAll() {
@@ -994,6 +1066,8 @@ function saveUserFromForm(event) {
   state.currentUser = user;
   els.authError.textContent = "";
   showAuth(false);
+  syncLater("login", { user });
+  flushSyncQueue();
   renderAll();
 }
 
@@ -1055,6 +1129,8 @@ async function init() {
     renderQuizSetup();
     initSlogan();
     bindEvents();
+    await flushSyncQueue();
+    await loadCloudStats();
     renderAll();
     showAuth(!state.currentUser);
   } catch (error) {

@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { SpreadsheetFile, Workbook } from "@oai/artifact-tool";
 
-const outputDir = "/Users/liangyanmei/Documents/公司知识库网站/outputs/role_quiz";
+const outputDir = path.resolve("outputs/role_quiz");
 const outputPath = path.join(outputDir, "岗位学习考核题库.xlsx");
 const jsonOutputPath = path.join(outputDir, "岗位学习考核题库.json");
 
@@ -245,6 +245,41 @@ addJudge(
   true,
   "图文信息一致能减少客服解释和售后争议。"
 );
+
+
+const roleScenarios = {
+  审单: [
+    ["发现客户地址缺少门牌号，审单第一步应怎么处理？", ["先联系客户/客服补全关键信息，未确认前不要放行", "直接发货", "随便补一个门牌号", "删除订单"], 0, "地址信息不完整会导致派送失败，审单应先补全关键字段。"],
+    ["订单商品编码和备注规格不一致，应该怎么做？", ["暂停放行并核对商品编码、规格和客服备注", "按价格高的发", "按库存多的发", "忽略备注"], 0, "编码、规格、备注冲突属于异常订单，要先核对再处理。"],
+    ["客户要求改地址但订单已进入发货流程，审单应优先确认什么？", ["是否已出库/是否还能拦截修改", "客户星座", "商品图片", "店铺装修"], 0, "改地址要先确认物流节点，避免承诺无法执行。"],
+  ],
+  仓储: [
+    ["装箱前发现商品外包装破损，正确处理是？", ["拦截更换并记录异常", "照常发出", "用胶带随便粘一下", "把破损处朝内"], 0, "仓储要保证出库品质，破损件不能直接发出。"],
+    ["同一订单有多件易混商品，仓储应如何降低错发？", ["按订单逐项核对编码/品名/数量后再封箱", "凭印象拿货", "先封箱后核对", "只看第一件商品"], 0, "多件订单要逐项复核，尤其编码和规格。"],
+    ["月饼礼盒发货前最需要确认哪项？", ["礼袋/配件/箱规是否匹配订单要求", "员工午餐", "店铺头像", "客服昵称"], 0, "礼盒类商品常带礼袋或配件，漏放会影响体验。"],
+  ],
+  客服: [
+    ["客户问送礼选哪款，客服最应该先确认什么？", ["预算、人数、场景和收货时间", "客户生肖", "客服心情", "快递员姓名"], 0, "送礼推荐要先确认预算、场景、人数和时效。"],
+    ["客户反馈收到商品少件，客服第一步应做什么？", ["安抚客户并核对订单、包裹重量/装箱记录", "直接让客户差评", "拒绝处理", "要求客户重新下单"], 0, "少件售后要先安抚和核实证据，再给解决方案。"],
+    ["客户纠结两款产品，客服推荐时应重点说明什么？", ["差异点、适用场景和性价比", "只说都很好", "让客户自己猜", "只发链接不解释"], 0, "推荐要讲清差异和匹配场景，减少犹豫。"],
+  ],
+};
+for (const [roleName, items] of Object.entries(roleScenarios)) {
+  for (const [question, options, answer, explanation] of items) {
+    addQuestion({
+      bank: "岗位场景题库",
+      role: roleName,
+      module: `${roleName}实操`,
+      difficulty: "场景",
+      knowledgePoint: `${roleName}异常处理`,
+      question,
+      options,
+      answer,
+      explanation,
+      source: "金尊岗位实操场景补充",
+    });
+  }
+}
 
 const workbook = Workbook.create();
 const headers = [
