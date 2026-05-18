@@ -777,7 +777,178 @@ button {
 }
 
 .quiz-size-select {
-  width: 120px;
+  width: 220px;
+}
+
+.section-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.task-panel,
+.summary-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.task-panel {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.task-card,
+.summary-card,
+.admin-panel,
+.admin-alert,
+.mistake-summary {
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 8px;
+  background: var(--panel-solid);
+  box-shadow: 0 10px 34px rgba(23, 38, 58, 0.07);
+}
+
+.task-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.task-card > span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(0, 167, 181, 0.12);
+  color: #0b5b64;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.task-card.done > span {
+  color: #fff;
+  background: var(--green);
+}
+
+.task-card strong,
+.summary-card strong {
+  display: block;
+}
+
+.task-card small,
+.summary-card small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.summary-card {
+  padding: 16px;
+}
+
+.summary-card span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.summary-card strong {
+  margin: 8px 0 4px;
+  font-size: 28px;
+}
+
+.admin-alert {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  color: #8a5a10;
+  background: rgba(197, 146, 54, 0.11);
+  border-color: rgba(197, 146, 54, 0.24);
+  line-height: 1.6;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.admin-panel {
+  padding: 18px;
+  overflow: auto;
+}
+
+.admin-panel h4 {
+  margin: 0 0 12px;
+}
+
+.admin-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.admin-table th {
+  color: var(--muted);
+  background: #f8fafc;
+}
+
+.mistake-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.mistake-summary > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.wrong-review {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.wrong-review h4 {
+  margin: 0;
+}
+
+.wrong-review-item {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.wrong-review-item p,
+.wrong-review-item small {
+  display: block;
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.option-btn.selected {
+  border-color: rgba(0, 167, 181, 0.48);
+  background: rgba(0, 167, 181, 0.08);
 }
 
 .hidden {
@@ -987,7 +1158,13 @@ button {
   }
 
   .nav-tabs {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  .task-panel,
+  .summary-grid,
+  .admin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .nav-tab {
@@ -1027,8 +1204,21 @@ button {
 
   .bank-grid,
   .options,
-  .learn-option-images {
+  .learn-option-images,
+  .task-panel,
+  .summary-grid,
+  .admin-grid {
     grid-template-columns: 1fr;
+  }
+
+  .quiz-start-row,
+  .mistake-summary {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .quiz-size-select {
+    width: 100%;
   }
 
   .nav-tabs {

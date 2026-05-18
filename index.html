@@ -55,6 +55,7 @@
           <button class="nav-tab" data-view="learn">学习</button>
           <button class="nav-tab" data-view="quiz">考核</button>
           <button class="nav-tab" data-view="mistakes">错题</button>
+          <button class="nav-tab" data-view="admin">管理</button>
         </nav>
 
         <div class="side-panel">
@@ -107,6 +108,8 @@
             </div>
           </div>
 
+          <div id="taskPanel" class="task-panel"></div>
+          <div id="summaryCards" class="summary-grid"></div>
           <div id="bankCards" class="bank-grid"></div>
         </section>
 
@@ -167,6 +170,13 @@
             </div>
             <div class="quiz-start-row">
               <label class="mode-label">
+                考核类型
+                <select id="examType" class="select quiz-size-select">
+                  <option value="practice">练习模式：答后显示解析</option>
+                  <option value="formal">正式考试：交卷后统一出成绩</option>
+                </select>
+              </label>
+              <label class="mode-label">
                 抽题数量
                 <select id="quizSize" class="select quiz-size-select">
                   <option value="10">10 题</option>
@@ -202,9 +212,37 @@
               <p class="eyebrow">Review</p>
               <h3>错题本</h3>
             </div>
-            <button id="clearMistakesBtn" class="secondary-btn">清空错题</button>
+            <div class="section-actions">
+              <button id="retryMistakesBtn" class="primary-btn">重练错题</button>
+              <button id="clearMistakesBtn" class="secondary-btn">清空错题</button>
+            </div>
           </div>
           <div id="mistakeList" class="learn-list"></div>
+        </section>
+
+        <section id="adminView" class="view">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Admin</p>
+              <h3>管理看板</h3>
+            </div>
+            <div class="section-actions">
+              <button id="exportRecordsBtn" class="primary-btn">导出考试记录</button>
+              <button id="exportMistakesBtn" class="secondary-btn">导出错题</button>
+            </div>
+          </div>
+          <div class="admin-alert">当前是静态网页增强版：数据仍保存在本机浏览器。已先补齐管理看板、导出、错题重练、正式考试流程；后续接飞书多维表格后可升级为全员云端统计。</div>
+          <div id="adminMetrics" class="summary-grid"></div>
+          <div class="admin-grid">
+            <div class="admin-panel">
+              <h4>员工成绩概览</h4>
+              <div id="adminUserTable" class="admin-table"></div>
+            </div>
+            <div class="admin-panel">
+              <h4>高频错题 / 薄弱知识点</h4>
+              <div id="adminWeakList" class="admin-table"></div>
+            </div>
+          </div>
         </section>
       </main>
     </div>

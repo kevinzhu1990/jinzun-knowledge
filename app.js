@@ -10,7 +10,9 @@ const state = {
   score: 0,
   answered: false,
   quizMode: "random",
+  examType: "practice",
   quizWrong: 0,
+  wrongDetails: [],
   currentUser: null,
 };
 
@@ -22,12 +24,15 @@ const els = {
     learn: document.querySelector("#learnView"),
     quiz: document.querySelector("#quizView"),
     mistakes: document.querySelector("#mistakesView"),
+    admin: document.querySelector("#adminView"),
   },
   pageTitle: document.querySelector("#pageTitle"),
   bankSelect: document.querySelector("#bankSelect"),
   bankCount: document.querySelector("#bankCount"),
   mistakeCount: document.querySelector("#mistakeCount"),
   accuracyText: document.querySelector("#accuracyText"),
+  taskPanel: document.querySelector("#taskPanel"),
+  summaryCards: document.querySelector("#summaryCards"),
   bankCards: document.querySelector("#bankCards"),
   learnFilter: document.querySelector("#learnFilter"),
   learnList: document.querySelector("#learnList"),
@@ -40,6 +45,7 @@ const els = {
   quizRunner: document.querySelector("#quizRunner"),
   quizResult: document.querySelector("#quizResult"),
   startQuizBtn: document.querySelector("#startQuizBtn"),
+  examType: document.querySelector("#examType"),
   quizSize: document.querySelector("#quizSize"),
   productBankSelect: document.querySelector("#productBankSelect"),
   roleBankSelect: document.querySelector("#roleBankSelect"),
@@ -51,7 +57,13 @@ const els = {
   progressBar: document.querySelector("#progressBar"),
   quizCard: document.querySelector("#quizCard"),
   mistakeList: document.querySelector("#mistakeList"),
+  retryMistakesBtn: document.querySelector("#retryMistakesBtn"),
   clearMistakesBtn: document.querySelector("#clearMistakesBtn"),
+  adminMetrics: document.querySelector("#adminMetrics"),
+  adminUserTable: document.querySelector("#adminUserTable"),
+  adminWeakList: document.querySelector("#adminWeakList"),
+  exportRecordsBtn: document.querySelector("#exportRecordsBtn"),
+  exportMistakesBtn: document.querySelector("#exportMistakesBtn"),
   authView: document.querySelector("#authView"),
   authForm: document.querySelector("#authForm"),
   authName: document.querySelector("#authName"),
@@ -172,6 +184,7 @@ const pageTitles = {
   learn: "学习题库",
   quiz: "随机考核",
   mistakes: "错题复习",
+  admin: "管理看板",
 };
 
 const normalize = (value) => String(value ?? "").toLowerCase().trim();
@@ -211,6 +224,34 @@ const shuffle = (items) => {
   }
   return arr;
 };
+
+const downloadText = (filename, content, type = "text/csv;charset=utf-8") => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+const csvCell = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+
+const toCsv = (headers, rows) => {
+  const lines = [headers.map(csvCell).join(",")];
+  rows.forEach((row) => lines.push(headers.map((header) => csvCell(row[header])).join(",")));
+  return `\uFEFF${lines.join("\n")}`;
+};
+
+const todayKey = () => new Date().toISOString().slice(0, 10);
+
+const getUserRecords = (phone) =>
+  JSON.parse(localStorage.getItem(`jz_${phone}_exam_records`) || "[]");
+
+const getUserMistakes = (phone) =>
+  JSON.parse(localStorage.getItem(`jz_${phone}_mistakes`) || "[]");
 
 async function loadQuestions() {
   const [productRes, roleRes] = await Promise.all([fetch(productUrl), fetch(roleUrl)]);
@@ -267,6 +308,37 @@ function renderStats() {
 }
 
 function renderDashboard() {
+  const records = storage.examRecords;
+  const mistakes = storage.mistakes;
+  const todayRecords = records.filter((record) => String(record.finishedAt || "").startsWith(todayKey()));
+  const best = records.reduce((acc, record) => Math.max(acc, Number(record.percent) || 0), 0);
+  const last = records[0];
+
+  els.taskPanel.innerHTML = `
+    <div class="task-card ${todayRecords.length ? "done" : ""}">
+      <span>${todayRecords.length ? "✓" : "1"}</span>
+      <div><strong>完成今日考核</strong><small>${todayRecords.length ? `今日已完成 ${todayRecords.length} 次` : "建议先做 30-50 题正式考核"}</small></div>
+    </div>
+    <div class="task-card ${mistakes.length === 0 ? "done" : ""}">
+      <span>${mistakes.length === 0 ? "✓" : "2"}</span>
+      <div><strong>复习错题</strong><small>${mistakes.length ? `还有 ${mistakes.length} 道错题待重练` : "当前没有待复习错题"}</small></div>
+    </div>
+    <div class="task-card ${best >= 90 ? "done" : ""}">
+      <span>${best >= 90 ? "✓" : "3"}</span>
+      <div><strong>冲刺优秀</strong><small>${best >= 90 ? `最佳成绩 ${best} 分` : `距离优秀还差 ${Math.max(0, 90 - best)} 分`}</small></div>
+    </div>
+  `;
+
+  const total = state.allQuestions.length;
+  const productTotal = state.allQuestions.filter((q) => PRODUCT_BANKS.includes(q.bank)).length;
+  const roleTotal = total - productTotal;
+  els.summaryCards.innerHTML = `
+    <div class="summary-card"><span>题库总量</span><strong>${total}</strong><small>覆盖产品与岗位</small></div>
+    <div class="summary-card"><span>产品题</span><strong>${productTotal}</strong><small>月饼 / 年货 / 耗材</small></div>
+    <div class="summary-card"><span>岗位题</span><strong>${roleTotal}</strong><small>运营 / 客服 / 美工等</small></div>
+    <div class="summary-card"><span>最近成绩</span><strong>${last ? `${last.percent}分` : "--"}</strong><small>${last ? examTimeLabel(last.finishedAt) : "暂无考试记录"}</small></div>
+  `;
+
   const grouped = banks()
     .filter((bank) => bank !== "全部题库")
     .map((bank) => ({
@@ -295,6 +367,13 @@ function renderDashboard() {
       renderAll();
     });
   });
+}
+
+function examTimeLabel(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 function renderQuestionImages(question) {
@@ -454,6 +533,8 @@ function startQuiz() {
   state.score = 0;
   state.answered = false;
   state.quizWrong = 0;
+  state.wrongDetails = [];
+  state.examType = els.examType?.value || "practice";
   startTimer();
   updateWrongCount();
   els.quizSetup.classList.add("hidden");
@@ -521,22 +602,29 @@ function chooseAnswer(letter) {
     state.score += 1;
   } else {
     state.quizWrong += 1;
+    state.wrongDetails.push({ ...question, selected: letter, savedAt: new Date().toISOString() });
     updateWrongCount();
     saveMistake(question, letter);
   }
   els.quizScore.textContent = `${state.score} 分`;
   els.quizCard.querySelectorAll(".option-btn").forEach((button) => {
     button.disabled = true;
-    if (button.dataset.letter === question.answer) button.classList.add("correct");
-    if (button.dataset.letter === letter && !correct) button.classList.add("wrong");
+    if (state.examType === "practice" && button.dataset.letter === question.answer) button.classList.add("correct");
+    if (state.examType === "practice" && button.dataset.letter === letter && !correct) button.classList.add("wrong");
+    if (state.examType === "formal" && button.dataset.letter === letter) button.classList.add("selected");
   });
   const feedback = document.querySelector("#feedback");
   feedback.classList.remove("hidden");
-  feedback.innerHTML = `
+  const isLast = state.quizIndex + 1 === state.quiz.length;
+  feedback.innerHTML = state.examType === "formal" ? `
+    <strong>已作答</strong>
+    <p class="explain">正式考试模式：交卷后统一展示成绩和错题解析。</p>
+    <button class="primary-btn next-btn" id="nextQuestionBtn">${isLast ? "交卷看成绩" : "下一题"}</button>
+  ` : `
     <strong>${correct ? "回答正确" : "回答错误"}</strong>
     <p class="explain">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(question.answerText)}</p>
     <p class="explain">${escapeHtml(question.explanation)}</p>
-    <button class="primary-btn next-btn" id="nextQuestionBtn">${state.quizIndex + 1 === state.quiz.length ? "查看成绩" : "下一题"}</button>
+    <button class="primary-btn next-btn" id="nextQuestionBtn">${isLast ? "查看成绩" : "下一题"}</button>
   `;
   document.querySelector("#nextQuestionBtn").addEventListener("click", () => {
     state.quizIndex += 1;
@@ -559,15 +647,30 @@ function finishQuiz() {
   saveExamRecord(percent);
   els.quizRunner.classList.add("hidden");
   els.quizResult.classList.remove("hidden");
+  const wrongReview = state.wrongDetails.length ? `
+    <div class="wrong-review">
+      <h4>本次错题解析</h4>
+      ${state.wrongDetails.slice(0, 8).map((q, i) => `
+        <div class="wrong-review-item">
+          <strong>${i + 1}. ${escapeHtml(q.question)}</strong>
+          <p>错选：${escapeHtml(q.selected)}｜正确：${escapeHtml(q.answer)} ${escapeHtml(q.answerText)}</p>
+          <small>${escapeHtml(q.explanation)}</small>
+        </div>
+      `).join("")}
+      ${state.wrongDetails.length > 8 ? `<p class="explain">更多错题已进入错题本。</p>` : ""}
+    </div>
+  ` : "";
   els.quizResult.innerHTML = `
-    <p class="eyebrow">Result · ${escapeHtml(examLabel())}</p>
+    <p class="eyebrow">Result · ${escapeHtml(examLabel())} · ${state.examType === "formal" ? "正式考试" : "练习模式"}</p>
     <h3>${percent} 分</h3>
     <div class="result-meta">
       <span>✓ 答对 ${state.score} 题</span>
       <span class="${state.quizWrong > 0 ? "result-wrong" : ""}">✗ 答错 ${state.quizWrong} 题</span>
       <span>⏱ 用时 ${timeStr}</span>
+      <span>${percent >= 80 ? "已通过" : "未通过"}</span>
     </div>
-    <p class="explain">${percent >= 90 ? "表现很稳，可以进入下一组题库。" : "建议先复习错题，再重新考一次。"}</p>
+    <p class="explain">${percent >= 90 ? "表现很稳，可以进入下一组题库。" : percent >= 80 ? "已达到合格线，建议继续重练错题冲刺优秀。" : "建议先复习错题，再重新考一次。"}</p>
+    ${wrongReview}
     <div class="result-actions">
       <button class="primary-btn" id="retryQuizBtn">重新考核</button>
       <button class="secondary-btn" id="reviewMistakesBtn">查看错题</button>
@@ -589,9 +692,12 @@ function saveExamRecord(percent) {
   records.unshift({
     user: state.currentUser,
     bank: examLabel(),
+    type: state.examType === "formal" ? "正式考试" : "练习模式",
     score: state.score,
     total: state.quiz.length,
+    wrong: state.quizWrong,
     percent,
+    passed: percent >= 80,
     duration: timerSeconds,
     finishedAt: new Date().toISOString(),
   });
@@ -600,30 +706,63 @@ function saveExamRecord(percent) {
 
 function renderMistakes() {
   const mistakes = storage.mistakes;
+  els.retryMistakesBtn.disabled = !mistakes.length;
   if (!mistakes.length) {
     els.mistakeList.innerHTML = `<div class="empty">现在还没有错题记录。</div>`;
     return;
   }
-  els.mistakeList.innerHTML = mistakes
-    .map(
-      (question) => `
-        <article class="learn-item">
-          <div>
-            <div class="meta">
-              <span>${escapeHtml(question.bank)}</span>
-              <span>${escapeHtml(question.knowledgePoint)}</span>
-              <span>错选：${escapeHtml(question.selected)}</span>
+  const grouped = mistakes.reduce((acc, q) => {
+    const key = q.knowledgePoint || "其他";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const topTags = Object.entries(grouped).sort((a, b) => b[1] - a[1]).slice(0, 6)
+    .map(([name, count]) => `<span class="pill">${escapeHtml(name)} ${count}</span>`).join("");
+  els.mistakeList.innerHTML = `
+    <div class="mistake-summary">
+      <strong>待复习 ${mistakes.length} 道</strong>
+      <div>${topTags}</div>
+    </div>
+    ${mistakes
+      .map(
+        (question) => `
+          <article class="learn-item">
+            <div>
+              <div class="meta">
+                <span>${escapeHtml(question.bank)}</span>
+                <span>${escapeHtml(question.knowledgePoint)}</span>
+                <span>错选：${escapeHtml(question.selected)}</span>
+              </div>
+              <h4>${escapeHtml(question.question)}</h4>
+              <p class="answer-line">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(question.answerText)}</p>
+              <p class="explain">${escapeHtml(question.explanation)}</p>
+              ${renderOptionImages(question)}
             </div>
-            <h4>${escapeHtml(question.question)}</h4>
-            <p class="answer-line">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(question.answerText)}</p>
-            <p class="explain">${escapeHtml(question.explanation)}</p>
-            ${renderOptionImages(question)}
-          </div>
-          ${renderQuestionImages(question)}
-        </article>
-      `
-    )
-    .join("");
+            ${renderQuestionImages(question)}
+          </article>
+        `
+      )
+      .join("")}
+  `;
+}
+
+function startMistakeQuiz() {
+  const mistakes = storage.mistakes;
+  if (!mistakes.length) return;
+  state.quiz = shuffle(mistakes).slice(0, Math.min(30, mistakes.length));
+  state.quizIndex = 0;
+  state.score = 0;
+  state.answered = false;
+  state.quizWrong = 0;
+  state.wrongDetails = [];
+  state.examType = "practice";
+  startTimer();
+  updateWrongCount();
+  switchView("quiz");
+  els.quizSetup.classList.add("hidden");
+  els.quizResult.classList.add("hidden");
+  els.quizRunner.classList.remove("hidden");
+  renderQuizCard();
 }
 
 let rankSortMode = "score";
@@ -692,6 +831,94 @@ function renderRanking() {
   });
 }
 
+function renderAdmin() {
+  const users = Object.values(userStore.users);
+  const rows = users.map((user) => {
+    const records = getUserRecords(user.phone);
+    const mistakes = getUserMistakes(user.phone);
+    const best = records.reduce((acc, record) => (Number(record.percent) > Number(acc?.percent || -1) ? record : acc), null);
+    const latest = records[0];
+    return { user, records, mistakes, best, latest };
+  });
+  const allRecords = rows.flatMap((row) => row.records.map((record) => ({ ...record, user: row.user })));
+  const avg = allRecords.length ? Math.round(allRecords.reduce((sum, r) => sum + Number(r.percent || 0), 0) / allRecords.length) : 0;
+  const passed = allRecords.filter((r) => Number(r.percent) >= 80).length;
+  const passRate = allRecords.length ? Math.round((passed / allRecords.length) * 100) : 0;
+  const notExam = rows.filter((row) => !row.records.length).length;
+
+  els.adminMetrics.innerHTML = `
+    <div class="summary-card"><span>员工数</span><strong>${users.length}</strong><small>本机已登录账号</small></div>
+    <div class="summary-card"><span>考试次数</span><strong>${allRecords.length}</strong><small>正式+练习记录</small></div>
+    <div class="summary-card"><span>平均分</span><strong>${avg}</strong><small>全部考试记录</small></div>
+    <div class="summary-card"><span>通过率</span><strong>${passRate}%</strong><small>80 分以上通过，未考 ${notExam} 人</small></div>
+  `;
+
+  els.adminUserTable.innerHTML = rows.length ? `
+    <table>
+      <thead><tr><th>姓名</th><th>岗位</th><th>次数</th><th>最佳</th><th>最近</th><th>错题</th></tr></thead>
+      <tbody>
+        ${rows.map(({ user, records, mistakes, best, latest }) => `
+          <tr>
+            <td>${escapeHtml(user.name)}</td>
+            <td>${escapeHtml(user.role)}</td>
+            <td>${records.length}</td>
+            <td>${best ? `${best.percent}分` : "未考"}</td>
+            <td>${latest ? `${latest.percent}分 · ${examTimeLabel(latest.finishedAt)}` : "--"}</td>
+            <td>${mistakes.length}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  ` : `<div class="empty">暂无员工记录。</div>`;
+
+  const allMistakes = rows.flatMap((row) => row.mistakes);
+  const weak = allMistakes.reduce((acc, q) => {
+    const key = q.knowledgePoint || q.bank || "其他";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const weakRows = Object.entries(weak).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  els.adminWeakList.innerHTML = weakRows.length ? `
+    <table><thead><tr><th>知识点</th><th>错题数</th></tr></thead><tbody>
+      ${weakRows.map(([name, count]) => `<tr><td>${escapeHtml(name)}</td><td>${count}</td></tr>`).join("")}
+    </tbody></table>
+  ` : `<div class="empty">暂无错题统计。</div>`;
+}
+
+function exportRecords() {
+  const rows = Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).map((record) => ({
+    姓名: user.name,
+    手机号: user.phone,
+    岗位: user.role,
+    考核类型: record.type || "练习模式",
+    题库: record.bank,
+    分数: record.percent,
+    答对: record.score,
+    总题数: record.total,
+    错题数: record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
+    是否通过: Number(record.percent) >= 80 ? "是" : "否",
+    用时秒: record.duration,
+    完成时间: record.finishedAt,
+  })));
+  downloadText(`金尊考试记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "考核类型", "题库", "分数", "答对", "总题数", "错题数", "是否通过", "用时秒", "完成时间"], rows));
+}
+
+function exportMistakes() {
+  const rows = Object.values(userStore.users).flatMap((user) => getUserMistakes(user.phone).map((q) => ({
+    姓名: user.name,
+    手机号: user.phone,
+    岗位: user.role,
+    题库: q.bank,
+    知识点: q.knowledgePoint,
+    题目: q.question,
+    错选: q.selected,
+    正确答案: `${q.answer} ${q.answerText}`,
+    解析: q.explanation,
+    记录时间: q.savedAt,
+  })));
+  downloadText(`金尊错题记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "题库", "知识点", "题目", "错选", "正确答案", "解析", "记录时间"], rows));
+}
+
 function switchView(view) {
   state.currentView = view;
   els.navTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.view === view));
@@ -704,6 +931,7 @@ function switchView(view) {
   }
   if (view === "ranking") renderRanking();
   if (view === "mistakes") renderMistakes();
+  if (view === "admin") renderAdmin();
 }
 
 function renderAll() {
@@ -712,6 +940,7 @@ function renderAll() {
   renderLearnFilter();
   renderLearnList();
   renderMistakes();
+  renderAdmin();
 }
 
 function renderUser() {
@@ -789,6 +1018,9 @@ function bindEvents() {
   });
   els.searchInput.addEventListener("input", renderAll);
   els.startQuizBtn.addEventListener("click", startQuiz);
+  els.retryMistakesBtn.addEventListener("click", startMistakeQuiz);
+  els.exportRecordsBtn.addEventListener("click", exportRecords);
+  els.exportMistakesBtn.addEventListener("click", exportMistakes);
   document.querySelectorAll(".mode-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
       state.quizMode = tab.dataset.mode;
