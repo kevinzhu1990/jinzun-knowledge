@@ -167,6 +167,9 @@ const productLineOverrides = new Map([
   ["1918", "曲奇/饼干类"],
   ["2223", "月饼-礼盒"],
   ["2587", "糕点礼盒类"],
+  ["2576", "糕点类"],
+  ["2577", "糕点类"],
+  ["2578", "糕点类"],
 ]);
 for (const row of sourceRows) {
   const override = productLineOverrides.get(row.code);
