@@ -165,6 +165,7 @@ const mooncakeRowsByCode = new Map(sourceRows.filter((row) => row.category === "
 
 const productLineOverrides = new Map([
   ["1918", "曲奇/饼干类"],
+  ["2223", "月饼-礼盒"],
 ]);
 for (const row of sourceRows) {
   const override = productLineOverrides.get(row.code);
