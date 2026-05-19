@@ -175,6 +175,7 @@ const productLineOverrides = new Map([
 for (const row of sourceRows) {
   const override = productLineOverrides.get(row.code);
   if (override) row.productLine = override;
+  if (row.code.includes("ZX")) row.productLine = "包装/耗材";
 }
 
 const pickDistractors = (answer, pool, fallbackPool, count = 3) => {
