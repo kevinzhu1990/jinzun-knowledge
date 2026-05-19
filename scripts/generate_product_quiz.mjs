@@ -458,26 +458,28 @@ const addScenarioQuestions = () => {
   const productLines = unique(sourceRows.map((row) => row.productLine || row.category));
   let scenarioIndex = 1;
   for (const row of sourceRows.slice(0, 260)) {
-    const serviceOptions = shuffle([row.name, ...pickDistractors(row.name, productNames, productNames)], `${row.code}-客服推荐`).slice(0, 4);
-    questions.push({
-      id: `S-${String(scenarioIndex++).padStart(4, "0")}`,
-      bank: "业务场景题库",
-      category: row.category,
-      productLine: row.productLine,
-      code: row.code,
-      productName: row.name,
-      type: "单选题",
-      difficulty: "场景",
-      knowledgePoint: "客服推荐",
-      question: `客户想找“${row.productLine || row.category}”相关产品，客服优先推荐哪一款最准确？`,
-      optionA: serviceOptions[0], optionB: serviceOptions[1], optionC: serviceOptions[2], optionD: serviceOptions[3],
-      answer: letters[serviceOptions.findIndex((option) => option === row.name)],
-      answerText: row.name,
-      explanation: `题干需求指向 ${row.productLine || row.category}，应优先匹配产品 ${row.code} ${row.name}，避免推荐到不相关品类。`,
-      questionImage: "", optionAImage: "", optionBImage: "", optionCImage: "", optionDImage: "",
-      source: "金尊产品知识库/业务场景补充",
-      note: "",
-    });
+    if (row.category !== "包装/耗材" && row.productLine !== "包装/耗材") {
+      const serviceOptions = shuffle([row.name, ...pickDistractors(row.name, productNames, productNames)], `${row.code}-客服推荐`).slice(0, 4);
+      questions.push({
+        id: `S-${String(scenarioIndex++).padStart(4, "0")}`,
+        bank: "业务场景题库",
+        category: row.category,
+        productLine: row.productLine,
+        code: row.code,
+        productName: row.name,
+        type: "单选题",
+        difficulty: "场景",
+        knowledgePoint: "客服推荐",
+        question: `客户想找“${row.productLine || row.category}”相关产品，客服优先推荐哪一款最准确？`,
+        optionA: serviceOptions[0], optionB: serviceOptions[1], optionC: serviceOptions[2], optionD: serviceOptions[3],
+        answer: letters[serviceOptions.findIndex((option) => option === row.name)],
+        answerText: row.name,
+        explanation: `题干需求指向 ${row.productLine || row.category}，应优先匹配产品 ${row.code} ${row.name}，避免推荐到不相关品类。`,
+        questionImage: "", optionAImage: "", optionBImage: "", optionCImage: "", optionDImage: "",
+        source: "金尊产品知识库/业务场景补充",
+        note: "",
+      });
+    }
     const lineAnswer = row.productLine || row.category;
     const lineOptions = shuffle([lineAnswer, ...pickDistractors(lineAnswer, productLines, productLines)], `${row.code}-运营活动`).slice(0, 4);
     questions.push({
