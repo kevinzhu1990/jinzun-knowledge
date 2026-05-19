@@ -163,6 +163,14 @@ const allValues = (field) => unique(sourceRows.map((row) => row[field]));
 const dailyRowsByCode = new Map(sourceRows.filter((row) => row.category === "日常年货产品").map((row) => [row.code, row]));
 const mooncakeRowsByCode = new Map(sourceRows.filter((row) => row.category === "月饼产品").map((row) => [row.code, row]));
 
+const productLineOverrides = new Map([
+  ["1918", "曲奇/饼干类"],
+]);
+for (const row of sourceRows) {
+  const override = productLineOverrides.get(row.code);
+  if (override) row.productLine = override;
+}
+
 const pickDistractors = (answer, pool, fallbackPool, count = 3) => {
   const cleanAnswer = normalizeText(answer);
   const merged = unique([...pool, ...fallbackPool])
