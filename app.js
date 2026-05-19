@@ -558,6 +558,8 @@ const PRODUCT_BANKS = ["月饼题库", "日常年货题库", "纸箱耗材题库
 
 let timerInterval = null;
 let timerSeconds = 0;
+let timerLimitSeconds = 0;
+let timerExpired = false;
 
 function formatTime(s) {
   const m = Math.floor(s / 60).toString().padStart(2, "0");
@@ -565,13 +567,29 @@ function formatTime(s) {
   return `${m}:${sec}`;
 }
 
-function startTimer() {
+function quizTimeLimit(size) {
+  // 50题=20分钟，按比例给时间：每题24秒；10题=4分钟。
+  return Math.max(60, Math.round(size * 24));
+}
+
+function updateTimerText() {
+  const remaining = Math.max(0, timerLimitSeconds - timerSeconds);
+  els.quizTimer.textContent = `⏳ 剩余 ${formatTime(remaining)}`;
+}
+
+function startTimer(limitSeconds) {
   clearInterval(timerInterval);
   timerSeconds = 0;
-  els.quizTimer.textContent = `⏱ 00:00`;
+  timerExpired = false;
+  timerLimitSeconds = limitSeconds || quizTimeLimit(state.quiz.length || EXAM_SIZE);
+  updateTimerText();
   timerInterval = setInterval(() => {
     timerSeconds += 1;
-    els.quizTimer.textContent = `⏱ ${formatTime(timerSeconds)}`;
+    updateTimerText();
+    if (timerSeconds >= timerLimitSeconds) {
+      timerExpired = true;
+      finishQuiz();
+    }
   }, 1000);
 }
 
@@ -631,7 +649,7 @@ function startQuiz() {
   state.quizWrong = 0;
   state.wrongDetails = [];
   state.examType = els.examType?.value || "practice";
-  startTimer();
+  startTimer(quizTimeLimit(state.quiz.length));
   updateWrongCount();
   els.quizSetup.classList.add("hidden");
   els.quizResult.classList.add("hidden");
@@ -763,6 +781,7 @@ function finishQuiz() {
   els.quizResult.innerHTML = `
     <p class="eyebrow">Result · ${escapeHtml(examLabel())} · ${state.examType === "formal" ? "正式考试" : "练习模式"}</p>
     <h3>${percent} 分</h3>
+    ${timerExpired ? `<p class="explain result-wrong">时间到，已自动交卷。</p>` : ""}
     <div class="result-meta">
       <span>✓ 答对 ${state.score} 题</span>
       <span class="${state.quizWrong > 0 ? "result-wrong" : ""}">✗ 答错 ${state.quizWrong} 题</span>
@@ -857,7 +876,7 @@ function startMistakeQuiz() {
   state.quizWrong = 0;
   state.wrongDetails = [];
   state.examType = "practice";
-  startTimer();
+  startTimer(quizTimeLimit(state.quiz.length));
   updateWrongCount();
   switchView("quiz");
   els.quizSetup.classList.add("hidden");
