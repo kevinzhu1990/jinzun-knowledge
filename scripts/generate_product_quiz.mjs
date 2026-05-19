@@ -169,6 +169,7 @@ const skippedKnowledgePointsByCode = new Map([
 ]);
 
 const productLineOverrides = new Map([
+  ["2231", "糕点礼盒类"],
   ["2179", "曲奇/饼干类"],
   ["1918", "曲奇/饼干类"],
   ["2223", "月饼-礼盒"],
