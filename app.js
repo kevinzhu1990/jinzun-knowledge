@@ -659,7 +659,8 @@ function renderQuizCard() {
     <h3>${escapeHtml(question.question)}</h3>
     ${question.questionImage ? (() => {
       const isMooncake = question.questionImage.includes('/mooncake/');
-      return `<div class="quiz-img-wrap${isMooncake ? ' quiz-img-crop-moon' : ''}">
+      const isDailyProduct = question.questionImage.includes('/daily/');
+      return `<div class="quiz-img-wrap${isMooncake ? ' quiz-img-crop-moon' : ''}${isDailyProduct ? ' quiz-img-crop-daily' : ''}">
         <img src="${imagePath(question.questionImage)}" alt="题目图片" />
       </div>`;
     })() : ""}
@@ -671,7 +672,8 @@ function renderQuizCard() {
               <strong>${letter}</strong>${escapeHtml(stripCodeFromOption(text, question.knowledgePoint))}
               ${img ? (() => {
                 const isMooncake = img.includes('/mooncake/');
-                return `<div class="quiz-opt-img${isMooncake ? ' quiz-img-crop-moon' : ''}">
+                const isDailyProduct = img.includes('/daily/');
+                return `<div class="quiz-opt-img${isMooncake ? ' quiz-img-crop-moon' : ''}${isDailyProduct ? ' quiz-img-crop-daily' : ''}">
                   <img src="${imagePath(img)}" alt="选项${letter}图片" />
                 </div>`;
               })() : ""}

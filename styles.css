@@ -1057,6 +1057,12 @@ button {
   aspect-ratio: 790 / 355;
 }
 
+/* Crop daily-product quiz images too: original 1440×1440 posters often show
+   the product name/spec text in the lower info card, which gives away answers. */
+.quiz-img-crop-daily {
+  aspect-ratio: 1440 / 760;
+}
+
 .options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
