@@ -87,7 +87,8 @@ const retiredCodes = new Set([
   "2429",
   "2431",
   "2532",
-  "2551"
+  "2551",
+  "气泡膜"
 ]);
 const isRetiredCode = (code) => [...retiredCodes].some((retiredCode) => String(code).startsWith(retiredCode));
 
