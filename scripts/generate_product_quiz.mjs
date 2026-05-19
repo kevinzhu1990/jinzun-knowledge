@@ -163,6 +163,10 @@ const allValues = (field) => unique(sourceRows.map((row) => row[field]));
 const dailyRowsByCode = new Map(sourceRows.filter((row) => row.category === "日常年货产品").map((row) => [row.code, row]));
 const mooncakeRowsByCode = new Map(sourceRows.filter((row) => row.category === "月饼产品").map((row) => [row.code, row]));
 
+const skippedKnowledgePointsByCode = new Map([
+  ["2295", new Set(["保质期"])],
+]);
+
 const productLineOverrides = new Map([
   ["1918", "曲奇/饼干类"],
   ["2223", "月饼-礼盒"],
@@ -332,7 +336,8 @@ for (const row of sourceRows) {
     );
   }
 
-  questions.push(...candidates.filter(Boolean));
+  const skippedKnowledgePoints = skippedKnowledgePointsByCode.get(row.code) ?? new Set();
+  questions.push(...candidates.filter((question) => question && !skippedKnowledgePoints.has(question.knowledgePoint)));
 }
 
 const loadImageRows = async ({ inputDir, assetDir, rowsByCode, assetSegment }) => {
