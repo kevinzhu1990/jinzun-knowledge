@@ -555,6 +555,7 @@ function renderLearnList() {
 }
 
 const PRODUCT_BANKS = ["月饼题库", "日常年货题库", "纸箱耗材题库"];
+const CORE_EXAM_BANKS = ["月饼题库", "日常年货题库"];
 
 let timerInterval = null;
 let timerSeconds = 0;
@@ -637,10 +638,10 @@ function startQuiz() {
     const bank = els.roleBankSelect.value;
     const roleQs = state.allQuestions.filter((q) => q.bank === bank);
     const needed = Math.max(0, size - roleQs.length);
-    const productPool = shuffle(state.allQuestions.filter((q) => PRODUCT_BANKS.includes(q.bank)));
+    const productPool = shuffle(state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank)));
     pool = [...roleQs, ...productPool.slice(0, needed)];
   } else {
-    pool = state.allQuestions;
+    pool = state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank));
   }
   state.quiz = shuffle(pool).slice(0, Math.min(size, pool.length));
   state.quizIndex = 0;
