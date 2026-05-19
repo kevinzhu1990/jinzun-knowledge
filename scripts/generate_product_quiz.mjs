@@ -35,6 +35,24 @@ const normalizeText = (value) =>
     .replace(/；\s*；/g, "；")
     .trim();
 
+const canonicalShelfLife = (value) => {
+  const text = normalizeText(value);
+  const digits = text.match(/\d+/)?.[0];
+  if (!digits) return text;
+  const number = Number(digits);
+  const days = text.includes("天") ? number : text.includes("月") ? number * 30 : number;
+  const map = new Map([
+    [30, "30天"],
+    [45, "45天"],
+    [90, "90天/3个月"],
+    [180, "180天/6个月"],
+    [270, "270天/9个月"],
+    [300, "300天/10个月"],
+    [360, "360天/12个月"],
+  ]);
+  return map.get(days) ?? text;
+};
+
 const sourceRows = rows
   .slice(1)
   .map((row) => ({
@@ -47,7 +65,7 @@ const sourceRows = rows
     specification: normalizeText(get(row, "规格")),
     cartonSpec: normalizeText(get(row, "箱规")),
     contents: normalizeText(get(row, "内配/口味")),
-    shelfLife: normalizeText(get(row, "保质期")),
+    shelfLife: canonicalShelfLife(get(row, "保质期")),
     productSize: normalizeText(get(row, "产品尺寸")),
     unitWeight: normalizeText(get(row, "单品重量kg")),
     outerBoxSize: normalizeText(get(row, "外箱尺寸")),

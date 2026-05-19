@@ -209,6 +209,24 @@ const pageTitles = {
 
 const normalize = (value) => String(value ?? "").toLowerCase().trim();
 
+const shelfLifeDays = (value) => {
+  const text = String(value ?? "").trim();
+  const digits = text.match(/\d+/)?.[0];
+  if (!digits) return null;
+  const number = Number(digits);
+  if (text.includes("天")) return number;
+  return text.includes("月") ? number * 30 : number;
+};
+
+const isEquivalentAnswer = (question, selectedLetter) => {
+  if (selectedLetter === question.answer) return true;
+  if (question.knowledgePoint !== "保质期") return false;
+  const selected = optionEntries(question).find(([letter]) => letter === selectedLetter)?.[1];
+  const selectedDays = shelfLifeDays(selected);
+  const answerDays = shelfLifeDays(question.answerText);
+  return selectedDays !== null && answerDays !== null && selectedDays === answerDays;
+};
+
 // Strip product code from option text for quiz display.
 // Only applied to 产品名称 questions where the code in the option text gives away the answer.
 const stripCodeFromOption = (text, knowledgePoint) => {
@@ -666,7 +684,7 @@ function chooseAnswer(letter) {
   if (state.answered) return;
   state.answered = true;
   const question = state.quiz[state.quizIndex];
-  const correct = letter === question.answer;
+  const correct = isEquivalentAnswer(question, letter);
   storage.attempts += 1;
   if (correct) {
     storage.correct += 1;
