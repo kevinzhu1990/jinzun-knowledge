@@ -232,9 +232,16 @@ const isEquivalentAnswer = (question, selectedLetter) => {
 const stripCodeFromOption = (text, knowledgePoint) => {
   if (knowledgePoint !== "产品名称" || !text) return text;
   return text
-    .replace(/^\d{4}/, "")          // "2421澳门八星..." → "澳门八星..."
-    .replace(/【[^】]+】/g, "")     // "礼盒【0206】2盒装" → "礼盒2盒装"
+    .replace(/^\d{4}[A-Za-z]?\s*/, "") // "2232A 金尊..." / "2421澳门八星..." → "金尊..." / "澳门八星..."
+    .replace(/【[^】]+】/g, "")          // "礼盒【0206】2盒装" → "礼盒2盒装"
     .trim();
+};
+
+const displayAnswerText = (question) => stripCodeFromOption(question.answerText, question.knowledgePoint);
+const displayExplanation = (question) => {
+  if (question.knowledgePoint !== "产品名称") return question.explanation;
+  const name = displayAnswerText(question);
+  return `${question.code} 对应的产品名称是：${name}。`;
 };
 
 const imagePath = (src) => (src ? `./${src}` : "");
@@ -536,8 +543,8 @@ function renderLearnList() {
               <span>${escapeHtml(question.knowledgePoint)}</span>
             </div>
             <h4>${escapeHtml(question.question)}</h4>
-            <p class="answer-line">答案：${escapeHtml(question.answer)}｜${escapeHtml(question.answerText)}</p>
-            <p class="explain">${escapeHtml(question.explanation)}</p>
+            <p class="answer-line">答案：${escapeHtml(question.answer)}｜${escapeHtml(displayAnswerText(question))}</p>
+            <p class="explain">${escapeHtml(displayExplanation(question))}</p>
             ${renderOptionImages(question)}
           </div>
           ${renderQuestionImages(question)}
@@ -711,8 +718,8 @@ function chooseAnswer(letter) {
     <button class="primary-btn next-btn" id="nextQuestionBtn">${isLast ? "交卷看成绩" : "下一题"}</button>
   ` : `
     <strong>${correct ? "回答正确" : "回答错误"}</strong>
-    <p class="explain">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(question.answerText)}</p>
-    <p class="explain">${escapeHtml(question.explanation)}</p>
+    <p class="explain">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(displayAnswerText(question))}</p>
+    <p class="explain">${escapeHtml(displayExplanation(question))}</p>
     <button class="primary-btn next-btn" id="nextQuestionBtn">${isLast ? "查看成绩" : "下一题"}</button>
   `;
   document.querySelector("#nextQuestionBtn").addEventListener("click", () => {
@@ -744,8 +751,8 @@ function finishQuiz() {
       ${state.wrongDetails.slice(0, 8).map((q, i) => `
         <div class="wrong-review-item">
           <strong>${i + 1}. ${escapeHtml(q.question)}</strong>
-          <p>错选：${escapeHtml(q.selected)}｜正确：${escapeHtml(q.answer)} ${escapeHtml(q.answerText)}</p>
-          <small>${escapeHtml(q.explanation)}</small>
+          <p>错选：${escapeHtml(q.selected)}｜正确：${escapeHtml(q.answer)} ${escapeHtml(displayAnswerText(q))}</p>
+          <small>${escapeHtml(displayExplanation(q))}</small>
         </div>
       `).join("")}
       ${state.wrongDetails.length > 8 ? `<p class="explain">更多错题已进入错题本。</p>` : ""}
@@ -826,8 +833,8 @@ function renderMistakes() {
                 <span>错选：${escapeHtml(question.selected)}</span>
               </div>
               <h4>${escapeHtml(question.question)}</h4>
-              <p class="answer-line">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(question.answerText)}</p>
-              <p class="explain">${escapeHtml(question.explanation)}</p>
+              <p class="answer-line">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(displayAnswerText(question))}</p>
+              <p class="explain">${escapeHtml(displayExplanation(question))}</p>
               ${renderOptionImages(question)}
             </div>
             ${renderQuestionImages(question)}
@@ -1028,8 +1035,8 @@ function exportMistakes() {
         知识点: q.knowledgePoint,
         题目: q.question,
         错选: q.selected,
-        正确答案: `${q.answer} ${q.answerText}`,
-        解析: q.explanation,
+        正确答案: `${q.answer} ${displayAnswerText(q)}`,
+        解析: displayExplanation(q),
         记录时间: q.savedAt,
       })));
   downloadText(`金尊错题记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "题库", "知识点", "题目", "错选", "正确答案", "解析", "记录时间"], rows));
