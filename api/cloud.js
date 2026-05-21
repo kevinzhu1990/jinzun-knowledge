@@ -1,7 +1,7 @@
-const BASE_TOKEN = 'JFGvbh608a5bqksc0WQcEeTlnne';
-const EMPLOYEE_TABLE_ID = 'tblSwMwUdLM9cxHR';
-const EXAM_TABLE_ID = 'tbln21myi7ysV9LI';
-const MISTAKE_TABLE_ID = 'tblmRBFD1V6ScIdL';
+const BASE_TOKEN = process.env.LARK_BASE_TOKEN || 'EAF6bIYugafViQsVYmZccrhkndd';
+const EXAM_TABLE_ID = process.env.LARK_EXAM_TABLE_ID || 'tbltXwPPYSVkhL6d';
+const LARK_APP_ID = process.env.LARK_APP_ID || '';
+const LARK_APP_SECRET = process.env.LARK_APP_SECRET || '';
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -14,83 +14,123 @@ const json = (res, status, body) => {
 
 const readBody = async (req) => {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   const raw = Buffer.concat(chunks).toString('utf8');
   return raw ? JSON.parse(raw) : {};
 };
 
 const dt = (value = new Date()) => {
   const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return undefined;
+  if (Number.isNaN(d.getTime())) return '';
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
-async function upsertEmployee(user, patch = {}) {
-  const phone = String(user?.phone || '').replace(/\D/g, '');
-  if (!phone) return null;
-  const fields = {
-    '姓名': user.name || '',
-    '手机号': phone,
-    '岗位': user.role || '新员工',
-    '最近登录时间': dt(),
-    '状态': '正常',
-    ...patch,
-  };
-  if (!patch['最近考试时间']) fields['首次登录时间'] = dt();
-  return { fields };
+const cleanPhone = (value) => String(value || '').replace(/\D/g, '');
+const num = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+
+let cachedToken = null;
+let cachedTokenExpireAt = 0;
+
+async function larkApi(path, options = {}) {
+  const res = await fetch(`https://open.feishu.cn/open-apis${path}`, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || (data.code && data.code !== 0)) {
+    throw new Error(data.msg || data.error?.message || `Feishu API error ${res.status}`);
+  }
+  return data;
+}
+
+async function getTenantToken() {
+  if (cachedToken && Date.now() < cachedTokenExpireAt) return cachedToken;
+  if (!LARK_APP_ID || !LARK_APP_SECRET) throw new Error('缺少 LARK_APP_ID / LARK_APP_SECRET 环境变量');
+  const data = await larkApi('/auth/v3/tenant_access_token/internal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({ app_id: LARK_APP_ID, app_secret: LARK_APP_SECRET }),
+  });
+  cachedToken = data.tenant_access_token;
+  cachedTokenExpireAt = Date.now() + Math.max(60, Number(data.expire || 7200) - 300) * 1000;
+  return cachedToken;
+}
+
+async function createRecord(tableId, fields) {
+  const token = await getTenantToken();
+  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ fields }),
+  });
+  return data?.data?.record || data?.data;
+}
+
+async function listRecords(tableId, pageSize = 200) {
+  const token = await getTenantToken();
+  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records?page_size=${pageSize}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return (data?.data?.items || []).map((item) => ({ record_id: item.record_id, ...item.fields }));
 }
 
 async function handleLogin(payload) {
-  const employee = await upsertEmployee(payload.user || payload);
-  return { ok: true, employee, baseToken: BASE_TOKEN, tableId: EMPLOYEE_TABLE_ID };
+  const user = payload.user || payload;
+  return { ok: true, user: { name: user.name || '', phone: cleanPhone(user.phone), role: user.role || '' } };
+}
+
+function wrongText(items, mode = 'ids') {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return '';
+  if (mode === 'ids') {
+    return list.map((q, index) => q.id ? `第${q.id}题` : `错题${index + 1}`).join('、');
+  }
+  return list.map((q, index) => {
+    const title = q.question || q.title || `错题${index + 1}`;
+    const selected = q.selected ? `错选：${q.selected}` : '';
+    const answer = q.answer ? `正确：${q.answer} ${q.answerText || ''}`.trim() : '';
+    return [`${index + 1}. ${title}`, selected, answer].filter(Boolean).join('；');
+  }).join('\n');
 }
 
 async function handleExam(payload) {
   const user = payload.user || {};
   const record = payload.record || payload;
+  const percent = num(record.percent ?? record.score, 0);
+  const total = num(record.total, 0);
+  const correct = num(record.score, 0);
+  const wrong = num(record.wrong, Math.max(0, total - correct));
+  const duration = num(record.duration, 0);
   const fields = {
+    '提交时间': dt(record.finishedAt || new Date()),
     '姓名': user.name || record.name || '',
-    '手机号': String(user.phone || record.phone || '').replace(/\D/g, ''),
+    '手机号': cleanPhone(user.phone || record.phone),
     '岗位': user.role || record.role || '',
-    '考核类型': record.type || record.examType || '练习模式',
-    '题库': record.bank || '',
-    '分数': Number(record.percent ?? record.score ?? 0),
-    '答对题数': Number(record.score ?? 0),
-    '总题数': Number(record.total ?? 0),
-    '错题数': Number(record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0))),
-    '是否通过': Number(record.percent ?? 0) >= 80 ? '是' : '否',
-    '用时秒': Number(record.duration ?? 0),
-    '完成时间': dt(record.finishedAt || new Date()),
-    '设备信息': payload.userAgent || '',
+    '门店|部门': user.department || user.store || record.department || record.store || '',
+    '考试名称': record.bank || record.examName || record.type || '金尊产品知识考试',
+    '总题数': total,
+    '答对数': correct,
+    '答错数': wrong,
+    '分数': percent,
+    '是否通过': percent >= 80 ? '通过' : '未通过',
+    '用时秒数': duration,
+    '用时分钟': duration ? Math.round((duration / 60) * 10) / 10 : 0,
+    '错题编号': wrongText(record.wrongDetails || payload.wrongDetails, 'ids'),
+    '错题明细': wrongText(record.wrongDetails || payload.wrongDetails, 'details'),
+    '设备ID': payload.deviceId || payload.userAgent || '',
   };
-  await upsertEmployee(user, { '最近考试时间': fields['完成时间'] });
-  return { ok: true, record: { fields }, baseToken: BASE_TOKEN, tableId: EXAM_TABLE_ID };
+  const examRecord = await createRecord(EXAM_TABLE_ID, fields);
+  return { ok: true, record: { fields, record_id: examRecord?.record_id } };
 }
 
 async function handleMistakes(payload) {
-  const user = payload.user || {};
-  const items = Array.isArray(payload.items) ? payload.items : [payload.item || payload];
-  const records = items.filter(Boolean).map((q) => ({
-    '姓名': user.name || q.name || '',
-    '手机号': String(user.phone || q.phone || '').replace(/\D/g, ''),
-    '岗位': user.role || q.role || '',
-    '题目ID': String(q.id || q.questionId || ''),
-    '题库': q.bank || '',
-    '知识点': q.knowledgePoint || '',
-    '题目': q.question || '',
-    '错选答案': q.selected || '',
-    '正确答案': `${q.answer || ''} ${q.answerText || ''}`.trim(),
-    '解析': q.explanation || '',
-    '出错时间': dt(q.savedAt || new Date()),
-    '错题次数': 1,
-  }));
-  await upsertEmployee(user);
-  return { ok: true, count: records.length, records, baseToken: BASE_TOKEN, tableId: MISTAKE_TABLE_ID };
+  return { ok: true, skipped: true, note: '当前版本只记录考试成绩，错题明细随考试记录一起保存。' };
 }
 
 async function handleStats() {
-  return { ok: true, employees: [], exams: [], mistakes: [], note: 'GitHub Pages 静态版通过本地记录展示；飞书 Base 已创建，可后续接入云函数实时汇总。' };
+  const exams = await listRecords(EXAM_TABLE_ID);
+  return { ok: true, employees: [], exams, mistakes: [] };
 }
 
 module.exports = async (req, res) => {
@@ -106,7 +146,7 @@ module.exports = async (req, res) => {
     if (action === 'mistakes') return json(res, 200, await handleMistakes(payload));
     return json(res, 404, { ok: false, error: 'Unknown action' });
   } catch (error) {
-    console.error(error);
+    console.error(error.response || error);
     return json(res, 500, { ok: false, error: error.message });
   }
 };

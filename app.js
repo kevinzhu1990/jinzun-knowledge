@@ -820,6 +820,7 @@ function saveExamRecord(percent) {
     passed: percent >= 80,
     duration: timerSeconds,
     finishedAt: new Date().toISOString(),
+    wrongDetails: state.wrongDetails,
   });
   storage.examRecords = records.slice(0, 100);
   syncLater("exam", { user: state.currentUser, record: records[0] });
