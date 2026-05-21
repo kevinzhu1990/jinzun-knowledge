@@ -107,7 +107,6 @@ async function handleExam(payload) {
     '姓名': user.name || record.name || '',
     '手机号': cleanPhone(user.phone || record.phone),
     '岗位': user.role || record.role || '',
-    '门店|部门': user.department || user.store || record.department || record.store || '',
     '考试名称': record.bank || record.examName || record.type || '金尊产品知识考试',
     '总题数': total,
     '答对数': correct,
