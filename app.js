@@ -1,5 +1,6 @@
-const productUrl = "./outputs/product_quiz/金尊产品知识库题库.json";
-const roleUrl = "./outputs/role_quiz/岗位学习考核题库.json";
+const BUILD_VERSION = "d261e8b";
+const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
+const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
 const API_BASE = window.JZ_API_BASE || "";
 const CLOUD_ENABLED = Boolean(window.JZ_API_BASE);
 const ADMIN_PHONES = (window.JZ_ADMIN_PHONES || "").split(",").map((phone) => phone.replace(/\D/g, "")).filter(Boolean);
