@@ -1,4 +1,4 @@
-const BUILD_VERSION = "c4f2a91";
+const BUILD_VERSION = "b7d8e02";
 const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
 const API_BASE = window.JZ_API_BASE || "";
@@ -312,22 +312,37 @@ function setSyncStatus(text, type = "info") {
 
 async function cloudRequest(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
-  const res = await fetch(`${API_BASE}/api/${action}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...payload, userAgent: navigator.userAgent, deviceId: navigator.userAgent }),
-  });
-  if (!res.ok) throw new Error(`云端同步失败：${res.status}`);
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || "云端同步失败");
-  return data;
+  const body = JSON.stringify({ ...payload, userAgent: navigator.userAgent, deviceId: navigator.userAgent });
+  try {
+    const res = await fetch(`${API_BASE}/api/${action}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    if (!res.ok) throw new Error(`云端同步失败：${res.status}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "云端同步失败");
+    return data;
+  } catch (error) {
+    if (String(error.message || error).includes("Failed to fetch")) {
+      await fetch(`${API_BASE}/api/${action}`, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=UTF-8" },
+        body,
+        keepalive: body.length < 60000,
+      });
+      return { ok: true, fallback: true };
+    }
+    throw error;
+  }
 }
 
 async function syncLater(action, payload) {
   try {
     const data = await cloudRequest(action, payload);
-    if (action === "exam") setSyncStatus("考试成绩已同步到飞书", "success");
-    if (action === "login") setSyncStatus(data.warning || "登录联系记录已同步", data.warning ? "warn" : "success");
+    if (action === "exam") setSyncStatus(data.fallback ? "考试成绩已提交，正在后台同步飞书" : "考试成绩已同步到飞书", "success");
+    if (action === "login") setSyncStatus(data.fallback ? "登录记录已提交，正在后台同步飞书" : (data.warning || "登录联系记录已同步"), data.warning ? "warn" : "success");
     return data;
   } catch (error) {
     const queue = JSON.parse(localStorage.getItem("jz_sync_queue") || "[]");
