@@ -1,8 +1,13 @@
-const BUILD_VERSION = "b7d8e02";
+const BUILD_VERSION = "e91f6c3";
 const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
-const API_BASE = window.JZ_API_BASE || "";
-const CLOUD_ENABLED = Boolean(window.JZ_API_BASE);
+const API_BASES = [
+  window.JZ_API_BASE,
+  "https://jinzun-knowledge.vercel.app",
+  "https://jinzun-knowledge-g34tl672n-kevinzhu-s-projects.vercel.app",
+].filter(Boolean);
+const API_BASE = API_BASES[0] || "";
+const CLOUD_ENABLED = API_BASES.length > 0;
 const ADMIN_PHONES = (window.JZ_ADMIN_PHONES || "").split(",").map((phone) => phone.replace(/\D/g, "")).filter(Boolean);
 const state = {
   allQuestions: [],
@@ -313,19 +318,31 @@ function setSyncStatus(text, type = "info") {
 async function cloudRequest(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   const body = JSON.stringify({ ...payload, userAgent: navigator.userAgent, deviceId: navigator.userAgent });
-  try {
-    const res = await fetch(`${API_BASE}/api/${action}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    if (!res.ok) throw new Error(`云端同步失败：${res.status}`);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || "云端同步失败");
-    return data;
-  } catch (error) {
-    if (String(error.message || error).includes("Failed to fetch")) {
-      await fetch(`${API_BASE}/api/${action}`, {
+  let lastError = null;
+  for (const base of API_BASES) {
+    try {
+      const res = await fetch(`${base}/api/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      if (!res.ok) throw new Error(`云端同步失败：${res.status}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "云端同步失败");
+      return data;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  for (const base of API_BASES) {
+    try {
+      if (navigator.sendBeacon) {
+        const blob = new Blob([body], { type: "text/plain;charset=UTF-8" });
+        if (navigator.sendBeacon(`${base}/api/${action}`, blob)) return { ok: true, fallback: true };
+      }
+    } catch {}
+    try {
+      await fetch(`${base}/api/${action}`, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=UTF-8" },
@@ -333,9 +350,11 @@ async function cloudRequest(action, payload) {
         keepalive: body.length < 60000,
       });
       return { ok: true, fallback: true };
+    } catch (error) {
+      lastError = error;
     }
-    throw error;
   }
+  throw lastError || new Error("云端同步失败");
 }
 
 async function syncLater(action, payload) {
