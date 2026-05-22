@@ -4,7 +4,7 @@ const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VER
 const API_BASES = [
   window.JZ_API_BASE,
   "https://jinzun-knowledge.vercel.app",
-  "https://jinzun-knowledge-g34tl672n-kevinzhu-s-projects.vercel.app",
+  "https://jinzun-knowledge-key943vg0-kevinzhu-s-projects.vercel.app",
 ].filter(Boolean);
 const API_BASE = API_BASES[0] || "";
 const CLOUD_ENABLED = API_BASES.length > 0;
