@@ -1,4 +1,4 @@
-const BUILD_VERSION = "d261e8b";
+const BUILD_VERSION = "c4f2a91";
 const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
 const API_BASE = window.JZ_API_BASE || "";
@@ -299,12 +299,23 @@ const getUserRecords = (phone) =>
 const getUserMistakes = (phone) =>
   JSON.parse(localStorage.getItem(`jz_${phone}_mistakes`) || "[]");
 
+function setSyncStatus(text, type = "info") {
+  const existing = document.querySelector("#cloudSyncStatus");
+  const target = existing || document.createElement("div");
+  target.id = "cloudSyncStatus";
+  target.className = `cloud-sync-status ${type}`;
+  target.textContent = text;
+  if (!existing) document.body.appendChild(target);
+  clearTimeout(target._timer);
+  target._timer = setTimeout(() => target.remove(), type === "error" ? 8000 : 3000);
+}
+
 async function cloudRequest(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   const res = await fetch(`${API_BASE}/api/${action}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...payload, userAgent: navigator.userAgent }),
+    body: JSON.stringify({ ...payload, userAgent: navigator.userAgent, deviceId: navigator.userAgent }),
   });
   if (!res.ok) throw new Error(`云端同步失败：${res.status}`);
   const data = await res.json();
@@ -314,11 +325,16 @@ async function cloudRequest(action, payload) {
 
 async function syncLater(action, payload) {
   try {
-    await cloudRequest(action, payload);
+    const data = await cloudRequest(action, payload);
+    if (action === "exam") setSyncStatus("考试成绩已同步到飞书", "success");
+    if (action === "login") setSyncStatus(data.warning || "登录联系记录已同步", data.warning ? "warn" : "success");
+    return data;
   } catch (error) {
     const queue = JSON.parse(localStorage.getItem("jz_sync_queue") || "[]");
     queue.push({ action, payload, createdAt: new Date().toISOString(), error: error.message });
     localStorage.setItem("jz_sync_queue", JSON.stringify(queue.slice(-300)));
+    setSyncStatus(`云端同步失败，已暂存本机：${error.message}`, "error");
+    return { ok: false, error: error.message };
   }
 }
 

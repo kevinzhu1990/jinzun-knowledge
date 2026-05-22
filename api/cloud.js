@@ -1,5 +1,7 @@
 const BASE_TOKEN = process.env.LARK_BASE_TOKEN || 'EAF6bIYugafViQsVYmZccrhkndd';
+const EMPLOYEE_TABLE_ID = process.env.LARK_EMPLOYEE_TABLE_ID || 'tblg4yzXSvif3oL8';
 const EXAM_TABLE_ID = process.env.LARK_EXAM_TABLE_ID || 'tbltXwPPYSVkhL6d';
+const MISTAKE_TABLE_ID = process.env.LARK_MISTAKE_TABLE_ID || 'tbl0M0DZSSgq6vAb';
 const LARK_APP_ID = process.env.LARK_APP_ID || '';
 const LARK_APP_SECRET = process.env.LARK_APP_SECRET || '';
 
@@ -78,7 +80,21 @@ async function listRecords(tableId, pageSize = 200) {
 
 async function handleLogin(payload) {
   const user = payload.user || payload;
-  return { ok: true, user: { name: user.name || '', phone: cleanPhone(user.phone), role: user.role || '' } };
+  const fields = {
+    '最后登录时间': dt(new Date()),
+    '姓名': user.name || '',
+    '手机号': cleanPhone(user.phone),
+    '岗位': user.role || '',
+    '设备ID': payload.deviceId || payload.userAgent || '',
+    '备注': '网页登录/进入学习',
+  };
+  let employeeRecord = null;
+  try {
+    employeeRecord = await createRecord(EMPLOYEE_TABLE_ID, fields);
+  } catch (error) {
+    return { ok: true, user: { name: fields['姓名'], phone: fields['手机号'], role: fields['岗位'] }, warning: `员工联系记录写入失败：${error.message}` };
+  }
+  return { ok: true, user: { name: fields['姓名'], phone: fields['手机号'], role: fields['岗位'] }, record: { fields, record_id: employeeRecord?.record_id } };
 }
 
 function wrongText(items, mode = 'ids') {
@@ -125,7 +141,31 @@ async function handleExam(payload) {
 }
 
 async function handleMistakes(payload) {
-  return { ok: true, skipped: true, note: '当前版本只记录考试成绩，错题明细随考试记录一起保存。' };
+  const user = payload.user || {};
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  if (!items.length) return { ok: true, skipped: true, note: '无错题可记录' };
+  const created = [];
+  for (const item of items.slice(0, 20)) {
+    const fields = {
+      '记录时间': dt(item.savedAt || new Date()),
+      '姓名': user.name || '',
+      '手机号': cleanPhone(user.phone),
+      '岗位': user.role || '',
+      '错题编号': item.id ? `第${item.id}题` : '',
+      '题目': item.question || item.title || '',
+      '错选': item.selected || '',
+      '正确答案': item.answer ? `${item.answer} ${item.answerText || ''}`.trim() : '',
+      '题库': item.bank || '',
+      '知识点': item.knowledgePoint || item.module || '',
+      '设备ID': payload.deviceId || payload.userAgent || '',
+    };
+    try {
+      created.push(await createRecord(MISTAKE_TABLE_ID, fields));
+    } catch (error) {
+      return { ok: true, partial: true, created: created.length, warning: `错题记录写入失败：${error.message}` };
+    }
+  }
+  return { ok: true, created: created.length };
 }
 
 async function handleStats() {
