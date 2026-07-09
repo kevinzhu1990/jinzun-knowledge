@@ -1,4 +1,4 @@
-const BUILD_VERSION = "e91f6c3";
+const BUILD_VERSION = "20260709";
 const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
 const API_BASES = [
