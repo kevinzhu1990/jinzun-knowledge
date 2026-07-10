@@ -1,9 +1,10 @@
-const BUILD_VERSION = "20260710-cloud";
+const BUILD_VERSION = "20260710-loginfix";
 const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
 const API_BASE = "https://jinzun-knowledge.vercel.app";
 const API_BASES = [API_BASE];
 const CLOUD_ENABLED = true;
+const CLOUD_TIMEOUT_MS = 3500;
 const ADMIN_PHONES = ["13750353689", "13538004509"];
 const state = {
   allQuestions: [],
@@ -111,6 +112,16 @@ const safeJsonObject = (key) => {
   const value = safeJson(key, {});
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 };
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = CLOUD_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const userStore = {
   get users() {
@@ -357,11 +368,11 @@ async function cloudRequest(action, payload) {
   let lastError = null;
   for (const base of API_BASES) {
     try {
-      const res = await fetch(`${base}/api/${action}`, {
+      const res = await fetchWithTimeout(`${base}/api/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
-      });
+      }, CLOUD_TIMEOUT_MS);
       if (!res.ok) throw new Error(`云端同步失败：${res.status}`);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "云端同步失败");
@@ -433,7 +444,7 @@ async function loadCloudStats() {
     return;
   }
   try {
-    const res = await fetch(`${API_BASE}/api/stats`);
+    const res = await fetchWithTimeout(`${API_BASE}/api/stats`, {}, CLOUD_TIMEOUT_MS);
     const data = await res.json();
     if (data.ok) state.cloudStats = data;
   } catch {
