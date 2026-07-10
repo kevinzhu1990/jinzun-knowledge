@@ -56,13 +56,44 @@ const num = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(val
 let cachedToken = null;
 let cachedTokenExpireAt = 0;
 
-async function larkApi(path, options = {}) {
-  const response = await fetch(`https://open.feishu.cn/open-apis${path}`, options);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || (data.code && data.code !== 0)) {
-    throw new Error(data.msg || data.error?.message || `Feishu API error ${response.status}`);
+class FeishuApiError extends Error {
+  constructor(message, { code = '', status = 0 } = {}) {
+    super(message);
+    this.name = 'FeishuApiError';
+    this.code = String(code || '');
+    this.status = Number(status || 0);
   }
-  return data;
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function larkApi(path, options = {}) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let response;
+    try {
+      response = await fetch(`https://open.feishu.cn/open-apis${path}`, {
+        ...options,
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch (error) {
+      if (attempt === 2) throw error;
+      await sleep(250 * (attempt + 1));
+      continue;
+    }
+    const data = await response.json().catch(() => ({}));
+    const code = data.code || data.error?.code || '';
+    if (!response.ok || (data.code && data.code !== 0)) {
+      const error = new FeishuApiError(
+        data.msg || data.error?.message || `Feishu API error ${response.status}`,
+        { code, status: response.status },
+      );
+      const retryable = response.status === 429 || response.status >= 500;
+      if (!retryable || attempt === 2) throw error;
+      await sleep(250 * (attempt + 1));
+      continue;
+    }
+    return data;
+  }
 }
 
 async function getTenantToken() {
@@ -97,6 +128,36 @@ async function updateRecord(tableId, recordId, fields) {
   return data?.data?.record || data?.data;
 }
 
+async function searchRecords(tableId, fieldName, fieldValue) {
+  const token = await getTenantToken();
+  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      page_size: 20,
+      filter: {
+        conjunction: 'and',
+        conditions: [{ field_name: fieldName, operator: 'is', value: [String(fieldValue)] }],
+      },
+    }),
+  });
+  return (data?.data?.items || []).map((item) => ({ record_id: item.record_id, ...item.fields }));
+}
+
+async function findEmployeeByPhone(phone) {
+  try {
+    const records = await searchRecords(EMPLOYEE_TABLE_ID, '手机号', phone);
+    return records.find((record) => cleanPhone(record['手机号']) === phone) || null;
+  } catch (error) {
+    // Keep compatibility with older Base permissions that allow list but not search.
+    if (error?.status === 400 || error?.status === 403) {
+      const records = await listRecords(EMPLOYEE_TABLE_ID);
+      return records.find((record) => cleanPhone(record['手机号']) === phone) || null;
+    }
+    throw error;
+  }
+}
+
 async function listRecords(tableId) {
   const token = await getTenantToken();
   const items = [];
@@ -125,8 +186,7 @@ async function handleLogin(payload) {
     '设备ID': payload.deviceId || '',
     '备注': '网页登录/进入学习',
   };
-  const employees = await listRecords(EMPLOYEE_TABLE_ID);
-  const existing = employees.find((record) => cleanPhone(record['手机号']) === phone);
+  const existing = await findEmployeeByPhone(phone);
   const record = existing
     ? await updateRecord(EMPLOYEE_TABLE_ID, existing.record_id, fields)
     : await createRecord(EMPLOYEE_TABLE_ID, fields);
@@ -195,12 +255,21 @@ async function handleMistakes(payload) {
 }
 
 async function handleStats() {
-  const [employees, exams, mistakes] = await Promise.all([
+  const entries = await Promise.allSettled([
     listRecords(EMPLOYEE_TABLE_ID),
     listRecords(EXAM_TABLE_ID),
     listRecords(MISTAKE_TABLE_ID),
   ]);
-  return { ok: true, employees, exams, mistakes };
+  const [employees, exams, mistakes] = entries.map((entry) => entry.status === 'fulfilled' ? entry.value : []);
+  const errors = entries
+    .map((entry, index) => entry.status === 'rejected' ? {
+      table: ['employees', 'exams', 'mistakes'][index],
+      code: entry.reason?.code || '',
+      status: entry.reason?.status || 0,
+      message: entry.reason?.message || 'Feishu API error',
+    } : null)
+    .filter(Boolean);
+  return { ok: true, employees, exams, mistakes, ...(errors.length ? { errors } : {}) };
 }
 
 module.exports = async (req, res) => {
@@ -226,7 +295,11 @@ module.exports = async (req, res) => {
     return json(req, res, 404, { ok: false, error: 'Unknown action' });
   } catch (error) {
     console.error(error);
-    return json(req, res, 400, { ok: false, error: 'Request rejected' });
+    return json(req, res, error?.status === 429 ? 429 : 400, {
+      ok: false,
+      error: error?.message || 'Request rejected',
+      code: error?.code || '',
+    });
   }
 };
 
