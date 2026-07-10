@@ -136,11 +136,11 @@ async function resolveTableId(configuredId, names) {
 }
 
 const employeeTableId = () => resolveTableId(EMPLOYEE_TABLE_ID, [
-  '员工联系记录', '员工信息', '员工登录记录', '员工',
+  '登录记录', '员工联系记录', '员工信息', '员工登录记录', '员工',
 ]);
 
 const examTableId = () => resolveTableId(EXAM_TABLE_ID, [
-  '考试记录', '考试成绩', '学习考核记录', '考核记录',
+  '考试成绩记录', '考试记录', '考试成绩', '学习考核记录', '考核记录',
 ]);
 
 const mistakeTableId = () => resolveTableId(MISTAKE_TABLE_ID, [
