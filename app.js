@@ -373,6 +373,7 @@ async function cloudRequest(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   const token = localStorage.getItem("jz_auth_token") || "";
   const body = JSON.stringify({ ...payload, token: payload.token || token, userAgent: navigator.userAgent, deviceId: navigator.userAgent });
+  const strictAction = action === "login" || action === "register";
   let lastError = null;
   for (const base of API_BASES) {
     try {
@@ -381,14 +382,17 @@ async function cloudRequest(action, payload) {
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body,
       }, CLOUD_TIMEOUT_MS);
-      if (!res.ok) throw new Error(`云端同步失败：${res.status}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `云端同步失败：${res.status}`);
       if (!data.ok) throw new Error(data.error || "云端同步失败");
       return data;
     } catch (error) {
       lastError = error;
     }
   }
+  // Authentication errors must reach the form. Sending them through the
+  // fire-and-forget sync fallback turns a real 4xx response into "注册失败".
+  if (strictAction) throw lastError || new Error("账号服务暂时不可用");
   for (const base of API_BASES) {
     try {
       if (navigator.sendBeacon) {
@@ -1439,7 +1443,10 @@ async function registerEmployee(event) {
     showAuth(false);
     renderAll();
   } catch (requestError) {
-    els.registerError.textContent = requestError.message || "注册失败，请稍后重试";
+    const message = requestError.message || "注册失败，请稍后重试";
+    els.registerError.textContent = message.includes("已经注册")
+      ? `${message}，请切换到“员工登录”`
+      : message;
   } finally {
     button.disabled = false;
     button.textContent = "注册并进入学习";
