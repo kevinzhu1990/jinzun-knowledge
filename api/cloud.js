@@ -248,12 +248,20 @@ const tokenUser = (req, payload = {}) => verifyToken(payload.token || getBearer(
 async function findAccountByPhone(phone) {
   const tableId = await accountTableId();
   const records = await searchRecords(tableId, '手机号', phone);
-  return records.find((record) => cleanPhone(record['手机号']) === phone) || null;
+  const matched = records.find((record) => cleanPhone(record['手机号']) === phone);
+  if (matched) return matched;
+  // Existing Bases may store 手机号 as a number or formatted text, so the
+  // typed search can miss an otherwise exact account.
+  const allRecords = await listRecords(tableId);
+  return allRecords.find((record) => cleanPhone(record['手机号']) === phone) || null;
 }
 
 async function findAccountsByName(name) {
   const tableId = await accountTableId();
-  return searchRecords(tableId, '姓名', name);
+  const records = await searchRecords(tableId, '姓名', name);
+  const matched = records.filter((record) => normalizeName(record['姓名']) === name);
+  if (matched.length) return matched;
+  return (await listRecords(tableId)).filter((record) => normalizeName(record['姓名']) === name);
 }
 
 const httpError = (status, message, code = '') => Object.assign(new Error(message), { status, code });
@@ -280,7 +288,7 @@ async function handleRegister(payload) {
     '岗位': role,
     '密码哈希': hash,
     '账号状态': '正常',
-    '是否管理员': existing?.['是否管理员'] === 'true' ? 'true' : 'false',
+    '是否管理员': String(existing?.['是否管理员']).toLowerCase() === 'true' ? 'true' : 'false',
     '注册时间': existing?.['注册时间'] || dt(new Date()),
     '最后登录时间': dt(new Date()),
     '登录失败次数': '0',
