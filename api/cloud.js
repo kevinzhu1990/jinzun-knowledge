@@ -55,6 +55,8 @@ const num = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(val
 
 let cachedToken = null;
 let cachedTokenExpireAt = 0;
+let cachedTables = null;
+let cachedTablesExpireAt = 0;
 
 class FeishuApiError extends Error {
   constructor(message, { code = '', status = 0 } = {}) {
@@ -108,6 +110,43 @@ async function getTenantToken() {
   return cachedToken;
 }
 
+const normalizeTableName = (value) => String(value || '').replace(/[\s_-]/g, '').toLowerCase();
+
+async function listTables() {
+  if (cachedTables && Date.now() < cachedTablesExpireAt) return cachedTables;
+  const token = await getTenantToken();
+  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables?page_size=100`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  cachedTables = data?.data?.items || [];
+  cachedTablesExpireAt = Date.now() + 5 * 60 * 1000;
+  return cachedTables;
+}
+
+async function resolveTableId(configuredId, names) {
+  const tables = await listTables();
+  if (configuredId && tables.some((table) => table.table_id === configuredId)) return configuredId;
+  const wanted = names.map(normalizeTableName);
+  const matched = tables.find((table) => wanted.includes(normalizeTableName(table.name)));
+  if (matched?.table_id) return matched.table_id;
+  throw new FeishuApiError(`Feishu table not found: ${names.join('/')}`, {
+    code: 'TABLE_NOT_FOUND',
+    status: 500,
+  });
+}
+
+const employeeTableId = () => resolveTableId(EMPLOYEE_TABLE_ID, [
+  '员工联系记录', '员工信息', '员工登录记录', '员工',
+]);
+
+const examTableId = () => resolveTableId(EXAM_TABLE_ID, [
+  '考试记录', '考试成绩', '学习考核记录', '考核记录',
+]);
+
+const mistakeTableId = () => resolveTableId(MISTAKE_TABLE_ID, [
+  '错题记录', '错题', '学习错题记录',
+]);
+
 async function createRecord(tableId, fields) {
   const token = await getTenantToken();
   const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records`, {
@@ -146,12 +185,12 @@ async function searchRecords(tableId, fieldName, fieldValue) {
 
 async function findEmployeeByPhone(phone) {
   try {
-    const records = await searchRecords(EMPLOYEE_TABLE_ID, '手机号', phone);
+    const records = await searchRecords(await employeeTableId(), '手机号', phone);
     return records.find((record) => cleanPhone(record['手机号']) === phone) || null;
   } catch (error) {
     // Keep compatibility with older Base permissions that allow list but not search.
     if (error?.status === 400 || error?.status === 403) {
-      const records = await listRecords(EMPLOYEE_TABLE_ID);
+      const records = await listRecords(await employeeTableId());
       return records.find((record) => cleanPhone(record['手机号']) === phone) || null;
     }
     throw error;
@@ -187,9 +226,10 @@ async function handleLogin(payload) {
     '备注': '网页登录/进入学习',
   };
   const existing = await findEmployeeByPhone(phone);
+  const tableId = await employeeTableId();
   const record = existing
-    ? await updateRecord(EMPLOYEE_TABLE_ID, existing.record_id, fields)
-    : await createRecord(EMPLOYEE_TABLE_ID, fields);
+    ? await updateRecord(tableId, existing.record_id, fields)
+    : await createRecord(tableId, fields);
   return { ok: true, record_id: record?.record_id || existing?.record_id || '' };
 }
 
@@ -228,7 +268,7 @@ async function handleExam(payload) {
     '错题明细': wrongText(record.wrongDetails, 'details'),
     '设备ID': payload.deviceId || '',
   };
-  const created = await createRecord(EXAM_TABLE_ID, fields);
+  const created = await createRecord(await examTableId(), fields);
   return { ok: true, record_id: created?.record_id || '' };
 }
 
@@ -236,8 +276,9 @@ async function handleMistakes(payload) {
   const user = payload.user || {};
   const items = Array.isArray(payload.items) ? payload.items.slice(0, 20) : [];
   if (!user.name || cleanPhone(user.phone).length !== 11) throw new Error('Invalid user data');
+  const tableId = await mistakeTableId();
   for (const item of items) {
-    await createRecord(MISTAKE_TABLE_ID, {
+    await createRecord(tableId, {
       '记录时间': dt(item.savedAt || new Date()),
       '姓名': user.name,
       '手机号': cleanPhone(user.phone),
@@ -255,10 +296,15 @@ async function handleMistakes(payload) {
 }
 
 async function handleStats() {
+  const [employeeId, examId, mistakeId] = await Promise.all([
+    employeeTableId(),
+    examTableId(),
+    mistakeTableId(),
+  ]);
   const entries = await Promise.allSettled([
-    listRecords(EMPLOYEE_TABLE_ID),
-    listRecords(EXAM_TABLE_ID),
-    listRecords(MISTAKE_TABLE_ID),
+    listRecords(employeeId),
+    listRecords(examId),
+    listRecords(mistakeId),
   ]);
   const [employees, exams, mistakes] = entries.map((entry) => entry.status === 'fulfilled' ? entry.value : []);
   const errors = entries
@@ -283,7 +329,7 @@ module.exports = async (req, res) => {
     const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
     const action = url.searchParams.get('action') || url.pathname.split('/').pop();
     if (req.method === 'GET' && action === 'stats') {
-      if (!authorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
+      if (!authorized(req) && !sameOrigin(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
       return json(req, res, 200, await handleStats());
     }
     if (req.method !== 'POST') return json(req, res, 405, { ok: false, error: 'Method not allowed' });
