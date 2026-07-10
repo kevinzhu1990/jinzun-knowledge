@@ -50,6 +50,9 @@ button {
   display: grid;
   place-items: center;
   padding: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background:
     linear-gradient(135deg, rgba(17, 35, 58, 0.96), rgba(14, 107, 121, 0.9)),
     var(--navy);
@@ -57,11 +60,27 @@ button {
 
 .auth-card {
   width: min(440px, 100%);
-  padding: 28px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 28px 28px 34px;
+  scrollbar-gutter: stable;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.72);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.28);
+}
+
+@media (max-width: 520px), (max-height: 720px) {
+  .auth-view {
+    align-items: start;
+    padding: 12px;
+  }
+
+  .auth-card {
+    max-height: calc(100dvh - 24px);
+    margin: auto 0;
+    padding: 22px 18px 30px;
+  }
 }
 
 .auth-card h1 {
