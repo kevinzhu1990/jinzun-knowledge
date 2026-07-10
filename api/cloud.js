@@ -279,15 +279,19 @@ async function handleRegister(payload) {
   if (!validatePassword(password)) throw httpError(400, '密码至少8位，并包含字母和数字');
   const tableId = await accountTableId();
   const existing = await findAccountByPhone(phone);
+  const resettingExisting = Boolean(existing?.['密码哈希']);
+  if (resettingExisting && String(existing?.['账号状态'] || '正常') !== '正常') {
+    throw httpError(403, '当前账号已停用，请联系管理员');
+  }
   const hash = await passwordHash(password);
   const employeeId = existing?.['员工ID'] || crypto.randomUUID();
   const fields = {
     '员工ID': employeeId,
-    '姓名': name,
+    '姓名': resettingExisting ? (existing['姓名'] || name) : name,
     '手机号': phone,
-    '岗位': role,
+    '岗位': resettingExisting ? (existing['岗位'] || role) : role,
     '密码哈希': hash,
-    '账号状态': '正常',
+    '账号状态': resettingExisting ? (existing['账号状态'] || '正常') : '正常',
     '是否管理员': String(existing?.['是否管理员']).toLowerCase() === 'true' ? 'true' : 'false',
     '注册时间': existing?.['注册时间'] || dt(new Date()),
     '最后登录时间': dt(new Date()),
@@ -295,9 +299,8 @@ async function handleRegister(payload) {
     '锁定截止时间': '',
     '密码更新时间': dt(new Date()),
     '客户端标识': String(payload.clientId || '').slice(0, 500),
-    '备注': '知识库账号注册',
+    '备注': resettingExisting ? '知识库账号密码重置' : '知识库账号注册',
   };
-  if (existing?.['密码哈希']) throw httpError(409, '该手机号已经注册，请直接登录');
   const record = existing
     ? await updateRecord(tableId, existing.record_id, fields)
     : await createRecord(tableId, fields);
@@ -343,6 +346,30 @@ async function handlePasswordLogin(payload) {
     '锁定截止时间': '',
     '客户端标识': String(payload.clientId || '').slice(0, 500),
   });
+  return { ok: true, token: authTokenFor(user), user };
+}
+
+async function handlePasswordReset(payload) {
+  if (!authConfigured()) throw httpError(503, 'Account service is not configured');
+  const phone = cleanPhone(payload.phone);
+  const password = String(payload.password || '');
+  if (String(payload.registerCode || '').trim() !== EMPLOYEE_REGISTER_CODE) throw httpError(403, '公司注册口令错误');
+  if (!/^1\d{10}$/.test(phone)) throw httpError(400, '手机号格式不正确');
+  if (!validatePassword(password)) throw httpError(400, '密码至少8位，并包含字母和数字');
+  const existing = await findAccountByPhone(phone);
+  if (!existing) throw httpError(404, '未找到该手机号对应的账号，请先注册');
+  if (String(existing['账号状态'] || '正常') !== '正常') throw httpError(403, '当前账号已停用，请联系管理员');
+  const tableId = await accountTableId();
+  const fields = {
+    '密码哈希': await passwordHash(password),
+    '登录失败次数': '0',
+    '锁定截止时间': '',
+    '密码更新时间': dt(new Date()),
+    '客户端标识': String(payload.clientId || '').slice(0, 500),
+    '备注': '知识库账号密码找回',
+  };
+  await updateRecord(tableId, existing.record_id, fields);
+  const user = authUserFromRecord(existing);
   return { ok: true, token: authTokenFor(user), user };
 }
 
@@ -542,6 +569,7 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') return json(req, res, 405, { ok: false, error: 'Method not allowed' });
     if (!writeAuthorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
     const payload = await readBody(req);
+    if (action === 'reset') return json(req, res, 200, await handlePasswordReset(payload));
     if (action === 'register') return json(req, res, 200, await handleRegister(payload));
     if (action === 'login' && Object.prototype.hasOwnProperty.call(payload, 'account')) {
       return json(req, res, 200, await handlePasswordLogin(payload));

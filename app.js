@@ -80,8 +80,11 @@ const els = {
   authView: document.querySelector("#authView"),
   loginForm: document.querySelector("#loginForm"),
   registerForm: document.querySelector("#registerForm"),
+  resetForm: document.querySelector("#resetForm"),
   showLoginTab: document.querySelector("#showLoginTab"),
   showRegisterTab: document.querySelector("#showRegisterTab"),
+  showResetForm: document.querySelector("#showResetForm"),
+  backToLogin: document.querySelector("#backToLogin"),
   loginAccount: document.querySelector("#loginAccount"),
   loginPassword: document.querySelector("#loginPassword"),
   loginError: document.querySelector("#loginError"),
@@ -92,6 +95,11 @@ const els = {
   registerPasswordConfirm: document.querySelector("#registerPasswordConfirm"),
   registerCode: document.querySelector("#registerCode"),
   registerError: document.querySelector("#registerError"),
+  resetPhone: document.querySelector("#resetPhone"),
+  resetPassword: document.querySelector("#resetPassword"),
+  resetPasswordConfirm: document.querySelector("#resetPasswordConfirm"),
+  resetCode: document.querySelector("#resetCode"),
+  resetError: document.querySelector("#resetError"),
   userName: document.querySelector("#userName"),
   userMeta: document.querySelector("#userMeta"),
   logoutBtn: document.querySelector("#logoutBtn"),
@@ -373,7 +381,7 @@ async function cloudRequest(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   const token = localStorage.getItem("jz_auth_token") || "";
   const body = JSON.stringify({ ...payload, token: payload.token || token, userAgent: navigator.userAgent, deviceId: navigator.userAgent });
-  const strictAction = action === "login" || action === "register";
+  const strictAction = action === "login" || action === "register" || action === "reset";
   let lastError = null;
   for (const base of API_BASES) {
     try {
@@ -1355,12 +1363,15 @@ function showAuth(visible) {
 
 function switchAuthMode(mode) {
   const isLogin = mode === "login";
+  const isRegister = mode === "register";
   els.loginForm.classList.toggle("hidden", !isLogin);
-  els.registerForm.classList.toggle("hidden", isLogin);
+  els.registerForm.classList.toggle("hidden", !isRegister);
+  els.resetForm.classList.toggle("hidden", mode !== "reset");
   els.showLoginTab.classList.toggle("active", isLogin);
-  els.showRegisterTab.classList.toggle("active", !isLogin);
+  els.showRegisterTab.classList.toggle("active", isRegister);
   els.loginError.textContent = "";
   els.registerError.textContent = "";
+  els.resetError.textContent = "";
 }
 
 function saveAuthenticatedUser(data) {
@@ -1453,6 +1464,36 @@ async function registerEmployee(event) {
   }
 }
 
+async function resetPassword(event) {
+  event.preventDefault();
+  const phone = normalizePhone(els.resetPhone.value);
+  const password = els.resetPassword.value;
+  const confirm = els.resetPasswordConfirm.value;
+  const registerCode = els.resetCode.value.trim();
+  els.resetError.textContent = "";
+  if (!/^1\d{10}$/.test(phone)) return void (els.resetError.textContent = "请输入正确的11位手机号");
+  const error = passwordError(password);
+  if (error) return void (els.resetError.textContent = error);
+  if (password !== confirm) return void (els.resetError.textContent = "两次输入的密码不一致");
+  if (!registerCode) return void (els.resetError.textContent = "请输入公司注册口令");
+  const button = els.resetForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = "正在重置...";
+  try {
+    const data = await cloudRequest("reset", { phone, password, registerCode, clientId: navigator.userAgent });
+    if (!data.token || !data.user) throw new Error("密码重置失败");
+    saveAuthenticatedUser(data);
+    els.resetForm.reset();
+    showAuth(false);
+    renderAll();
+  } catch (requestError) {
+    els.resetError.textContent = requestError.message || "密码重置失败，请稍后重试";
+  } finally {
+    button.disabled = false;
+    button.textContent = "重置密码并登录";
+  }
+}
+
 function logout() {
   stopTimer();
   state.examFinished = true;
@@ -1467,6 +1508,7 @@ function logout() {
   els.loginAccount.value = "";
   els.loginPassword.value = "";
   els.registerForm.reset();
+  els.resetForm.reset();
   showAuth(true);
   renderAll();
 }
@@ -1513,8 +1555,11 @@ function bindEvents() {
   });
   els.showLoginTab.addEventListener("click", () => switchAuthMode("login"));
   els.showRegisterTab.addEventListener("click", () => switchAuthMode("register"));
+  els.showResetForm.addEventListener("click", () => switchAuthMode("reset"));
+  els.backToLogin.addEventListener("click", () => switchAuthMode("login"));
   els.loginForm.addEventListener("submit", loginEmployee);
   els.registerForm.addEventListener("submit", registerEmployee);
+  els.resetForm.addEventListener("submit", resetPassword);
   document.querySelectorAll(".password-toggle").forEach((button) => {
     button.addEventListener("click", () => {
       const input = document.getElementById(button.dataset.target);
