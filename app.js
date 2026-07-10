@@ -1,11 +1,10 @@
-const BUILD_VERSION = "20260710-loginfix";
+const BUILD_VERSION = "20260710-account-auth";
 const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
 const API_BASE = "https://jinzun-knowledge.vercel.app";
 const API_BASES = [API_BASE];
 const CLOUD_ENABLED = true;
-const CLOUD_TIMEOUT_MS = 3500;
-const ADMIN_PHONES = ["13750353689", "13538004509"];
+const CLOUD_TIMEOUT_MS = 8000;
 const state = {
   allQuestions: [],
   filtered: [],
@@ -79,11 +78,20 @@ const els = {
   exportRecordsBtn: document.querySelector("#exportRecordsBtn"),
   exportMistakesBtn: document.querySelector("#exportMistakesBtn"),
   authView: document.querySelector("#authView"),
-  authForm: document.querySelector("#authForm"),
-  authName: document.querySelector("#authName"),
-  authPhone: document.querySelector("#authPhone"),
-  authRole: document.querySelector("#authRole"),
-  authError: document.querySelector("#authError"),
+  loginForm: document.querySelector("#loginForm"),
+  registerForm: document.querySelector("#registerForm"),
+  showLoginTab: document.querySelector("#showLoginTab"),
+  showRegisterTab: document.querySelector("#showRegisterTab"),
+  loginAccount: document.querySelector("#loginAccount"),
+  loginPassword: document.querySelector("#loginPassword"),
+  loginError: document.querySelector("#loginError"),
+  registerName: document.querySelector("#registerName"),
+  registerPhone: document.querySelector("#registerPhone"),
+  registerRole: document.querySelector("#registerRole"),
+  registerPassword: document.querySelector("#registerPassword"),
+  registerPasswordConfirm: document.querySelector("#registerPasswordConfirm"),
+  registerCode: document.querySelector("#registerCode"),
+  registerError: document.querySelector("#registerError"),
   userName: document.querySelector("#userName"),
   userMeta: document.querySelector("#userMeta"),
   logoutBtn: document.querySelector("#logoutBtn"),
@@ -143,8 +151,7 @@ const userStore = {
 };
 
 const isAdminUser = (user = state.currentUser) => {
-  const phone = String(user?.phone || "").replace(/\D/g, "");
-  return Boolean(phone && ADMIN_PHONES.includes(phone));
+  return user?.isAdmin === true;
 };
 
 function applyAdminAccess() {
@@ -364,13 +371,14 @@ function setSyncStatus(text, type = "info") {
 
 async function cloudRequest(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
-  const body = JSON.stringify({ ...payload, userAgent: navigator.userAgent, deviceId: navigator.userAgent });
+  const token = localStorage.getItem("jz_auth_token") || "";
+  const body = JSON.stringify({ ...payload, token: payload.token || token, userAgent: navigator.userAgent, deviceId: navigator.userAgent });
   let lastError = null;
   for (const base of API_BASES) {
     try {
       const res = await fetchWithTimeout(`${base}/api/${action}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body,
       }, CLOUD_TIMEOUT_MS);
       if (!res.ok) throw new Error(`云端同步失败：${res.status}`);
@@ -444,7 +452,8 @@ async function loadCloudStats() {
     return;
   }
   try {
-    const res = await fetchWithTimeout(`${API_BASE}/api/stats`, {}, CLOUD_TIMEOUT_MS);
+    const token = localStorage.getItem("jz_auth_token") || "";
+    const res = await fetchWithTimeout(`${API_BASE}/api/stats`, token ? { headers: { Authorization: `Bearer ${token}` } } : {}, CLOUD_TIMEOUT_MS);
     const data = await res.json();
     if (data.ok) state.cloudStats = data;
   } catch {
@@ -870,10 +879,8 @@ function renderQuizCard() {
     </div>
     <h3>${escapeHtml(question.question)}</h3>
     ${question.questionImage ? (() => {
-      const isMooncake = question.questionImage.includes('/mooncake/');
-      const isDailyProduct = question.questionImage.includes('/daily/');
       const sourceWidth = Math.max(120, Number(question.questionImageWidth) || 520);
-      return `<div class="quiz-img-wrap${isMooncake ? ' quiz-img-crop-moon' : ''}${isDailyProduct ? ' quiz-img-crop-daily' : ''}" style="width:min(${sourceWidth}px, 100%)">
+      return `<div class="quiz-img-wrap" style="width:min(${sourceWidth}px, 100%)">
         <img src="${imagePath(question.questionImage)}" alt="题目图片" />
       </div>`;
     })() : ""}
@@ -884,9 +891,7 @@ function renderQuizCard() {
             <button class="option-btn" data-letter="${letter}">
               <strong>${letter}</strong>${escapeHtml(stripCodeFromOption(text, question))}
               ${img ? (() => {
-                const isMooncake = img.includes('/mooncake/');
-                const isDailyProduct = img.includes('/daily/');
-                return `<div class="quiz-opt-img${isMooncake ? ' quiz-img-crop-moon' : ''}${isDailyProduct ? ' quiz-img-crop-daily' : ''}" ${imageWidth ? `style="max-width:${Math.max(120, imageWidth)}px"` : ""}>
+                return `<div class="quiz-opt-img" ${imageWidth ? `style="max-width:${Math.max(120, imageWidth)}px"` : ""}>
                   <img src="${imagePath(img)}" alt="选项${letter}图片" />
                 </div>`;
               })() : ""}
@@ -1330,6 +1335,10 @@ function normalizePhone(value) {
 }
 
 function loadCurrentUser() {
+  if (!localStorage.getItem("jz_auth_token")) {
+    state.currentUser = null;
+    return;
+  }
   const phone = userStore.currentPhone;
   const users = userStore.users;
   state.currentUser = phone && users[phone] ? users[phone] : null;
@@ -1340,37 +1349,101 @@ function showAuth(visible) {
   document.body.classList.toggle("auth-locked", visible);
 }
 
-function saveUserFromForm(event) {
-  event.preventDefault();
-  const name = els.authName.value.trim();
-  const phone = normalizePhone(els.authPhone.value);
-  const role = els.authRole.value;
-  if (!name) {
-    els.authError.textContent = "请填写姓名。";
-    return;
-  }
-  if (phone.length !== 11) {
-    els.authError.textContent = "请输入 11 位手机号。";
-    return;
-  }
-  const users = userStore.users;
+function switchAuthMode(mode) {
+  const isLogin = mode === "login";
+  els.loginForm.classList.toggle("hidden", !isLogin);
+  els.registerForm.classList.toggle("hidden", isLogin);
+  els.showLoginTab.classList.toggle("active", isLogin);
+  els.showRegisterTab.classList.toggle("active", !isLogin);
+  els.loginError.textContent = "";
+  els.registerError.textContent = "";
+}
+
+function saveAuthenticatedUser(data) {
+  localStorage.setItem("jz_auth_token", data.token);
   const user = {
-    name,
-    phone,
-    role,
+    id: data.user.id,
+    name: data.user.name,
+    phone: data.user.phone,
+    role: data.user.role,
+    isAdmin: data.user.isAdmin === true,
     updatedAt: new Date().toISOString(),
   };
-  users[phone] = user;
+  const users = userStore.users;
+  users[user.phone] = user;
   userStore.users = users;
-  userStore.currentPhone = phone;
+  userStore.currentPhone = user.phone;
   state.currentUser = user;
   reconcileStoredQuestions();
   applyAdminAccess();
-  els.authError.textContent = "";
-  showAuth(false);
-  syncLater("login", { user });
-  flushSyncQueue();
-  renderAll();
+}
+
+const passwordError = (password) => {
+  if (password.length < 8) return "密码不能少于8位";
+  if (!/[A-Za-z]/.test(password)) return "密码必须包含字母";
+  if (!/\d/.test(password)) return "密码必须包含数字";
+  return "";
+};
+
+async function loginEmployee(event) {
+  event.preventDefault();
+  const account = els.loginAccount.value.trim();
+  const password = els.loginPassword.value;
+  els.loginError.textContent = "";
+  if (!account || !password) {
+    els.loginError.textContent = "请输入姓名或手机号和密码";
+    return;
+  }
+  const button = els.loginForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = "正在登录...";
+  try {
+    const data = await cloudRequest("login", { account, password, clientId: navigator.userAgent });
+    if (!data.token || !data.user) throw new Error("账号或密码错误");
+    saveAuthenticatedUser(data);
+    els.loginPassword.value = "";
+    showAuth(false);
+    renderAll();
+  } catch (error) {
+    els.loginError.textContent = error.message || "账号或密码错误";
+  } finally {
+    button.disabled = false;
+    button.textContent = "登录";
+  }
+}
+
+async function registerEmployee(event) {
+  event.preventDefault();
+  const name = els.registerName.value.trim();
+  const phone = normalizePhone(els.registerPhone.value);
+  const role = els.registerRole.value;
+  const password = els.registerPassword.value;
+  const confirm = els.registerPasswordConfirm.value;
+  const registerCode = els.registerCode.value.trim();
+  els.registerError.textContent = "";
+  if (!name) return void (els.registerError.textContent = "请填写真实姓名");
+  if (!/^1\d{10}$/.test(phone)) return void (els.registerError.textContent = "请输入正确的11位手机号");
+  if (!role) return void (els.registerError.textContent = "请选择岗位");
+  const error = passwordError(password);
+  if (error) return void (els.registerError.textContent = error);
+  if (password !== confirm) return void (els.registerError.textContent = "两次输入的密码不一致");
+  if (!registerCode) return void (els.registerError.textContent = "请输入公司注册口令");
+  const button = els.registerForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = "正在注册...";
+  try {
+    const data = await cloudRequest("register", { name, phone, role, password, registerCode, clientId: navigator.userAgent });
+    if (!data.token || !data.user) throw new Error("注册失败");
+    saveAuthenticatedUser(data);
+    els.registerForm.reset();
+    showAuth(false);
+    renderAll();
+  } catch (requestError) {
+    els.registerError.textContent = requestError.message || "注册失败，请稍后重试";
+  } finally {
+    button.disabled = false;
+    button.textContent = "注册并进入学习";
+  }
 }
 
 function logout() {
@@ -1378,13 +1451,15 @@ function logout() {
   state.examFinished = true;
   setExamLocked(false);
   userStore.currentPhone = "";
+  localStorage.removeItem("jz_auth_token");
   state.currentUser = null;
   applyAdminAccess();
   state.quiz = [];
   state.quizIndex = 0;
   state.score = 0;
-  els.authPhone.value = "";
-  els.authName.value = "";
+  els.loginAccount.value = "";
+  els.loginPassword.value = "";
+  els.registerForm.reset();
   showAuth(true);
   renderAll();
 }
@@ -1429,7 +1504,19 @@ function bindEvents() {
     localStorage.removeItem("jz_sync_queue");
     renderAll();
   });
-  els.authForm.addEventListener("submit", saveUserFromForm);
+  els.showLoginTab.addEventListener("click", () => switchAuthMode("login"));
+  els.showRegisterTab.addEventListener("click", () => switchAuthMode("register"));
+  els.loginForm.addEventListener("submit", loginEmployee);
+  els.registerForm.addEventListener("submit", registerEmployee);
+  document.querySelectorAll(".password-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const input = document.getElementById(button.dataset.target);
+      if (!input) return;
+      const visible = input.type === "text";
+      input.type = visible ? "password" : "text";
+      button.textContent = visible ? "显示" : "隐藏";
+    });
+  });
   els.logoutBtn.addEventListener("click", logout);
   els.mobileSidebarToggle?.addEventListener("click", () => {
     const open = !els.sidebarTools.classList.contains("mobile-open");

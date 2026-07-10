@@ -1,3 +1,6 @@
+const crypto = require('node:crypto');
+const bcrypt = require('bcryptjs');
+
 const BASE_TOKEN = process.env.LARK_BASE_TOKEN || '';
 const EMPLOYEE_TABLE_ID = process.env.LARK_EMPLOYEE_TABLE_ID || '';
 const EXAM_TABLE_ID = process.env.LARK_EXAM_TABLE_ID || '';
@@ -6,6 +9,10 @@ const LARK_APP_ID = process.env.LARK_APP_ID || '';
 const LARK_APP_SECRET = process.env.LARK_APP_SECRET || '';
 const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN || '';
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://kevinzhu1990.github.io';
+const AUTH_SECRET = process.env.AUTH_SECRET || '';
+const EMPLOYEE_REGISTER_CODE = process.env.EMPLOYEE_REGISTER_CODE || '';
+const PASSWORD_PEPPER = process.env.PASSWORD_PEPPER || '';
+const AUTH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const json = (req, res, status, body) => {
   const origin = String(req.headers.origin || '');
@@ -32,6 +39,8 @@ const configured = () => Boolean(
   BASE_TOKEN && EMPLOYEE_TABLE_ID && EXAM_TABLE_ID && MISTAKE_TABLE_ID &&
   LARK_APP_ID && LARK_APP_SECRET
 );
+
+const authConfigured = () => Boolean(AUTH_SECRET && EMPLOYEE_REGISTER_CODE && PASSWORD_PEPPER);
 
 const readBody = async (req) => {
   const chunks = [];
@@ -146,6 +155,195 @@ const examTableId = () => resolveTableId(EXAM_TABLE_ID, [
 const mistakeTableId = () => resolveTableId(MISTAKE_TABLE_ID, [
   '错题记录', '错题', '学习错题记录',
 ]);
+
+const ACCOUNT_TEXT_FIELDS = [
+  '员工ID', '密码哈希', '账号状态', '是否管理员', '注册时间',
+  '登录失败次数', '锁定截止时间', '密码更新时间', '客户端标识',
+];
+let accountFieldsReady = null;
+
+async function listFields(tableId) {
+  const token = await getTenantToken();
+  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/fields?page_size=100`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data?.data?.items || [];
+}
+
+async function ensureAccountFields() {
+  if (accountFieldsReady) return accountFieldsReady;
+  accountFieldsReady = (async () => {
+    const tableId = await employeeTableId();
+    const fields = await listFields(tableId);
+    const existing = new Set(fields.map((field) => String(field.field_name || '')));
+    const token = await getTenantToken();
+    for (const fieldName of ACCOUNT_TEXT_FIELDS) {
+      if (existing.has(fieldName)) continue;
+      try {
+        await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/fields`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ field_name: fieldName, type: 1 }),
+        });
+      } catch (error) {
+        if (error?.code !== '1254067' && !String(error?.message || '').toLowerCase().includes('duplicate')) throw error;
+      }
+    }
+    return tableId;
+  })();
+  try {
+    return await accountFieldsReady;
+  } catch (error) {
+    accountFieldsReady = null;
+    throw error;
+  }
+}
+
+const accountTableId = () => ensureAccountFields();
+
+const allowedRoles = new Set([
+  '运营', '客服', '美工', '主播', '中控', '采购', '财务', '行政', '审单', '仓储', '管理', '新员工',
+]);
+
+const normalizeName = (value) => String(value || '').trim();
+const validatePassword = (value) => typeof value === 'string'
+  && value.length >= 8 && value.length <= 64 && /[A-Za-z]/.test(value) && /\d/.test(value);
+
+const b64url = (value) => Buffer.from(value).toString('base64url');
+const signToken = (payload) => {
+  const body = b64url(JSON.stringify(payload));
+  const signature = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url');
+  return `${body}.${signature}`;
+};
+const verifyToken = (token) => {
+  if (!AUTH_SECRET || typeof token !== 'string') return null;
+  const [body, signature] = token.split('.');
+  if (!body || !signature) return null;
+  const expected = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url');
+  if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    return payload.exp > Date.now() ? payload : null;
+  } catch {
+    return null;
+  }
+};
+
+const passwordHash = (password) => bcrypt.hash(`${password}${PASSWORD_PEPPER}`, 12);
+const passwordMatches = (password, hash) => bcrypt.compare(`${password}${PASSWORD_PEPPER}`, hash);
+
+const authUserFromRecord = (record) => ({
+  id: record['员工ID'] || record.record_id,
+  name: record['姓名'] || '',
+  phone: cleanPhone(record['手机号']),
+  role: record['岗位'] || '',
+  isAdmin: String(record['是否管理员']).toLowerCase() === 'true',
+});
+
+const authTokenFor = (user) => signToken({ ...user, exp: Date.now() + AUTH_TOKEN_TTL_MS });
+
+const getBearer = (req) => String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+const tokenUser = (req, payload = {}) => verifyToken(payload.token || getBearer(req));
+
+async function findAccountByPhone(phone) {
+  const tableId = await accountTableId();
+  const records = await searchRecords(tableId, '手机号', phone);
+  return records.find((record) => cleanPhone(record['手机号']) === phone) || null;
+}
+
+async function findAccountsByName(name) {
+  const tableId = await accountTableId();
+  return searchRecords(tableId, '姓名', name);
+}
+
+const httpError = (status, message, code = '') => Object.assign(new Error(message), { status, code });
+
+async function handleRegister(payload) {
+  if (!authConfigured()) throw httpError(503, 'Account service is not configured');
+  const name = normalizeName(payload.name);
+  const phone = cleanPhone(payload.phone);
+  const role = normalizeName(payload.role);
+  const password = String(payload.password || '');
+  if (String(payload.registerCode || '').trim() !== EMPLOYEE_REGISTER_CODE) throw httpError(403, '公司注册口令错误');
+  if (!name || name.length > 30) throw httpError(400, '姓名格式不正确');
+  if (!/^1\d{10}$/.test(phone)) throw httpError(400, '手机号格式不正确');
+  if (!allowedRoles.has(role)) throw httpError(400, '岗位信息不正确');
+  if (!validatePassword(password)) throw httpError(400, '密码至少8位，并包含字母和数字');
+  const tableId = await accountTableId();
+  const existing = await findAccountByPhone(phone);
+  const hash = await passwordHash(password);
+  const employeeId = existing?.['员工ID'] || crypto.randomUUID();
+  const fields = {
+    '员工ID': employeeId,
+    '姓名': name,
+    '手机号': phone,
+    '岗位': role,
+    '密码哈希': hash,
+    '账号状态': '正常',
+    '是否管理员': existing?.['是否管理员'] === 'true' ? 'true' : 'false',
+    '注册时间': existing?.['注册时间'] || dt(new Date()),
+    '最后登录时间': dt(new Date()),
+    '登录失败次数': '0',
+    '锁定截止时间': '',
+    '密码更新时间': dt(new Date()),
+    '客户端标识': String(payload.clientId || '').slice(0, 500),
+    '备注': '知识库账号注册',
+  };
+  if (existing?.['密码哈希']) throw httpError(409, '该手机号已经注册，请直接登录');
+  const record = existing
+    ? await updateRecord(tableId, existing.record_id, fields)
+    : await createRecord(tableId, fields);
+  const user = authUserFromRecord({ ...fields, record_id: record?.record_id || existing?.record_id });
+  return { ok: true, token: authTokenFor(user), user };
+}
+
+async function handlePasswordLogin(payload) {
+  if (!authConfigured()) throw httpError(503, 'Account service is not configured');
+  const account = normalizeName(payload.account);
+  const password = String(payload.password || '');
+  let record = null;
+  if (/^1\d{10}$/.test(account)) {
+    record = await findAccountByPhone(account);
+  } else {
+    const matches = await findAccountsByName(account);
+    if (matches.length > 1) throw httpError(409, '存在同名员工，请使用手机号登录');
+    record = matches[0] || null;
+  }
+  if (!record || !record['密码哈希']) throw httpError(401, '账号或密码错误');
+  const status = String(record['账号状态'] || '正常');
+  if (status !== '正常') throw httpError(403, '当前账号已停用，请联系管理员');
+  const lockedUntil = Date.parse(String(record['锁定截止时间'] || ''));
+  if (lockedUntil > Date.now()) throw httpError(429, '账号暂时锁定，请稍后重试');
+  const valid = await passwordMatches(password, record['密码哈希']);
+  const tableId = await accountTableId();
+  if (!valid) {
+    const failures = num(record['登录失败次数'], 0) + 1;
+    const lockMs = failures >= 10 ? 2 * 60 * 60 * 1000 : failures >= 5 ? 15 * 60 * 1000 : 0;
+    const updates = {
+      '登录失败次数': String(failures),
+      '锁定截止时间': lockMs ? dt(new Date(Date.now() + lockMs)) : '',
+      '客户端标识': String(payload.clientId || '').slice(0, 500),
+    };
+    if (failures >= 20) updates['账号状态'] = '停用';
+    await updateRecord(tableId, record.record_id, updates);
+    throw httpError(failures >= 20 ? 403 : 401, failures >= 20 ? '当前账号已停用，请联系管理员' : '账号或密码错误');
+  }
+  const user = authUserFromRecord(record);
+  await updateRecord(tableId, record.record_id, {
+    '最后登录时间': dt(new Date()),
+    '登录失败次数': '0',
+    '锁定截止时间': '',
+    '客户端标识': String(payload.clientId || '').slice(0, 500),
+  });
+  return { ok: true, token: authTokenFor(user), user };
+}
+
+function requireUser(req, payload) {
+  const user = tokenUser(req, payload);
+  if (!user) throw httpError(401, 'Unauthorized');
+  if (payload.user?.phone && cleanPhone(payload.user.phone) !== cleanPhone(user.phone)) throw httpError(403, 'Unauthorized');
+  return user;
+}
 
 async function createRecord(tableId, fields) {
   const token = await getTenantToken();
@@ -329,19 +527,31 @@ module.exports = async (req, res) => {
     const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
     const action = url.searchParams.get('action') || url.pathname.split('/').pop();
     if (req.method === 'GET' && action === 'stats') {
-      if (!authorized(req) && !sameOrigin(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
+      const user = tokenUser(req, {});
+      if (!user || !user.isAdmin) return json(req, res, 403, { ok: false, error: '管理员权限不足' });
       return json(req, res, 200, await handleStats());
     }
     if (req.method !== 'POST') return json(req, res, 405, { ok: false, error: 'Method not allowed' });
     if (!writeAuthorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
     const payload = await readBody(req);
+    if (action === 'register') return json(req, res, 200, await handleRegister(payload));
+    if (action === 'login' && Object.prototype.hasOwnProperty.call(payload, 'account')) {
+      return json(req, res, 200, await handlePasswordLogin(payload));
+    }
     if (action === 'login') return json(req, res, 200, await handleLogin(payload));
-    if (action === 'exam') return json(req, res, 200, await handleExam(payload));
-    if (action === 'mistakes') return json(req, res, 200, await handleMistakes(payload));
+    if (action === 'exam') {
+      requireUser(req, payload);
+      return json(req, res, 200, await handleExam(payload));
+    }
+    if (action === 'mistakes') {
+      requireUser(req, payload);
+      return json(req, res, 200, await handleMistakes(payload));
+    }
     return json(req, res, 404, { ok: false, error: 'Unknown action' });
   } catch (error) {
     console.error(error);
-    return json(req, res, error?.status === 429 ? 429 : 400, {
+    const status = [400, 401, 403, 409, 429, 500, 503].includes(Number(error?.status)) ? Number(error.status) : 400;
+    return json(req, res, status, {
       ok: false,
       error: error?.message || 'Request rejected',
       code: error?.code || '',
