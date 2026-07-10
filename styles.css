@@ -783,7 +783,7 @@ input:disabled {
 .option-image {
   width: 148px;
   height: 112px;
-  object-fit: cover;
+  object-fit: contain;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f7fafc;
@@ -1187,7 +1187,7 @@ input:disabled {
 }
 
 .quiz-opt-img {
-  overflow: hidden;
+  overflow: visible;
   width: 100%;
   margin-top: 10px;
   border: 1px solid var(--line);
