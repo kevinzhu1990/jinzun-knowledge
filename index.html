@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>金尊知识库学习考核</title>
-    <link rel="stylesheet" href="./styles.css?v=7c6b4e8" />
+    <link rel="stylesheet" href="./styles.css?v=20260710-2" />
   </head>
   <body>
     <section id="authView" class="auth-view">
       <div class="auth-card">
         <p class="eyebrow">Mobile Access</p>
-        <h1>手机号注册登录</h1>
-        <p class="auth-note">员工用姓名、手机号和岗位进入学习。当前版本会把学习记录保存在本机浏览器，并按手机号分开。</p>
+        <h1>本机学习账号</h1>
+        <p class="auth-note">员工用姓名、手机号和岗位进入学习。学习记录仅保存在当前设备的浏览器中，不会上传姓名、手机号、成绩或错题。</p>
         <form id="authForm" class="auth-form">
           <label>
             姓名
@@ -60,9 +60,10 @@
           <button class="nav-tab" data-view="learn">学习</button>
           <button class="nav-tab" data-view="quiz">考核</button>
           <button class="nav-tab" data-view="mistakes">错题</button>
-          <button class="nav-tab" data-view="admin">管理</button>
         </nav>
 
+        <button id="mobileSidebarToggle" class="mobile-sidebar-toggle" type="button" aria-expanded="false" aria-controls="sidebarTools">筛选与账号</button>
+        <div id="sidebarTools" class="sidebar-tools">
         <div class="side-panel">
           <p class="side-label">当前员工</p>
           <div class="user-panel">
@@ -86,6 +87,7 @@
             </div>
           </div>
         </div>
+        </div>
       </aside>
 
       <main class="main">
@@ -96,7 +98,7 @@
           </div>
           <div class="top-actions">
             <input id="searchInput" class="search" type="search" placeholder="搜索货号、题目、产品名" />
-            <button id="resetBtn" class="icon-btn" title="清空本机学习记录">↺</button>
+            <button id="resetBtn" class="icon-btn" type="button" title="清空本机学习记录" aria-label="清空本机学习记录">↺</button>
           </div>
         </header>
 
@@ -122,7 +124,8 @@
           <div class="section-head">
             <div>
               <p class="eyebrow">Leaderboard</p>
-              <h3>排行榜</h3>
+              <h3>本机排行榜</h3>
+              <p class="section-note">仅统计当前设备浏览器中保存的账号和成绩。</p>
             </div>
             <div class="rank-sort-btns">
               <button class="rank-sort-btn active" data-sort="score">按分数</button>
@@ -142,6 +145,7 @@
           </div>
           <div id="learnFilter" class="learn-filter"></div>
           <div id="learnList" class="learn-list"></div>
+          <div id="learnPagination" class="learn-pagination"></div>
         </section>
 
         <section id="quizView" class="view">
@@ -149,7 +153,7 @@
             <div>
               <p class="eyebrow">Quiz</p>
               <h3>开始考核</h3>
-              <p>答题后显示解析，错题自动进入错题本。</p>
+              <p>练习模式答后显示解析；正式模式在交卷后统一显示结果。</p>
             </div>
             <div class="quiz-mode-tabs">
               <button class="mode-tab active" data-mode="random">随机混合</button>
@@ -157,28 +161,28 @@
               <button class="mode-tab" data-mode="role">岗位考试</button>
             </div>
             <div id="modeRandom" class="mode-panel">
-              <p class="mode-desc">随机混合只抽月饼题库 + 日常年货题库，不加入岗位题和纸箱耗材题。</p>
+              <p class="mode-desc">从月饼、日常年货和业务场景题库中随机抽题。搜索或侧边栏筛选生效时，优先使用当前筛选结果。</p>
             </div>
             <div id="modeProduct" class="mode-panel hidden">
               <label class="mode-label">
                 选择产品题库
                 <select id="productBankSelect" class="select"></select>
               </label>
-              <p class="mode-desc">从所选产品题库中随机抽取 50 题。</p>
+              <p class="mode-desc">按所选数量随机抽题，题量不足时使用该题库全部题目。</p>
             </div>
             <div id="modeRole" class="mode-panel hidden">
               <label class="mode-label">
                 选择岗位
                 <select id="roleBankSelect" class="select"></select>
               </label>
-              <p class="mode-desc">岗位考试按“岗位题库 + 月饼题库 + 日常年货题库”组合抽题，不加入纸箱耗材题。</p>
+              <p class="mode-desc">仅抽取所选岗位题库，避免岗位题不足时被大量产品题替代。</p>
             </div>
             <div class="quiz-start-row">
               <label class="mode-label">
                 考核类型
                 <select id="examType" class="select quiz-size-select">
                   <option value="practice">练习模式：答后显示解析</option>
-                  <option value="formal">正式考试：交卷后统一出成绩</option>
+                  <option value="formal">正式模式：交卷后统一出成绩</option>
                 </select>
               </label>
               <label class="mode-label">
@@ -193,6 +197,7 @@
               </label>
               <button id="startQuizBtn" class="primary-btn">开始答题</button>
             </div>
+            <p id="quizSetupStatus" class="form-error quiz-setup-status" role="status"></p>
           </div>
 
           <div id="quizRunner" class="quiz-runner hidden">
@@ -236,7 +241,7 @@
               <button id="exportMistakesBtn" class="secondary-btn">导出错题</button>
             </div>
           </div>
-          <div class="admin-alert">当前是静态网页增强版：数据仍保存在本机浏览器。已先补齐管理看板、导出、错题重练、正式考试流程；后续接飞书多维表格后可升级为全员云端统计。</div>
+          <div class="admin-alert">当前为安全的本机模式，数据仅保存在本设备。全员统计需在完成可靠身份验证后再启用。</div>
           <div id="adminMetrics" class="summary-grid"></div>
           <div class="admin-grid">
             <div class="admin-panel">
@@ -252,10 +257,6 @@
       </main>
     </div>
 
-    <script>
-      window.JZ_ADMIN_PHONES = "13750353689,13538004509"; // 管理员手机号白名单，多个手机号用英文逗号隔开
-      window.JZ_API_BASE = "https://jinzun-knowledge.vercel.app"; // 飞书云端记录接口
-    </script>
-    <script src="./app.js?v=20260709" type="module"></script>
+    <script src="./app.js?v=20260710" type="module"></script>
   </body>
 </html>

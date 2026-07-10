@@ -1,1 +1,1 @@
-{"scripts":{"start":"vercel dev","deploy":"vercel --prod"},"devDependencies":{"vercel":"latest"}}
+{"scripts":{"start":"vercel dev","deploy":"vercel --prod","generate:products":"python scripts/generate_product_quiz.py","verify":"python scripts/verify_site_data.py"},"devDependencies":{"vercel":"latest"}}

@@ -1,14 +1,10 @@
-const BUILD_VERSION = "20260709";
+const BUILD_VERSION = "20260710";
 const productUrl = `./outputs/product_quiz/é‡‘å°Šäº§å“çŸ¥è¯†åº“é¢˜åº“.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/å²—ä½å­¦ä¹ è€ƒæ ¸é¢˜åº“.json?v=${BUILD_VERSION}`;
-const API_BASES = [
-  window.JZ_API_BASE,
-  "https://jinzun-knowledge.vercel.app",
-  "https://jinzun-knowledge-key943vg0-kevinzhu-s-projects.vercel.app",
-].filter(Boolean);
-const API_BASE = API_BASES[0] || "";
-const CLOUD_ENABLED = API_BASES.length > 0;
-const ADMIN_PHONES = (window.JZ_ADMIN_PHONES || "").split(",").map((phone) => phone.replace(/\D/g, "")).filter(Boolean);
+const API_BASES = [];
+const API_BASE = "";
+const CLOUD_ENABLED = false;
+const ADMIN_PHONES = [];
 const state = {
   allQuestions: [],
   filtered: [],
@@ -24,6 +20,12 @@ const state = {
   wrongDetails: [],
   currentUser: null,
   cloudStats: null,
+  learnPage: 1,
+  learnPageSize: 60,
+  answeredCount: 0,
+  answeredQuestionIds: new Set(),
+  examFinished: true,
+  examLabelOverride: "",
 };
 
 const els = {
@@ -47,6 +49,7 @@ const els = {
   learnFilter: document.querySelector("#learnFilter"),
   learnList: document.querySelector("#learnList"),
   learnCount: document.querySelector("#learnCount"),
+  learnPagination: document.querySelector("#learnPagination"),
   searchInput: document.querySelector("#searchInput"),
   resetBtn: document.querySelector("#resetBtn"),
   quizTimer: document.querySelector("#quizTimer"),
@@ -83,6 +86,9 @@ const els = {
   userName: document.querySelector("#userName"),
   userMeta: document.querySelector("#userMeta"),
   logoutBtn: document.querySelector("#logoutBtn"),
+  quizSetupStatus: document.querySelector("#quizSetupStatus"),
+  mobileSidebarToggle: document.querySelector("#mobileSidebarToggle"),
+  sidebarTools: document.querySelector("#sidebarTools"),
 };
 
 const userStore = {
@@ -171,7 +177,7 @@ function initSlogan() {
   if (!el || !dots) return;
 
   dots.innerHTML = slogans.map((_, i) =>
-    `<button class="slogan-dot${i === 0 ? " active" : ""}" data-i="${i}"></button>`
+    `<button class="slogan-dot${i === 0 ? " active" : ""}" data-i="${i}" aria-label="æŸ¥çœ‹ç¬¬ ${i + 1} æ¡å­¦ä¹ æç¤º"></button>`
   ).join("");
 
   dots.querySelectorAll(".slogan-dot").forEach((btn) => {
@@ -208,7 +214,7 @@ const pageTitles = {
   dashboard: "å­¦ä¹ æ€»è§ˆ",
   ranking: "æ’è¡Œæ¦œ",
   learn: "å­¦ä¹ é¢˜åº“",
-  quiz: "éšæœºè€ƒæ ¸",
+  quiz: "å­¦ä¹ è€ƒæ ¸",
   mistakes: "é”™é¢˜å¤ä¹ ",
   admin: "ç®¡ç†çœ‹æ¿",
 };
@@ -235,15 +241,18 @@ const isEquivalentAnswer = (question, selectedLetter) => {
 
 // Strip product code from option text for quiz display.
 // Only applied to äº§å“åç§° questions where the code in the option text gives away the answer.
-const stripCodeFromOption = (text, knowledgePoint) => {
-  if (knowledgePoint !== "äº§å“åç§°" || !text) return text;
+const stripCodeFromOption = (text, question) => {
+  if (question.knowledgePoint !== "äº§å“åç§°" || !text) return text;
+  const isCorrectAnswer = text === question.answerText;
+  const answerStartsWithCurrentCode = normalize(text).startsWith(normalize(question.code));
+  if (isCorrectAnswer && !answerStartsWithCurrentCode) return text;
   return text
     .replace(/^\d{4}[A-Za-z]?\s*/, "") // "2232A é‡‘å°Š..." / "2421æ¾³é—¨å…«æ˜Ÿ..." â†’ "é‡‘å°Š..." / "æ¾³é—¨å…«æ˜Ÿ..."
     .replace(/ã€[^ã€‘]+ã€‘/g, "")          // "ç¤¼ç›’ã€0206ã€‘2ç›’è£…" â†’ "ç¤¼ç›’2ç›’è£…"
     .trim();
 };
 
-const displayAnswerText = (question) => stripCodeFromOption(question.answerText, question.knowledgePoint);
+const displayAnswerText = (question) => stripCodeFromOption(question.answerText, question);
 const displayExplanation = (question) => {
   if (question.knowledgePoint !== "äº§å“åç§°") return question.explanation;
   const name = displayAnswerText(question);
@@ -253,10 +262,10 @@ const displayExplanation = (question) => {
 const imagePath = (src) => (src ? `./${src}` : "");
 
 const optionEntries = (question) => [
-  ["A", question.optionA, question.optionAImage],
-  ["B", question.optionB, question.optionBImage],
-  ["C", question.optionC, question.optionCImage],
-  ["D", question.optionD, question.optionDImage],
+  ["A", question.optionA, question.optionAImage, Number(question.optionAImageWidth) || 0],
+  ["B", question.optionB, question.optionBImage, Number(question.optionBImageWidth) || 0],
+  ["C", question.optionC, question.optionCImage, Number(question.optionCImageWidth) || 0],
+  ["D", question.optionD, question.optionDImage, Number(question.optionDImageWidth) || 0],
 ].filter(([, text, image]) => text || image);
 
 const escapeHtml = (value) =>
@@ -296,7 +305,13 @@ const toCsv = (headers, rows) => {
   return `\uFEFF${lines.join("\n")}`;
 };
 
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = (value = new Date()) => {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const getUserRecords = (phone) =>
   JSON.parse(localStorage.getItem(`jz_${phone}_exam_records`) || "[]");
@@ -358,6 +373,7 @@ async function cloudRequest(action, payload) {
 }
 
 async function syncLater(action, payload) {
+  if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   try {
     const data = await cloudRequest(action, payload);
     if (action === "exam") setSyncStatus(data.fallback ? "è€ƒè¯•æˆç»©å·²æäº¤ï¼Œæ­£åœ¨åå°åŒæ­¥é£ä¹¦" : "è€ƒè¯•æˆç»©å·²åŒæ­¥åˆ°é£ä¹¦", "success");
@@ -369,909 +385,13 @@ async function syncLater(action, payload) {
     localStorage.setItem("jz_sync_queue", JSON.stringify(queue.slice(-300)));
     setSyncStatus(`äº‘ç«¯åŒæ­¥å¤±è´¥ï¼Œå·²æš‚å­˜æœ¬æœºï¼š${error.message}`, "error");
     return { ok: false, error: error.message };
-  }
-}
-
-async function flushSyncQueue() {
-  const queue = JSON.parse(localStorage.getItem("jz_sync_queue") || "[]");
-  if (!queue.length) return;
-  const remain = [];
-  for (const item of queue) {
-    try {
-      await cloudRequest(item.action, item.payload);
-    } catch (error) {
-      remain.push({ ...item, error: error.message });
-    }
-  }
-  localStorage.setItem("jz_sync_queue", JSON.stringify(remain.slice(-300)));
-}
-
-async function loadCloudStats() {
-  if (!CLOUD_ENABLED) {
-    state.cloudStats = null;
-    return;
-  }
-  try {
-    const res = await fetch(`${API_BASE}/api/stats`);
-    const data = await res.json();
-    if (data.ok) state.cloudStats = data;
-  } catch {
-    state.cloudStats = null;
-  }
-}
-
-async function loadQuestions() {
-  const [productRes, roleRes] = await Promise.all([fetch(productUrl), fetch(roleUrl)]);
-  const [productQuestions, roleQuestions] = await Promise.all([productRes.json(), roleRes.json()]);
-  state.allQuestions = [...productQuestions, ...roleQuestions].map((question) => ({
-    ...question,
-    role: question.role || question.category || "",
-    module: question.module || question.productLine || "",
-    source: question.source || "äº§å“çŸ¥è¯†åº“",
-    note: question.note || "",
-  }));
-}
-
-function banks() {
-  return ["å…¨éƒ¨é¢˜åº“", ...new Set(state.allQuestions.map((question) => question.bank))];
-}
-
-function bankQuestions() {
-  const keyword = normalize(els.searchInput.value);
-  return state.allQuestions.filter((question) => {
-    const bankMatch = state.currentBank === "å…¨éƒ¨é¢˜åº“" || question.bank === state.currentBank;
-    if (!bankMatch) return false;
-    if (!keyword) return true;
-    return [
-      question.id,
-      question.bank,
-      question.role,
-      question.module,
-      question.code,
-      question.productName,
-      question.knowledgePoint,
-      question.question,
-      question.answerText,
-    ]
-      .map(normalize)
-      .some((text) => text.includes(keyword));
-  });
-}
-
-function renderBankSelect() {
-  els.bankSelect.innerHTML = banks()
-    .map((bank) => `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}</option>`)
-    .join("");
-  els.bankSelect.value = state.currentBank;
-}
-
-function renderStats() {
-  state.filtered = bankQuestions();
-  els.bankCount.textContent = state.filtered.length;
-  els.mistakeCount.textContent = storage.mistakes.length;
-  const accuracy = storage.attempts ? Math.round((storage.correct / storage.attempts) * 100) : 0;
-  els.accuracyText.textContent = `${accuracy}%`;
-  renderUser();
-}
-
-function renderDashboard() {
-  const records = storage.examRecords;
-  const mistakes = storage.mistakes;
-  const todayRecords = records.filter((record) => String(record.finishedAt || "").startsWith(todayKey()));
-  const best = records.reduce((acc, record) => Math.max(acc, Number(record.percent) || 0), 0);
-  const last = records[0];
-
-  els.taskPanel.innerHTML = `
-    <div class="task-card ${todayRecords.length ? "done" : ""}">
-      <span>${todayRecords.length ? "âœ“" : "1"}</span>
-      <div><strong>å®Œæˆä»Šæ—¥è€ƒæ ¸</strong><small>${todayRecords.length ? `ä»Šæ—¥å·²å®Œæˆ ${todayRecords.length} æ¬¡` : "å»ºè®®å…ˆåš 30-50 é¢˜æ­£å¼è€ƒæ ¸"}</small></div>
-    </div>
-    <div class="task-card ${mistakes.length === 0 ? "done" : ""}">
-      <span>${mistakes.length === 0 ? "âœ“" : "2"}</span>
-      <div><strong>å¤ä¹ é”™é¢˜</strong><small>${mistakes.length ? `è¿˜æœ‰ ${mistakes.length} é“é”™é¢˜å¾…é‡ç»ƒ` : "å½“å‰æ²¡æœ‰å¾…å¤ä¹ é”™é¢˜"}</small></div>
-    </div>
-    <div class="task-card ${best >= 90 ? "done" : ""}">
-      <span>${best >= 90 ? "âœ“" : "3"}</span>
-      <div><strong>å†²åˆºä¼˜ç§€</strong><small>${best >= 90 ? `æœ€ä½³æˆç»© ${best} åˆ†` : `è·ç¦»ä¼˜ç§€è¿˜å·® ${Math.max(0, 90 - best)} åˆ†`}</small></div>
-    </div>
-  `;
-
-  const total = state.allQuestions.length;
-  const productTotal = state.allQuestions.filter((q) => PRODUCT_BANKS.includes(q.bank)).length;
-  const roleTotal = total - productTotal;
-  els.summaryCards.innerHTML = `
-    <div class="summary-card"><span>é¢˜åº“æ€»é‡</span><strong>${total}</strong><small>è¦†ç›–äº§å“ä¸å²—ä½</small></div>
-    <div class="summary-card"><span>äº§å“é¢˜</span><strong>${productTotal}</strong><small>æœˆé¥¼ / å¹´è´§ / è€—æ</small></div>
-    <div class="summary-card"><span>å²—ä½é¢˜</span><strong>${roleTotal}</strong><small>è¿è¥ / å®¢æœ / ç¾å·¥ç­‰</small></div>
-    <div class="summary-card"><span>æœ€è¿‘æˆç»©</span><strong>${last ? `${last.percent}åˆ†` : "--"}</strong><small>${last ? examTimeLabel(last.finishedAt) : "æš‚æ— è€ƒè¯•è®°å½•"}</small></div>
-  `;
-
-  const grouped = banks()
-    .filter((bank) => bank !== "å…¨éƒ¨é¢˜åº“")
-    .map((bank) => ({
-      bank,
-      count: state.allQuestions.filter((question) => question.bank === bank).length,
-      imageCount: state.allQuestions.filter((question) => question.bank === bank && (question.questionImage || question.optionAImage)).length,
-    }));
-
-  els.bankCards.innerHTML = grouped
-    .map(
-      (item) => `
-        <button class="bank-card" data-bank="${escapeHtml(item.bank)}">
-          <h4>${escapeHtml(item.bank)}</h4>
-          <p>${item.imageCount ? `${item.imageCount} é“å›¾ç‰‡é¢˜` : "å²—ä½ä¸çŸ¥è¯†ç‚¹ç»ƒä¹ "}</p>
-          <strong>${item.count}</strong>
-        </button>
-      `
-    )
-    .join("");
-
-  els.bankCards.querySelectorAll(".bank-card").forEach((card) => {
-    card.addEventListener("click", () => {
-      state.currentBank = card.dataset.bank;
-      els.bankSelect.value = state.currentBank;
-      switchView("learn");
-      renderAll();
-    });
-  });
-}
-
-function examTimeLabel(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
-
-function renderQuestionImages(question) {
-  if (!question.questionImage) return "";
-  return `<img class="thumb" src="${imagePath(question.questionImage)}" alt="é¢˜ç›®å›¾ç‰‡" loading="lazy" />`;
-}
-
-function renderOptionImages(question) {
-  const imageOptions = optionEntries(question).filter(([, , image]) => image);
-  if (!imageOptions.length) return "";
-  return `
-    <div class="learn-option-images">
-      ${imageOptions
-        .map(
-          ([letter, text, img]) => `
-            <figure>
-              <img src="${imagePath(img)}" alt="é€‰é¡¹${letter}å›¾ç‰‡" loading="lazy" />
-              <figcaption>${letter} ${escapeHtml(text)}</figcaption>
-            </figure>
-          `
-        )
-        .join("")}
-    </div>
-  `;
-}
-
-function renderLearnFilter() {
-  const allBanks = banks().filter((b) => b !== "å…¨éƒ¨é¢˜åº“");
-  const productBankSet = new Set(PRODUCT_BANKS);
-  const productGroup = allBanks.filter((b) => productBankSet.has(b));
-  const roleGroup = allBanks.filter((b) => !productBankSet.has(b));
-
-  const makeBtn = (label, value) => {
-    const active = state.currentBank === value;
-    return `<button class="learn-filter-btn${active ? " active" : ""}" data-bank="${escapeHtml(value)}">${escapeHtml(label)}</button>`;
-  };
-
-  els.learnFilter.innerHTML = `
-    ${makeBtn("å…¨éƒ¨", "å…¨éƒ¨é¢˜åº“")}
-    <span class="filter-sep"></span>
-    ${productGroup.map((b) => makeBtn(b, b)).join("")}
-    <span class="filter-sep"></span>
-    ${roleGroup.map((b) => makeBtn(b, b)).join("")}
-  `;
-
-  els.learnFilter.querySelectorAll(".learn-filter-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.currentBank = btn.dataset.bank;
-      els.bankSelect.value = state.currentBank;
-      renderAll();
-    });
-  });
-}
-
-function renderLearnList() {
-  const items = state.filtered.slice(0, 180);
-  els.learnCount.textContent = `${state.filtered.length} é“é¢˜${state.filtered.length > 180 ? "ï¼Œå½“å‰æ˜¾ç¤ºå‰ 180 é“" : ""}`;
-  if (!items.length) {
-    els.learnList.innerHTML = `<div class="empty">æ²¡æœ‰æ‰¾åˆ°åŒ¹é…çš„é¢˜ç›®ã€‚</div>`;
-    return;
-  }
-  els.learnList.innerHTML = items
-    .map(
-      (question) => `
-        <article class="learn-item">
-          <div>
-            <div class="meta">
-              <span>${escapeHtml(question.bank)}</span>
-              <span>${escapeHtml(question.type)}</span>
-              <span>${escapeHtml(question.difficulty)}</span>
-              <span>${escapeHtml(question.knowledgePoint)}</span>
-            </div>
-            <h4>${escapeHtml(question.question)}</h4>
-            <p class="answer-line">ç­”æ¡ˆï¼š${escapeHtml(question.answer)}ï½œ${escapeHtml(displayAnswerText(question))}</p>
-            <p class="explain">${escapeHtml(displayExplanation(question))}</p>
-            ${renderOptionImages(question)}
-          </div>
-          ${renderQuestionImages(question)}
-        </article>
-      `
-    )
-    .join("");
-}
-
-const PRODUCT_BANKS = ["æœˆé¥¼é¢˜åº“", "æ—¥å¸¸å¹´è´§é¢˜åº“", "çº¸ç®±è€—æé¢˜åº“"];
-const CORE_EXAM_BANKS = ["æœˆé¥¼é¢˜åº“", "æ—¥å¸¸å¹´è´§é¢˜åº“"];
-
-let timerInterval = null;
-let timerSeconds = 0;
-let timerLimitSeconds = 0;
-let timerExpired = false;
-
-function formatTime(s) {
-  const m = Math.floor(s / 60).toString().padStart(2, "0");
-  const sec = (s % 60).toString().padStart(2, "0");
-  return `${m}:${sec}`;
-}
-
-function quizTimeLimit(size) {
-  // 50é¢˜=20åˆ†é’Ÿï¼ŒæŒ‰æ¯”ä¾‹ç»™æ—¶é—´ï¼šæ¯é¢˜24ç§’ï¼›10é¢˜=4åˆ†é’Ÿã€‚
-  return Math.max(60, Math.round(size * 24));
-}
-
-function updateTimerText() {
-  const remaining = Math.max(0, timerLimitSeconds - timerSeconds);
-  els.quizTimer.textContent = `â³ å‰©ä½™ ${formatTime(remaining)}`;
-}
-
-function startTimer(limitSeconds) {
-  clearInterval(timerInterval);
-  timerSeconds = 0;
-  timerExpired = false;
-  timerLimitSeconds = limitSeconds || quizTimeLimit(state.quiz.length || EXAM_SIZE);
-  updateTimerText();
-  timerInterval = setInterval(() => {
-    timerSeconds += 1;
-    updateTimerText();
-    if (timerSeconds >= timerLimitSeconds) {
-      timerExpired = true;
-      finishQuiz();
-    }
-  }, 1000);
-}
-
-function stopTimer() {
-  clearInterval(timerInterval);
-  timerInterval = null;
-}
-
-function updateWrongCount() {
-  els.quizWrongCount.textContent = `âœ— é”™è¯¯ ${state.quizWrong} é¢˜`;
-  els.quizWrongCount.classList.toggle("has-wrong", state.quizWrong > 0);
-}
-const EXAM_SIZE = 50;
-
-function renderQuizSetup() {
-  const productBanks = PRODUCT_BANKS.filter((bank) =>
-    state.allQuestions.some((q) => q.bank === bank)
-  );
-  const roleBanks = banks().filter(
-    (bank) => bank !== "å…¨éƒ¨é¢˜åº“" && !PRODUCT_BANKS.includes(bank)
-  );
-
-  els.productBankSelect.innerHTML = productBanks
-    .map((bank) => {
-      const count = state.allQuestions.filter((q) => q.bank === bank).length;
-      return `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}ï¼ˆ${count} é¢˜ï¼‰</option>`;
-    })
-    .join("");
-
-  els.roleBankSelect.innerHTML = roleBanks
-    .map((bank) => {
-      const count = state.allQuestions.filter((q) => q.bank === bank).length;
-      return `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}ï¼ˆ${count} é¢˜ï¼‰</option>`;
-    })
-    .join("");
-}
-
-function startQuiz() {
-  const size = Number(els.quizSize.value) || EXAM_SIZE;
-  let pool;
-  if (state.quizMode === "product") {
-    const bank = els.productBankSelect.value;
-    pool = state.allQuestions.filter((q) => q.bank === bank);
-  } else if (state.quizMode === "role") {
-    const bank = els.roleBankSelect.value;
-    const roleQs = state.allQuestions.filter((q) => q.bank === bank);
-    const needed = Math.max(0, size - roleQs.length);
-    const productPool = shuffle(state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank)));
-    pool = [...roleQs, ...productPool.slice(0, needed)];
-  } else {
-    pool = state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank));
-  }
-  state.quiz = shuffle(pool).slice(0, Math.min(size, pool.length));
-  state.quizIndex = 0;
-  state.score = 0;
-  state.answered = false;
-  state.quizWrong = 0;
-  state.wrongDetails = [];
-  state.examType = els.examType?.value || "practice";
-  startTimer(quizTimeLimit(state.quiz.length));
-  updateWrongCount();
-  els.quizSetup.classList.add("hidden");
-  els.quizResult.classList.add("hidden");
-  els.quizRunner.classList.remove("hidden");
-  renderQuizCard();
-}
-
-function renderQuizCard() {
-  const question = state.quiz[state.quizIndex];
-  if (!question) {
-    finishQuiz();
-    return;
-  }
-  const progress = ((state.quizIndex + 1) / state.quiz.length) * 100;
-  els.quizStep.textContent = `ç¬¬ ${state.quizIndex + 1} é¢˜`;
-  els.quizScore.textContent = `${state.score} åˆ†`;
-  els.progressBar.style.width = `${progress}%`;
-  const options = optionEntries(question);
-  els.quizCard.innerHTML = `
-    <div class="meta">
-      <span>${escapeHtml(question.bank)}</span>
-      <span>${escapeHtml(question.type)}</span>
-      <span>${escapeHtml(question.knowledgePoint)}</span>
-    </div>
-    <h3>${escapeHtml(question.question)}</h3>
-    ${question.questionImage ? (() => {
-      const isMooncake = question.questionImage.includes('/mooncake/');
-      const isDailyProduct = question.questionImage.includes('/daily/');
-      return `<div class="quiz-img-wrap${isMooncake ? ' quiz-img-crop-moon' : ''}${isDailyProduct ? ' quiz-img-crop-daily' : ''}">
-        <img src="${imagePath(question.questionImage)}" alt="é¢˜ç›®å›¾ç‰‡" />
-      </div>`;
-    })() : ""}
-    <div class="options">
-      ${options
-        .map(
-          ([letter, text, img]) => `
-            <button class="option-btn" data-letter="${letter}">
-              <strong>${letter}</strong>${escapeHtml(stripCodeFromOption(text, question.knowledgePoint))}
-              ${img ? (() => {
-                const isMooncake = img.includes('/mooncake/');
-                const isDailyProduct = img.includes('/daily/');
-                return `<div class="quiz-opt-img${isMooncake ? ' quiz-img-crop-moon' : ''}${isDailyProduct ? ' quiz-img-crop-daily' : ''}">
-                  <img src="${imagePath(img)}" alt="é€‰é¡¹${letter}å›¾ç‰‡" />
-                </div>`;
-              })() : ""}
-            </button>
-          `
-        )
-        .join("")}
-    </div>
-    <div id="feedback" class="feedback hidden"></div>
-  `;
-  els.quizCard.querySelectorAll(".option-btn").forEach((button) => {
-    button.addEventListener("click", () => chooseAnswer(button.dataset.letter));
-  });
-}
-
-function chooseAnswer(letter) {
-  if (state.answered) return;
-  state.answered = true;
-  const question = state.quiz[state.quizIndex];
-  const correct = isEquivalentAnswer(question, letter);
-  storage.attempts += 1;
-  if (correct) {
-    storage.correct += 1;
-    state.score += 1;
-  } else {
-    state.quizWrong += 1;
-    state.wrongDetails.push({ ...question, selected: letter, savedAt: new Date().toISOString() });
-    updateWrongCount();
-    saveMistake(question, letter);
-  }
-  els.quizScore.textContent = `${state.score} åˆ†`;
-  els.quizCard.querySelectorAll(".option-btn").forEach((button) => {
-    button.disabled = true;
-    if (state.examType === "practice" && button.dataset.letter === question.answer) button.classList.add("correct");
-    if (state.examType === "practice" && button.dataset.letter === letter && !correct) button.classList.add("wrong");
-    if (state.examType === "formal" && button.dataset.letter === letter) button.classList.add("selected");
-  });
-  const feedback = document.querySelector("#feedback");
-  feedback.classList.remove("hidden");
-  const isLast = state.quizIndex + 1 === state.quiz.length;
-  feedback.innerHTML = state.examType === "formal" ? `
-    <strong>å·²ä½œç­”</strong>
-    <p class="explain">æ­£å¼è€ƒè¯•æ¨¡å¼ï¼šäº¤å·åç»Ÿä¸€å±•ç¤ºæˆç»©å’Œé”™é¢˜è§£æã€‚</p>
-    <button class="primary-btn next-btn" id="nextQuestionBtn">${isLast ? "äº¤å·çœ‹æˆç»©" : "ä¸‹ä¸€é¢˜"}</button>
-  ` : `
-    <strong>${correct ? "å›ç­”æ­£ç¡®" : "å›ç­”é”™è¯¯"}</strong>
-    <p class="explain">æ­£ç¡®ç­”æ¡ˆï¼š${escapeHtml(question.answer)}ï½œ${escapeHtml(displayAnswerText(question))}</p>
-    <p class="explain">${escapeHtml(displayExplanation(question))}</p>
-    <button class="primary-btn next-btn" id="nextQuestionBtn">${isLast ? "æŸ¥çœ‹æˆç»©" : "ä¸‹ä¸€é¢˜"}</button>
-  `;
-  document.querySelector("#nextQuestionBtn").addEventListener("click", () => {
-    state.quizIndex += 1;
-    state.answered = false;
-    renderQuizCard();
-    renderStats();
-  });
-}
-
-function saveMistake(question, selected) {
-  const mistakes = storage.mistakes.filter((item) => item.id !== question.id);
-  const item = { ...question, selected, savedAt: new Date().toISOString() };
-  mistakes.unshift(item);
-  storage.mistakes = mistakes.slice(0, 300);
-  syncLater("mistakes", { user: state.currentUser, items: [item] });
-}
-
-function finishQuiz() {
-  stopTimer();
-  const percent = state.quiz.length ? Math.round((state.score / state.quiz.length) * 100) : 0;
-  const timeStr = formatTime(timerSeconds);
-  saveExamRecord(percent);
-  els.quizRunner.classList.add("hidden");
-  els.quizResult.classList.remove("hidden");
-  const wrongReview = state.wrongDetails.length ? `
-    <div class="wrong-review">
-      <h4>æœ¬æ¬¡é”™é¢˜è§£æ</h4>
-      ${state.wrongDetails.slice(0, 8).map((q, i) => `
-        <div class="wrong-review-item">
-          <strong>${i + 1}. ${escapeHtml(q.question)}</strong>
-          <p>é”™é€‰ï¼š${escapeHtml(q.selected)}ï½œæ­£ç¡®ï¼š${escapeHtml(q.answer)} ${escapeHtml(displayAnswerText(q))}</p>
-          <small>${escapeHtml(displayExplanation(q))}</small>
-        </div>
-      `).join("")}
-      ${state.wrongDetails.length > 8 ? `<p class="explain">æ›´å¤šé”™é¢˜å·²è¿›å…¥é”™é¢˜æœ¬ã€‚</p>` : ""}
-    </div>
-  ` : "";
-  els.quizResult.innerHTML = `
-    <p class="eyebrow">Result Â· ${escapeHtml(examLabel())} Â· ${state.examType === "formal" ? "æ­£å¼è€ƒè¯•" : "ç»ƒä¹ æ¨¡å¼"}</p>
-    <h3>${percent} åˆ†</h3>
-    ${timerExpired ? `<p class="explain result-wrong">æ—¶é—´åˆ°ï¼Œå·²è‡ªåŠ¨äº¤å·ã€‚</p>` : ""}
-    <div class="result-meta">
-      <span>âœ“ ç­”å¯¹ ${state.score} é¢˜</span>
-      <span class="${state.quizWrong > 0 ? "result-wrong" : ""}">âœ— ç­”é”™ ${state.quizWrong} é¢˜</span>
-      <span>â± ç”¨æ—¶ ${timeStr}</span>
-      <span>${percent >= 80 ? "å·²é€šè¿‡" : "æœªé€šè¿‡"}</span>
-    </div>
-    <p class="explain">${percent >= 90 ? "è¡¨ç°å¾ˆç¨³ï¼Œå¯ä»¥è¿›å…¥ä¸‹ä¸€ç»„é¢˜åº“ã€‚" : percent >= 80 ? "å·²è¾¾åˆ°åˆæ ¼çº¿ï¼Œå»ºè®®ç»§ç»­é‡ç»ƒé”™é¢˜å†²åˆºä¼˜ç§€ã€‚" : "å»ºè®®å…ˆå¤ä¹ é”™é¢˜ï¼Œå†é‡æ–°è€ƒä¸€æ¬¡ã€‚"}</p>
-    ${wrongReview}
-    <div class="result-actions">
-      <button class="primary-btn" id="retryQuizBtn">é‡æ–°è€ƒæ ¸</button>
-      <button class="secondary-btn" id="reviewMistakesBtn">æŸ¥çœ‹é”™é¢˜</button>
-    </div>
-  `;
-  document.querySelector("#retryQuizBtn").addEventListener("click", startQuiz);
-  document.querySelector("#reviewMistakesBtn").addEventListener("click", () => switchView("mistakes"));
-  renderStats();
-}
-
-function examLabel() {
-  if (state.quizMode === "product") return els.productBankSelect.value;
-  if (state.quizMode === "role") return els.roleBankSelect.value + "ï¼ˆå«è¡¥å……é¢˜ï¼‰";
-  return "éšæœºæ··åˆ";
-}
-
-function saveExamRecord(percent) {
-  const records = storage.examRecords;
-  records.unshift({
-    user: state.currentUser,
-    bank: examLabel(),
-    type: state.examType === "formal" ? "æ­£å¼è€ƒè¯•" : "ç»ƒä¹ æ¨¡å¼",
-    score: state.score,
-    total: state.quiz.length,
-    wrong: state.quizWrong,
-    percent,
-    passed: percent >= 80,
-    duration: timerSeconds,
-    finishedAt: new Date().toISOString(),
-    wrongDetails: state.wrongDetails,
-  });
-  storage.examRecords = records.slice(0, 100);
-  syncLater("exam", { user: state.currentUser, record: records[0] });
-}
-
-function renderMistakes() {
-  const mistakes = storage.mistakes;
-  els.retryMistakesBtn.disabled = !mistakes.length;
-  if (!mistakes.length) {
-    els.mistakeList.innerHTML = `<div class="empty">ç°åœ¨è¿˜æ²¡æœ‰é”™é¢˜è®°å½•ã€‚</div>`;
-    return;
-  }
-  const grouped = mistakes.reduce((acc, q) => {
-    const key = q.knowledgePoint || "å…¶ä»–";
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-  const topTags = Object.entries(grouped).sort((a, b) => b[1] - a[1]).slice(0, 6)
-    .map(([name, count]) => `<span class="pill">${escapeHtml(name)} ${count}</span>`).join("");
-  els.mistakeList.innerHTML = `
-    <div class="mistake-summary">
-      <strong>å¾…å¤ä¹  ${mistakes.length} é“</strong>
-      <div>${topTags}</div>
-    </div>
-    ${mistakes
-      .map(
-        (question) => `
-          <article class="learn-item">
-            <div>
-              <div class="meta">
-                <span>${escapeHtml(question.bank)}</span>
-                <span>${escapeHtml(question.knowledgePoint)}</span>
-                <span>é”™é€‰ï¼š${escapeHtml(question.selected)}</span>
-              </div>
-              <h4>${escapeHtml(question.question)}</h4>
-              <p class="answer-line">æ­£ç¡®ç­”æ¡ˆï¼š${escapeHtml(question.answer)}ï½œ${escapeHtml(displayAnswerText(question))}</p>
-              <p class="explain">${escapeHtml(displayExplanation(question))}</p>
-              ${renderOptionImages(question)}
-            </div>
-            ${renderQuestionImages(question)}
-          </article>
-        `
-      )
-      .join("")}
-  `;
-}
-
-function startMistakeQuiz() {
-  const mistakes = storage.mistakes;
-  if (!mistakes.length) return;
-  state.quiz = shuffle(mistakes).slice(0, Math.min(30, mistakes.length));
-  state.quizIndex = 0;
-  state.score = 0;
-  state.answered = false;
-  state.quizWrong = 0;
-  state.wrongDetails = [];
-  state.examType = "practice";
-  startTimer(quizTimeLimit(state.quiz.length));
-  updateWrongCount();
-  switchView("quiz");
-  els.quizSetup.classList.add("hidden");
-  els.quizResult.classList.add("hidden");
-  els.quizRunner.classList.remove("hidden");
-  renderQuizCard();
-}
-
-let rankSortMode = "score";
-
-function renderRanking() {
-  const listEl = document.querySelector("#rankingList");
-  if (!listEl) return;
-
-  const allUsers = userStore.users;
-  const rows = Object.values(allUsers).map((user) => {
-    const records = JSON.parse(
-      localStorage.getItem(`jz_${user.phone}_exam_records`) || "[]"
-    );
-    if (!records.length) return null;
-    const best = records.reduce((a, b) => {
-      if (b.percent > a.percent) return b;
-      if (b.percent === a.percent && (b.duration ?? 99999) < (a.duration ?? 99999)) return b;
-      return a;
-    });
-    return { user, best, totalExams: records.length };
-  }).filter(Boolean);
-
-  if (rankSortMode === "time") {
-    rows.sort((a, b) => {
-      const ta = a.best.duration ?? 99999;
-      const tb = b.best.duration ?? 99999;
-      if (ta !== tb) return ta - tb;
-      return b.best.percent - a.best.percent;
-    });
-  } else {
-    rows.sort((a, b) => {
-      if (b.best.percent !== a.best.percent) return b.best.percent - a.best.percent;
-      return (a.best.duration ?? 99999) - (b.best.duration ?? 99999);
-    });
-  }
-
-  if (!rows.length) {
-    listEl.innerHTML = `<div class="empty">è¿˜æ²¡æœ‰è€ƒæ ¸è®°å½•ï¼Œå®Œæˆä¸€æ¬¡è€ƒæ ¸åå³å¯ä¸Šæ¦œã€‚</div>`;
-    return;
-  }
-
-  const medalClass = (i) => (i === 0 ? " rank-gold" : i === 1 ? " rank-silver" : i === 2 ? " rank-bronze" : "");
-  const medalLabel = (i) => (i === 0 ? "ğŸ¥‡" : i === 1 ? "ğŸ¥ˆ" : i === 2 ? "ğŸ¥‰" : String(i + 1));
-
-  listEl.innerHTML = rows.map(({ user, best, totalExams }, i) => `
-    <div class="rank-row${i < 3 ? " rank-top" : ""}">
-      <div class="rank-num${medalClass(i)}">${medalLabel(i)}</div>
-      <div class="rank-info">
-        <strong>${escapeHtml(user.name)}</strong>
-        <span>${escapeHtml(user.role)} Â· è€ƒæ ¸ ${totalExams} æ¬¡</span>
-      </div>
-      <div class="rank-mid">
-        <span class="rank-bank">${escapeHtml(best.bank || "")}</span>
-        <span class="rank-detail-time">${best.duration != null ? "â± " + formatTime(best.duration) : ""}</span>
-      </div>
-      <div class="rank-score${best.percent >= 90 ? " rank-score-high" : ""}">${best.percent}<small>åˆ†</small></div>
-    </div>
-  `).join("");
-
-  document.querySelectorAll(".rank-sort-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.sort === rankSortMode);
-    btn.onclick = () => {
-      rankSortMode = btn.dataset.sort;
-      renderRanking();
-    };
-  });
-}
-
-function renderAdmin() {
-  if (!isAdminUser()) {
-    els.adminMetrics.innerHTML = `<div class="empty">æ— æƒé™è®¿é—®ç®¡ç†çœ‹æ¿ã€‚</div>`;
-    els.adminUserTable.innerHTML = "";
-    els.adminWeakList.innerHTML = "";
-    return;
-  }
-  const cloud = state.cloudStats;
-  const users = cloud?.employees?.length
-    ? cloud.employees.map((u) => ({ name: u["å§“å"], phone: u["æ‰‹æœºå·"], role: u["å²—ä½"] }))
-    : Object.values(userStore.users);
-  const rows = users.map((user) => {
-    const records = cloud?.exams?.length
-      ? cloud.exams.filter((r) => String(r["æ‰‹æœºå·"]) === String(user.phone)).map((r) => ({
-          percent: Number(r["åˆ†æ•°"] || 0), score: Number(r["ç­”å¯¹é¢˜æ•°"] || 0), total: Number(r["æ€»é¢˜æ•°"] || 0),
-          wrong: Number(r["é”™é¢˜æ•°"] || 0), duration: Number(r["ç”¨æ—¶ç§’"] || 0), bank: r["é¢˜åº“"], type: r["è€ƒæ ¸ç±»å‹"], finishedAt: r["å®Œæˆæ—¶é—´"],
-        }))
-      : getUserRecords(user.phone);
-    const mistakes = cloud?.mistakes?.length
-      ? cloud.mistakes.filter((r) => String(r["æ‰‹æœºå·"]) === String(user.phone)).map((r) => ({ knowledgePoint: r["çŸ¥è¯†ç‚¹"], bank: r["é¢˜åº“"] }))
-      : getUserMistakes(user.phone);
-    const best = records.reduce((acc, record) => (Number(record.percent) > Number(acc?.percent || -1) ? record : acc), null);
-    const latest = records[0];
-    return { user, records, mistakes, best, latest };
-  });
-  const allRecords = rows.flatMap((row) => row.records.map((record) => ({ ...record, user: row.user })));
-  const avg = allRecords.length ? Math.round(allRecords.reduce((sum, r) => sum + Number(r.percent || 0), 0) / allRecords.length) : 0;
-  const passed = allRecords.filter((r) => Number(r.percent) >= 80).length;
-  const passRate = allRecords.length ? Math.round((passed / allRecords.length) * 100) : 0;
-  const notExam = rows.filter((row) => !row.records.length).length;
-
-  els.adminMetrics.innerHTML = `
-    <div class="summary-card"><span>å‘˜å·¥æ•°</span><strong>${users.length}</strong><small>${cloud?.employees?.length ? "é£ä¹¦äº‘ç«¯æ•°æ®" : "æœ¬æœºå·²ç™»å½•è´¦å·"}</small></div>
-    <div class="summary-card"><span>è€ƒè¯•æ¬¡æ•°</span><strong>${allRecords.length}</strong><small>æ­£å¼+ç»ƒä¹ è®°å½•</small></div>
-    <div class="summary-card"><span>å¹³å‡åˆ†</span><strong>${avg}</strong><small>å…¨éƒ¨è€ƒè¯•è®°å½•</small></div>
-    <div class="summary-card"><span>é€šè¿‡ç‡</span><strong>${passRate}%</strong><small>80 åˆ†ä»¥ä¸Šé€šè¿‡ï¼Œæœªè€ƒ ${notExam} äºº</small></div>
-  `;
-
-  els.adminUserTable.innerHTML = rows.length ? `
-    <table>
-      <thead><tr><th>å§“å</th><th>å²—ä½</th><th>æ¬¡æ•°</th><th>æœ€ä½³</th><th>æœ€è¿‘</th><th>é”™é¢˜</th></tr></thead>
-      <tbody>
-        ${rows.map(({ user, records, mistakes, best, latest }) => `
-          <tr>
-            <td>${escapeHtml(user.name)}</td>
-            <td>${escapeHtml(user.role)}</td>
-            <td>${records.length}</td>
-            <td>${best ? `${best.percent}åˆ†` : "æœªè€ƒ"}</td>
-            <td>${latest ? `${latest.percent}åˆ† Â· ${examTimeLabel(latest.finishedAt)}` : "--"}</td>
-            <td>${mistakes.length}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  ` : `<div class="empty">æš‚æ— å‘˜å·¥è®°å½•ã€‚</div>`;
-
-  const allMistakes = rows.flatMap((row) => row.mistakes);
-  const weak = allMistakes.reduce((acc, q) => {
-    const key = q.knowledgePoint || q.bank || "å…¶ä»–";
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-  const weakRows = Object.entries(weak).sort((a, b) => b[1] - a[1]).slice(0, 12);
-  els.adminWeakList.innerHTML = weakRows.length ? `
-    <table><thead><tr><th>çŸ¥è¯†ç‚¹</th><th>é”™é¢˜æ•°</th></tr></thead><tbody>
-      ${weakRows.map(([name, count]) => `<tr><td>${escapeHtml(name)}</td><td>${count}</td></tr>`).join("")}
-    </tbody></table>
-  ` : `<div class="empty">æš‚æ— é”™é¢˜ç»Ÿè®¡ã€‚</div>`;
-}
-
-function exportRecords() {
-  const rows = state.cloudStats?.exams?.length
-    ? state.cloudStats.exams.map((r) => ({
-        å§“å: r["å§“å"], æ‰‹æœºå·: r["æ‰‹æœºå·"], å²—ä½: r["å²—ä½"], è€ƒæ ¸ç±»å‹: r["è€ƒæ ¸ç±»å‹"], é¢˜åº“: r["é¢˜åº“"], åˆ†æ•°: r["åˆ†æ•°"], ç­”å¯¹: r["ç­”å¯¹é¢˜æ•°"], æ€»é¢˜æ•°: r["æ€»é¢˜æ•°"], é”™é¢˜æ•°: r["é”™é¢˜æ•°"], æ˜¯å¦é€šè¿‡: r["æ˜¯å¦é€šè¿‡"], ç”¨æ—¶ç§’: r["ç”¨æ—¶ç§’"], å®Œæˆæ—¶é—´: r["å®Œæˆæ—¶é—´"],
-      }))
-    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).map((record) => ({
-        å§“å: user.name,
-        æ‰‹æœºå·: user.phone,
-        å²—ä½: user.role,
-        è€ƒæ ¸ç±»å‹: record.type || "ç»ƒä¹ æ¨¡å¼",
-        é¢˜åº“: record.bank,
-        åˆ†æ•°: record.percent,
-        ç­”å¯¹: record.score,
-        æ€»é¢˜æ•°: record.total,
-        é”™é¢˜æ•°: record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
-        æ˜¯å¦é€šè¿‡: Number(record.percent) >= 80 ? "æ˜¯" : "å¦",
-        ç”¨æ—¶ç§’: record.duration,
-        å®Œæˆæ—¶é—´: record.finishedAt,
-      })));
-  downloadText(`é‡‘å°Šè€ƒè¯•è®°å½•_${todayKey()}.csv`, toCsv(["å§“å", "æ‰‹æœºå·", "å²—ä½", "è€ƒæ ¸ç±»å‹", "é¢˜åº“", "åˆ†æ•°", "ç­”å¯¹", "æ€»é¢˜æ•°", "é”™é¢˜æ•°", "æ˜¯å¦é€šè¿‡", "ç”¨æ—¶ç§’", "å®Œæˆæ—¶é—´"], rows));
-}
-
-function exportMistakes() {
-  const rows = state.cloudStats?.mistakes?.length
-    ? state.cloudStats.mistakes.map((q) => ({
-        å§“å: q["å§“å"], æ‰‹æœºå·: q["æ‰‹æœºå·"], å²—ä½: q["å²—ä½"], é¢˜åº“: q["é¢˜åº“"], çŸ¥è¯†ç‚¹: q["çŸ¥è¯†ç‚¹"], é¢˜ç›®: q["é¢˜ç›®"], é”™é€‰: q["é”™é€‰ç­”æ¡ˆ"], æ­£ç¡®ç­”æ¡ˆ: q["æ­£ç¡®ç­”æ¡ˆ"], è§£æ: q["è§£æ"], è®°å½•æ—¶é—´: q["å‡ºé”™æ—¶é—´"],
-      }))
-    : Object.values(userStore.users).flatMap((user) => getUserMistakes(user.phone).map((q) => ({
-        å§“å: user.name,
-        æ‰‹æœºå·: user.phone,
-        å²—ä½: user.role,
-        é¢˜åº“: q.bank,
-        çŸ¥è¯†ç‚¹: q.knowledgePoint,
-        é¢˜ç›®: q.question,
-        é”™é€‰: q.selected,
-        æ­£ç¡®ç­”æ¡ˆ: `${q.answer} ${displayAnswerText(q)}`,
-        è§£æ: displayExplanation(q),
-        è®°å½•æ—¶é—´: q.savedAt,
-      })));
-  downloadText(`é‡‘å°Šé”™é¢˜è®°å½•_${todayKey()}.csv`, toCsv(["å§“å", "æ‰‹æœºå·", "å²—ä½", "é¢˜åº“", "çŸ¥è¯†ç‚¹", "é¢˜ç›®", "é”™é€‰", "æ­£ç¡®ç­”æ¡ˆ", "è§£æ", "è®°å½•æ—¶é—´"], rows));
-}
-
-function switchView(view) {
-  if (view === "admin" && !isAdminUser()) {
-    view = "dashboard";
-  }
-  state.currentView = view;
-  els.navTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.view === view));
-  Object.entries(els.views).forEach(([name, element]) => element.classList.toggle("active", name === view));
-  els.pageTitle.textContent = pageTitles[view];
-  if (view === "quiz" && !state.quiz.length) {
-    els.quizSetup.classList.remove("hidden");
-    els.quizRunner.classList.add("hidden");
-    els.quizResult.classList.add("hidden");
-  }
-  if (view === "ranking") renderRanking();
-  if (view === "mistakes") renderMistakes();
-  if (view === "admin") {
-    loadCloudStats().then(renderAdmin);
-    renderAdmin();
-  }
-}
-
-function renderAll() {
-  renderStats();
-  renderDashboard();
-  renderLearnFilter();
-  renderLearnList();
-  renderMistakes();
-  renderAdmin();
-}
-
-function renderUser() {
-  applyAdminAccess();
-  if (!state.currentUser) {
-    els.userName.textContent = "æœªç™»å½•";
-    els.userMeta.textContent = "-";
-    return;
-  }
-  els.userName.textContent = state.currentUser.name;
-  els.userMeta.textContent = `${state.currentUser.role} Â· ${state.currentUser.phone}`;
-}
-
-function normalizePhone(value) {
-  return String(value || "").replace(/\D/g, "");
-}
-
-function loadCurrentUser() {
-  const phone = userStore.currentPhone;
-  const users = userStore.users;
-  state.currentUser = phone && users[phone] ? users[phone] : null;
-}
-
-function showAuth(visible) {
-  els.authView.classList.toggle("hidden", !visible);
-  document.body.classList.toggle("auth-locked", visible);
-}
-
-function saveUserFromForm(event) {
-  event.preventDefault();
-  const name = els.authName.value.trim();
-  const phone = normalizePhone(els.authPhone.value);
-  const role = els.authRole.value;
-  if (!name) {
-    els.authError.textContent = "è¯·å¡«å†™å§“åã€‚";
-    return;
-  }
-  if (phone.length !== 11) {
-    els.authError.textContent = "è¯·è¾“å…¥ 11 ä½æ‰‹æœºå·ã€‚";
-    return;
-  }
-  const users = userStore.users;
-  const user = {
-    name,
-    phone,
-    role,
-    updatedAt: new Date().toISOString(),
-  };
-  users[phone] = user;
-  userStore.users = users;
-  userStore.currentPhone = phone;
-  state.currentUser = user;
-  applyAdminAccess();
-  els.authError.textContent = "";
-  showAuth(false);
-  syncLater("login", { user });
-  flushSyncQueue();
-  renderAll();
-}
-
-function logout() {
-  userStore.currentPhone = "";
-  state.currentUser = null;
-  applyAdminAccess();
-  state.quiz = [];
-  state.quizIndex = 0;
-  state.score = 0;
-  els.authPhone.value = "";
-  els.authName.value = "";
-  showAuth(true);
-  renderAll();
-}
-
-function bindEvents() {
-  els.navTabs.forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
-  els.bankSelect.addEventListener("change", () => {
-    state.currentBank = els.bankSelect.value;
-    state.quiz = [];
-    renderAll();
-  });
-  els.searchInput.addEventListener("input", renderAll);
-  els.startQuizBtn.addEventListener("click", startQuiz);
-  els.retryMistakesBtn.addEventListener("click", startMistakeQuiz);
-  els.exportRecordsBtn.addEventListener("click", exportRecords);
-  els.exportMistakesBtn.addEventListener("click", exportMistakes);
-  document.querySelectorAll(".mode-tab").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      state.quizMode = tab.dataset.mode;
-      document.querySelectorAll(".mode-tab").forEach((t) =>
-        t.classList.toggle("active", t === tab)
-      );
-      els.modeRandom.classList.toggle("hidden", state.quizMode !== "random");
-      els.modeProduct.classList.toggle("hidden", state.quizMode !== "product");
-      els.modeRole.classList.toggle("hidden", state.quizMode !== "role");
-    });
-  });
-  els.clearMistakesBtn.addEventListener("click", () => {
-    storage.mistakes = [];
-    renderAll();
-  });
-  els.resetBtn.addEventListener("click", () => {
-    storage.attempts = 0;
-    storage.correct = 0;
-    storage.mistakes = [];
-    storage.examRecords = [];
-    renderAll();
-  });
-  els.authForm.addEventListener("submit", saveUserFromForm);
-  els.logoutBtn.addEventListener("click", logout);
-}
-
-async function init() {
-  try {
-    await loadQuestions();
-    loadCurrentUser();
-    renderBankSelect();
-    renderQuizSetup();
-    initSlogan();
-    bindEvents();
-    applyAdminAccess();
-    await flushSyncQueue();
-    await loadCloudStats();
-    renderAll();
-    showAuth(!state.currentUser);
-  } catch (error) {
-    document.body.innerHTML = `<div class="empty">é¢˜åº“åŠ è½½å¤±è´¥ï¼š${escapeHtml(error.message)}</div>`;
-    throw error;
-  }
-}
-
-init();
+÷Mµ¶‰Ëkºwµç@ì4(€ÍÑ…Ñ”¹…¹Íİ•É•‘EÕ•ÍÑ¥½¹%‘Ì€ô¹•ÜM•Ğ ¤ì4(€ÍÑ…Ñ”¹ÅÕ¥é]É½¹œ€ô€Àì4(€ÍÑ…Ñ”¹İÉ½¹•Ñ…¥±Ì€ômtì4(€ÍÑ…Ñ”¹•á…µQåÁ”€ô€‰ÁÉ…Ñ¥”ˆì4(€ÍÑ…Ñ”¹•á…µ¥¹¥Í¡•€ô™…±Í”ì4(€ÍÑ…Ñ”¹•á…µ1…‰•±=Ù•ÉÉ¥‘”€ô€‹¦Rg¦Šc¦7îˆì4(€ÍÑ…ÉÑQ¥µ•È¡ÅÕ¥éQ¥µ•1¥µ¥Ğ¡ÍÑ…Ñ”¹ÅÕ¥è¹±•¹Ñ ¤¤ì4(€ÕÁ‘…Ñ•]É½¹½Õ¹Ğ ¤ì4(€Íİ¥Ñ¡Y¥•Ü ‰ÅÕ¥èˆ¤ì4(€•±Ì¹ÅÕ¥éM•ÑÕÀ¹±…ÍÍ1¥ÍĞ¹…‘ ‰¡¥‘‘•¸ˆ¤ì4(€•±Ì¹ÅÕ¥éI•ÍÕ±Ğ¹±…ÍÍ1¥ÍĞ¹…‘ ‰¡¥‘‘•¸ˆ¤ì4(€•±Ì¹ÅÕ¥éIÕ¹¹•È¹±…ÍÍ1¥ÍĞ¹É•µ½Ù” ‰¡¥‘‘•¸ˆ¤ì4(€É•¹‘•ÉEÕ¥é…É ¤ì4)ô4(4)±•ĞÉ…¹­M½ÉÑ5½‘”€ô€‰Í½É”ˆì4(4)™Õ¹Ñ¥½¸É•¹‘•ÉI…¹­¥¹œ ¤ì4(€½¹ÍĞ±¥ÍÑ°€ô‘½Õµ•¹Ğ¹ÅÕ•ÉåM•±•Ñ½È ˆÉ…¹­¥¹1¥ÍĞˆ¤ì4(€¥˜€ …±¥ÍÑ°¤É•ÑÕÉ¸ì4(4(€½¹ÍĞ…±±UÍ•ÉÌ€ôÕÍ•ÉMÑ½É”¹ÕÍ•ÉÌì4(€½¹ÍĞÉ½İÌ€ô=‰©•Ğ¹Ù…±Õ•Ì¡…±±UÍ•ÉÌ¤¹µ…À ¡ÕÍ•È¤€ôøì4(€€€½¹ÍĞÉ•½É‘Ì€ô)M=8¹Á…ÉÍ” 4(€€€€€±½…±MÑ½É…”¹•Ñ%Ñ•´¡©é|‘íÕÍ•È¹Á¡½¹•õ}•á…µ}É•½É‘Í€¤ñğ€‰mtˆ4(€€€€¤ì4(€€€¥˜€ …É•½É‘Ì¹±•¹Ñ ¤É•ÑÕÉ¸¹Õ±°ì4(€€€½¹ÍĞ‰•ÍĞ€ôÉ•½É‘Ì¹É•‘Õ” ¡„°ˆ¤€ôøì4(€€€€€¥˜€¡ˆ¹Á•É•¹Ğ€ø„¹Á•É•¹Ğ¤É•ÑÕÉ¸ˆì4(€€€€€¥˜€¡ˆ¹Á•É•¹Ğ€ôôô„¹Á•É•¹Ğ€˜˜€¡ˆ¹‘ÕÉ…Ñ¥½¸€üü€äääää¤€ğ€¡„¹‘ÕÉ…Ñ¥½¸€üü€äääää¤¤É•ÑÕÉ¸ˆì4(€€€€€É•ÑÕÉ¸„ì4(€€€ô¤ì4(€€€É•ÑÕÉ¸ìÕÍ•È°‰•ÍĞ°Ñ½Ñ…±á…µÌèÉ•½É‘Ì¹±•¹Ñ ôì4(€ô¤¹™¥±Ñ•È¡	½½±•…¸¤ì4(4(€¥˜€¡É…¹­M½ÉÑ5½‘”€ôôô€‰Ñ¥µ”ˆ¤ì4(€€€É½İÌ¹Í½ÉĞ ¡„°ˆ¤€ôøì4(€€€€€½¹ÍĞÑ„€ô„¹‰•ÍĞ¹‘ÕÉ…Ñ¥½¸€üü€äääääì4(€€€€€½¹ÍĞÑˆ€ôˆ¹‰•ÍĞ¹‘ÕÉ…Ñ¥½¸€üü€äääääì4(€€€€€¥˜€¡Ñ„€„ôôÑˆ¤É•ÑÕÉ¸Ñ„€´Ñˆì4(€€€€€É•ÑÕÉ¸ˆ¹‰•ÍĞ¹Á•É•¹Ğ€´„¹‰•ÍĞ¹Á•É•¹Ğì4(€€€ô¤ì4(€ô•±Í”ì4(€€€É½İÌ¹Í½ÉĞ ¡„°ˆ¤€ôøì4(€€€€€¥˜€¡ˆ¹‰•ÍĞ¹Á•É•¹Ğ€„ôô„¹‰•ÍĞ¹Á•É•¹Ğ¤É•ÑÕÉ¸ˆ¹‰•ÍĞ¹Á•É•¹Ğ€´„¹‰•ÍĞ¹Á•É•¹Ğì4(€€€€€É•ÑÕÉ¸€¡„¹‰•ÍĞ¹‘ÕÉ…Ñ¥½¸€üü€äääää¤€´€¡ˆ¹‰•ÍĞ¹‘ÕÉ…Ñ¥½¸€üü€äääää¤ì4(€€€ô¤ì4(€ô4(4(€¥˜€ …É½İÌ¹±•¹Ñ ¤ì4(€€€±¥ÍÑ°¹¥¹¹•É!Q50€ô€ñ‘¥Ø±…ÍÌô‰•µÁÑäˆû¢şcšÊ‡šr'¢š‚ã¢ºÃ–öW¾ò3–º3š"C’âš²‡¢š‚ã–B;–6Ï–>¿’â+ššsğ½‘¥Øù€ì4(€€€É•ÑÕÉ¸ì4(€ô4(4(€½¹ÍĞµ•‘…±±…ÍÌ€ô€¡¤¤€ôø€¡¤€ôôô€À€ü€ˆÉ…¹¬µ½±ˆ€è¤€ôôô€Ä€ü€ˆÉ…¹¬µÍ¥±Ù•Èˆ€è¤€ôôô€È€ü€ˆÉ…¹¬µ‰É½¹é”ˆ€è€ˆˆ¤ì4(€½¹ÍĞµ•‘…±1…‰•°€ô€¡¤¤€ôø€¡¤€ôôô€À€ü€‹Â~–ˆ€è¤€ôôô€Ä€ü€‹Â~– ˆ€è¤€ôôô€È€ü€‹Â~–$ˆ€èMÑÉ¥¹œ¡¤€¬€Ä¤¤ì4(4(€±¥ÍÑ°¹¥¹¹•É!Q50€ôÉ½İÌ¹µ…À ¡ìÕÍ•È°‰•ÍĞ°Ñ½Ñ…±á…µÌô°¤¤€ôø€4(€€€€ñ‘¥Ø±…ÍÌô‰É…¹¬µÉ½Ü‘í¤€ğ€Ì€ü€ˆÉ…¹¬µÑ½Àˆ€è€ˆ‰ôˆø4(€€€€€€ñ‘¥Ø±…ÍÌô‰É…¹¬µ¹Õ´‘íµ•‘…±±…ÍÌ¡¤¥ôˆø‘íµ•‘…±1…‰•°¡¤¥ôğ½‘¥Øø4(€€€€€€ñ‘¥Ø±…ÍÌô‰É…¹¬µ¥¹™¼ˆø4(€€€€€€€€ñÍÑÉ½¹œø‘í•Í…Á•!Ñµ°¡ÕÍ•È¹¹…µ”¥ôğ½ÍÑÉ½¹œø4(€€€€€€€€ñÍÁ…¸ø‘í•Í…Á•!Ñµ°¡ÕÍ•È¹É½±”¥ôƒ
+Üƒ¢š‚à€‘íÑ½Ñ…±á…µÍôƒš²„ğ½ÍÁ…¸ø4(€€€€€€ğ½‘¥Øø4(€€€€€€ñ‘¥Ø±…ÍÌô‰É…¹¬µµ¥ˆø4(€€€€€€€€ñÍÁ…¸±…ÍÌô‰É…¹¬µ‰…¹¬ˆø‘í•Í…Á•!Ñµ°¡‰•ÍĞ¹‰…¹¬ñğ€ˆˆ¥ôğ½ÍÁ…¸ø4(€€€€€€€€ñÍÁ…¸±…ÍÌô‰É…¹¬µ‘•Ñ…¥°µÑ¥µ”ˆø‘í‰•ÍĞ¹‘ÕÉ…Ñ¥½¸€„ô¹Õ±°€ü€‹Š>Ä€ˆ€¬™½Éµ…ÑQ¥µ”¡‰•ÍĞ¹‘ÕÉ…Ñ¥½¸¤€è€ˆ‰ôğ½ÍÁ…¸ø4(€€€€€€ğ½‘¥Øø4(€€€€€€ñ‘¥Ø±…ÍÌô‰É…¹¬µÍ½É”‘í‰•ÍĞ¹Á•É•¹Ğ€øô€äÀ€ü€ˆÉ…¹¬µÍ½É”µ¡¥ ˆ€è€ˆ‰ôˆø‘í‰•ÍĞ¹Á•É•¹ÑôñÍµ…±°û–"ğ½Íµ…±°øğ½‘¥Øø4(€€€€ğ½‘¥Øø4(€€¤¹©½¥¸ ˆˆ¤ì4(4(€‘½Õµ•¹Ğ¹ÅÕ•ÉåM•±•Ñ½É±° ˆ¹É…¹¬µÍ½ÉĞµ‰Ñ¸ˆ¤¹™½É…  ¡‰Ñ¸¤€ôøì4(€€€‰Ñ¸¹±…ÍÍ1¥ÍĞ¹Ñ½±” ‰…Ñ¥Ù”ˆ°‰Ñ¸¹‘…Ñ…Í•Ğ¹Í½ÉĞ€ôôôÉ…¹­M½ÉÑ5½‘”¤ì4(€€€‰Ñ¸¹½¹±¥¬€ô€ ¤€ôøì4(€€€€€É…¹­M½ÉÑ5½‘”€ô‰Ñ¸¹‘…Ñ…Í•Ğ¹Í½ÉĞì4(€€€€€É•¹‘•ÉI…¹­¥¹œ ¤ì4(€€€ôì4(€ô¤ì4)ô4(4)™Õ¹Ñ¥½¸É•¹‘•É‘µ¥¸ ¤ì4(€¥˜€ …¥Í‘µ¥¹UÍ•È ¤¤ì4(€€€•±Ì¹…‘µ¥¹5•ÑÉ¥Ì¹¥¹¹•É!Q50€ô€ñ‘¥Ø±…ÍÌô‰•µÁÑäˆûš^ƒšv¦fC¢ºÿ¦^»º‡Br/švÿğ½‘¥Øù€ì4(€€€•±Ì¹…‘µ¥¹UÍ•ÉQ…‰±”¹¥¹¹•É!Q50€ô€ˆˆì4(€€€•±Ì¹…‘µ¥¹]•…­1¥ÍĞ¹¥¹¹•É!Q50€ô€ˆˆì4(€€€É•ÑÕÉ¸ì4(€ô4(€½¹ÍĞ±½Õ€ôÍÑ…Ñ”¹±½Õ‘MÑ…ÑÌì4(€½¹ÍĞÕÍ•ÉÌ€ô±½Õü¹•µÁ±½å••Ìü¹±•¹Ñ 4(€€€€ü±½Õ¹•µÁ±½å••Ì¹µ…À ¡Ô¤€ôø€¡ì¹…µ”èÕl‹–O–B4‰t°Á¡½¹”èÕl‹š&/šrë–>Ü‰t°É½±”èÕl‹–Ê_’ö4‰tô¤¤4(€€€€è=‰©•Ğ¹Ù…±Õ•Ì¡ÕÍ•ÉMÑ½É”¹ÕÍ•ÉÌ¤ì4(€½¹ÍĞÉ½İÌ€ôÕÍ•ÉÌ¹µ…À ¡ÕÍ•È¤€ôøì4(€€€½¹ÍĞÉ•½É‘Ì€ô±½Õü¹•á…µÌü¹±•¹Ñ 4(€€€€€€ü±½Õ¹•á…µÌ¹™¥±Ñ•È ¡È¤€ôøMÑÉ¥¹œ¡Él‹š&/šrë–>Ü‰t¤€ôôôMÑÉ¥¹œ¡ÕÍ•È¹Á¡½¹”¤¤¹µ…À ¡È¤€ôø€¡ì4(€€€€€€€€€Á•É•¹Ğè9Õµ‰•È¡Él‹–"šVÀ‰tñğ€À¤°Í½É”è9Õµ‰•È¡Él‹¶S–¾ç¦ŠcšVÀ‰tñğ€À¤°Ñ½Ñ…°è9Õµ‰•È¡Él‹šï¦ŠcšVÀ‰tñğ€À¤°4(€€€€€€€€€İÉ½¹œè9Õµ‰•È¡Él‹¦Rg¦ŠcšVÀ‰tñğ€À¤°‘ÕÉ…Ñ¥½¸è9Õµ‰•È¡Él‹R£š^ÛH‰tñğ€À¤°‰…¹¬èÉl‹¦Šc–êL‰t°ÑåÁ”èÉl‹¢š‚ãÆï–z,‰t°™¥¹¥Í¡•‘ĞèÉl‹–º3š"Cš^Û¦^Ğ‰t°4(€€€€€€€ô¤¤4(€€€€€€è•ÑUÍ•ÉI•½É‘Ì¡ÕÍ•È¹Á¡½¹”¤ì4(€€€½¹ÍĞµ¥ÍÑ…­•Ì€ô±½Õü¹µ¥ÍÑ…­•Ìü¹±•¹Ñ 4(€€€€€€ü±½Õ¹µ¥ÍÑ…­•Ì¹™¥±Ñ•È ¡È¤€ôøMÑÉ¥¹œ¡Él‹š&/šrë–>Ü‰t¤€ôôôMÑÉ¥¹œ¡ÕÍ•È¹Á¡½¹”¤¤¹µ…À ¡È¤€ôø€¡ì­¹½İ±•‘•A½¥¹ĞèÉl‹~—¢¾
+ä‰t°‰…¹¬èÉl‹¦Šc–êL‰tô¤¤4(€€€€€€è•ÑUÍ•É5¥ÍÑ…­•Ì¡ÕÍ•È¹Á¡½¹”¤ì4(€€€½¹ÍĞ‰•ÍĞ€ôÉ•½É‘Ì¹É•‘Õ” ¡…Œ°É•½É¤€ôø€¡9Õµ‰•È¡É•½É¹Á•É•¹Ğ¤€ø9Õµ‰•È¡…Œü¹Á•É•¹Ğñğ€´Ä¤€üÉ•½É€è…Œ¤°¹Õ±°¤ì4(€€€½¹ÍĞ±…Ñ•ÍĞ€ôÉ•½É‘ÍlÁtì4(€€€É•ÑÕÉ¸ìÕÍ•È°É•½É‘Ì°µ¥ÍÑ…­•Ì°‰•ÍĞ°±…Ñ•ÍĞôì4(€ô¤ì4(€½¹ÍĞ…±±I•½É‘Ì€ôÉ½İÌ¹™±…Ñ5…À ¡É½Ü¤€ôøÉ½Ü¹É•½É‘Ì¹µ…À ¡É•½É¤€ôø€¡ì€¸¸¹É•½É°ÕÍ•ÈèÉ½Ü¹ÕÍ•Èô¤¤¤ì4(€½¹ÍĞ…Ùœ€ô…±±I•½É‘Ì¹±•¹Ñ €ü5…Ñ ¹É½Õ¹¡…±±I•½É‘Ì¹É•‘Õ” ¡ÍÕ´°È¤€ôøÍÕ´€¬9Õµ‰•È¡È¹Á•É•¹Ğñğ€À¤°€À¤€¼…±±I•½É‘Ì¹±•¹Ñ ¤€è€Àì4(€½¹ÍĞÁ…ÍÍ•€ô…±±I•½É‘Ì¹™¥±Ñ•È ¡È¤€ôø9Õµ‰•È¡È¹Á•É•¹Ğ¤€øô€àÀ¤¹±•¹Ñ ì4(€½¹ÍĞÁ…ÍÍI…Ñ”€ô…±±I•½É‘Ì¹±•¹Ñ €ü5…Ñ ¹É½Õ¹ ¡Á…ÍÍ•€¼…±±I•½É‘Ì¹±•¹Ñ ¤€¨€ÄÀÀ¤€è€Àì4(€½¹ÍĞ¹½Ñá…´€ôÉ½İÌ¹™¥±Ñ•È ¡É½Ü¤€ôø€…É½Ü¹É•½É‘Ì¹±•¹Ñ ¤¹±•¹Ñ ì4(4(€•±Ì¹…‘µ¥¹5•ÑÉ¥Ì¹¥¹¹•É!Q50€ô€4(€€€€ñ‘¥Ø±…ÍÌô‰ÍÕµµ…Éäµ…ÉˆøñÍÁ…¸û–Fc–Ş—šVÀğ½ÍÁ…¸øñÍÑÉ½¹œø‘íÕÍ•ÉÌ¹±•¹Ñ¡ôğ½ÍÑÉ½¹œøñÍµ…±°ø‘í±½Õü¹•µÁ±½å••Ìü¹±•¹Ñ €ü€‹¦{’æ›’êG®¿šVÃš6¸ˆ€è€‹šr³šrë–ŞËfï–öW¢Ò›–>Ü‰ôğ½Íµ…±°øğ½‘¥Øø4(€€€€ñ‘¥Ø±…ÍÌô‰ÍÕµµ…Éäµ…ÉˆøñÍÁ…¸û¢¢¾Wš²‡šVÀğ½ÍÁ…¸øñÍÑÉ½¹œø‘í…±±I•½É‘Ì¹±•¹Ñ¡ôğ½ÍÑÉ½¹œøñÍµ…±°ûš¶–ò<¯î’æƒ¢ºÃ–öTğ½Íµ…±°øğ½‘¥Øø4(€€€€ñ‘¥Ø±…ÍÌô‰ÍÕµµ…Éäµ…ÉˆøñÍÁ…¸û–æÏ–v–"ğ½ÍÁ…¸øñÍÑÉ½¹œø‘í…Ùôğ½ÍÑÉ½¹œøñÍµ…±°û–£¦£¢¢¾W¢ºÃ–öTğ½Íµ…±°øğ½‘¥Øø4(€€€€ñ‘¥Ø±…ÍÌô‰ÍÕµµ…Éäµ…ÉˆøñÍÁ…¸û¦k¢ş:ğ½ÍÁ…¸øñÍÑÉ½¹œø‘íÁ…ÍÍI…Ñ•ô”ğ½ÍÑÉ½¹œøñÍµ…±°øàÀƒ–"’î—’â+¦k¢ş¾ò3šr«¢€‘í¹½Ñá…µôƒ’êèğ½Íµ…±°øğ½‘¥Øø4(€€ì4(4(€•±Ì¹…‘µ¥¹UÍ•ÉQ…‰±”¹¥¹¹•É!Q50€ôÉ½İÌ¹±•¹Ñ €ü€4(€€€€ñÑ…‰±”ø4(€€€€€€ñÑ¡•…øñÑÈøñÑ û–O–B4ğ½Ñ øñÑ û–Ê_’ö4ğ½Ñ øñÑ ûš²‡šVÀğ½Ñ øñÑ ûšr’öÌğ½Ñ øñÑ ûšr¢şDğ½Ñ øñÑ û¦Rg¦Š`ğ½Ñ øğ½ÑÈøğ½Ñ¡•…ø4(€€€€€€ñÑ‰½‘äø4(€€€€€€€€‘íÉ½İÌ¹µ…À ¡ìÕÍ•È°É•½É‘Ì°µ¥ÍÑ…­•Ì°‰•ÍĞ°±…Ñ•ÍĞô¤€ôø€4(€€€€€€€€€€ñÑÈø4(€€€€€€€€€€€€ñÑø‘í•Í…Á•!Ñµ°¡ÕÍ•È¹¹…µ”¥ôğ½Ñø4(€€€€€€€€€€€€ñÑø‘í•Í…Á•!Ñµ°¡ÕÍ•È¹É½±”¥ôğ½Ñø4(€€€€€€€€€€€€ñÑø‘íÉ•½É‘Ì¹±•¹Ñ¡ôğ½Ñø4(€€€€€€€€€€€€ñÑø‘í‰•ÍĞ€ü€‘í‰•ÍĞ¹Á•É•¹Ñ÷–"€€è€‹šr«¢‰ôğ½Ñø4(€€€€€€€€€€€€ñÑø‘í±…Ñ•ÍĞ€ü€‘í±…Ñ•ÍĞ¹Á•É•¹Ñ÷–"ƒ
+Ü€‘í•á…µQ¥µ•1…‰•°¡±…Ñ•ÍĞ¹™¥¹¥Í¡•‘Ğ¥õ€€è€ˆ´´‰ôğ½Ñø4(€€€€€€€€€€€€ñÑø‘íµ¥ÍÑ…­•Ì¹±•¹Ñ¡ôğ½Ñø4(€€€€€€€€€€ğ½ÑÈø4(€€€€€€€€¤¹©½¥¸ ˆˆ¥ô4(€€€€€€ğ½Ñ‰½‘äø4(€€€€ğ½Ñ…‰±”ø4(€€€è€ñ‘¥Ø±…ÍÌô‰•µÁÑäˆûšjš^ƒ–Fc–Ş—¢ºÃ–öWğ½‘¥Øù€ì4(4(€½¹ÍĞ…±±5¥ÍÑ…­•Ì€ôÉ½İÌ¹™±…Ñ5…À ¡É½Ü¤€ôøÉ½Ü¹µ¥ÍÑ…­•Ì¤ì4(€½¹ÍĞİ•…¬€ô…±±5¥ÍÑ…­•Ì¹É•‘Õ” ¡…Œ°Ä¤€ôøì4(€€€½¹ÍĞ­•ä€ôÄ¹­¹½İ±•‘•A½¥¹ĞñğÄ¹‰…¹¬ñğ€‹–Û’îXˆì4(€€€…m­•åt€ô€¡…m­•åtñğ€À¤€¬€Äì4(€€€É•ÑÕÉ¸…Œì4(€ô°íô¤ì4(€½¹ÍĞİ•…­I½İÌ€ô=‰©•Ğ¹•¹ÑÉ¥•Ì¡İ•…¬¤¹Í½ÉĞ ¡„°ˆ¤€ôø‰lÅt€´…lÅt¤¹Í±¥” À°€ÄÈ¤ì4(€•±Ì¹…‘µ¥¹]•…­1¥ÍĞ¹¥¹¹•É!Q50€ôİ•…­I½İÌ¹±•¹Ñ €ü€4(€€€€ñÑ…‰±”øñÑ¡•…øñÑÈøñÑ û~—¢¾
+äğ½Ñ øñÑ û¦Rg¦ŠcšVÀğ½Ñ øğ½ÑÈøğ½Ñ¡•…øñÑ‰½‘äø4(€€€€€€‘íİ•…­I½İÌ¹µ…À ¡m¹…µ”°½Õ¹Ñt¤€ôø€ñÑÈøñÑø‘í•Í…Á•!Ñµ°¡¹…µ”¥ôğ½ÑøñÑø‘í½Õ¹Ñôğ½Ñøğ½ÑÈù€¤¹©½¥¸ ˆˆ¥ô4(€€€€ğ½Ñ‰½‘äøğ½Ñ…‰±”ø4(€€€è€ñ‘¥Ø±…ÍÌô‰•µÁÑäˆûšjš^ƒ¦Rg¦Šcî¢º‡ğ½‘¥Øù€ì4)ô4(4)™Õ¹Ñ¥½¸•áÁ½ÉÑI•½É‘Ì ¤ì4(€½¹ÍĞÉ½İÌ€ôÍÑ…Ñ”¹±½Õ‘MÑ…ÑÌü¹•á…µÌü¹±•¹Ñ 4(€€€€üÍÑ…Ñ”¹±½Õ‘MÑ…ÑÌ¹•á…µÌ¹µ…À ¡È¤€ôø€¡ì4(€€€€€€€ƒ–O–B4èÉl‹–O–B4‰t°ƒš&/šrë–>ÜèÉl‹š&/šrë–>Ü‰t°ƒ–Ê_’ö4èÉl‹–Ê_’ö4‰t°ƒ¢š‚ãÆï–z,èÉl‹¢š‚ãÆï–z,‰t°ƒ¦Šc–êLèÉl‹¦Šc–êL‰t°ƒ–"šVÀèÉl‹–"šVÀ‰t°ƒ¶S–¾äèÉl‹¶S–¾ç¦ŠcšVÀ‰t°ƒšï¦ŠcšVÀèÉl‹šï¦ŠcšVÀ‰t°ƒ¦Rg¦ŠcšVÀèÉl‹¦Rg¦ŠcšVÀ‰t°ƒšb¿–B›¦k¢şèÉl‹šb¿–B›¦k¢ş‰t°ƒR£š^ÛHèÉl‹R£š^ÛH‰t°ƒ–º3š"Cš^Û¦^ĞèÉl‹–º3š"Cš^Û¦^Ğ‰t°4(€€€€€ô¤¤4(€€€€è=‰©•Ğ¹Ù…±Õ•Ì¡ÕÍ•ÉMÑ½É”¹ÕÍ•ÉÌ¤¹™±…Ñ5…À ¡ÕÍ•È¤€ôø•ÑUÍ•ÉI•½É‘Ì¡ÕÍ•È¹Á¡½¹”¤¹µ…À ¡É•½É¤€ôø€¡ì4(€€€€€€€ƒ–O–B4èÕÍ•È¹¹…µ”°4(€€€€€€€ƒš&/šrë–>ÜèÕÍ•È¹Á¡½¹”°4(€€€€€€€ƒ–Ê_’ö4èÕÍ•È¹É½±”°4(€€€€€€€ƒ¢š‚ãÆï–z,èÉ•½É¹ÑåÁ”ñğ€‹î’æƒš¢‡–ò<ˆ°4(€€€€€€€ƒ¦Šc–êLèÉ•½É¹‰…¹¬°4(€€€€€€€ƒ–"šVÀèÉ•½É¹Á•É•¹Ğ°4(€€€€€€€ƒ¶S–¾äèÉ•½É¹Í½É”°4(€€€€€€€ƒšï¦ŠcšVÀèÉ•½É¹Ñ½Ñ…°°4(€€€€€€€ƒ¦Rg¦ŠcšVÀèÉ•½É¹İÉ½¹œ€üü5…Ñ ¹µ…à À°9Õµ‰•È¡É•½É¹Ñ½Ñ…°ñğ€À¤€´9Õµ‰•È¡É•½É¹Í½É”ñğ€À¤¤°4(€€€€€€€ƒšb¿–B›¦k¢şè9Õµ‰•È¡É•½É¹Á•É•¹Ğ¤€øô€àÀ€ü€‹šb¼ˆ€è€‹–B˜ˆ°4(€€€€€€€ƒR£š^ÛHèÉ•½É¹‘ÕÉ…Ñ¥½¸°4(€€€€€€€ƒ–º3š"Cš^Û¦^ĞèÉ•½É¹™¥¹¥Í¡•‘Ğ°4(€€€€€ô¤¤¤ì4(€‘½İ¹±½…‘Q•áĞ¡ƒ¦G–Â+¢¢¾W¢ºÃ–öU|‘íÑ½‘…å-•ä ¥ô¹ÍÙ€°Ñ½ÍØ¡l‹–O–B4ˆ°€‹š&/šrë–>Üˆ°€‹–Ê_’ö4ˆ°€‹¢š‚ãÆï–z,ˆ°€‹¦Šc–êLˆ°€‹–"šVÀˆ°€‹¶S–¾äˆ°€‹šï¦ŠcšVÀˆ°€‹¦Rg¦ŠcšVÀˆ°€‹šb¿–B›¦k¢şˆ°€‹R£š^ÛHˆ°€‹–º3š"Cš^Û¦^Ğ‰t°É½İÌ¤¤ì4)ô4(4)™Õ¹Ñ¥½¸•áÁ½ÉÑ5¥ÍÑ…­•Ì ¤ì4(€½¹ÍĞÉ½İÌ€ôÍÑ…Ñ”¹±½Õ‘MÑ…ÑÌü¹µ¥ÍÑ…­•Ìü¹±•¹Ñ 4(€€€€üÍÑ…Ñ”¹±½Õ‘MÑ…ÑÌ¹µ¥ÍÑ…­•Ì¹µ…À ¡Ä¤€ôø€¡ì4(€€€€€€€ƒ–O–B4èÅl‹–O–B4‰t°ƒš&/šrë–>ÜèÅl‹š&/šrë–>Ü‰t°ƒ–Ê_’ö4èÅl‹–Ê_’ö4‰t°ƒ¦Šc–êLèÅl‹¦Šc–êL‰t°ƒ~—¢¾
+äèÅl‹~—¢¾
+ä‰t°ƒ¦Šcn¸èÅl‹¦Šcn¸‰t°ƒ¦Rg¦$èÅl‹¦Rg¦'¶Sš† ‰t°ƒš¶†»¶Sš† èÅl‹š¶†»¶Sš† ‰t°ƒ¢šz@èÅl‹¢šz@‰t°ƒ¢ºÃ–öWš^Û¦^ĞèÅl‹–ë¦Rgš^Û¦^Ğ‰t°4(€€€€€ô¤¤4(€€€€è=‰©•Ğ¹Ù…±Õ•Ì¡ÕÍ•ÉMÑ½É”¹ÕÍ•ÉÌ¤¹™±…Ñ5…À ¡ÕÍ•È¤€ôø•ÑUÍ•É5¥ÍÑ…­•Ì¡ÕÍ•È¹Á¡½¹”¤¹µ…À ¡Ä¤€ôø€¡ì4(€€€€€€€ƒ–O–B4èÕÍ•È¹¹…µ”°4(€€€€€€€ƒš&/šrë–>ÜèÕÍ•È¹Á¡½¹”°4(€€€€€€€ƒ–Ê_’ö4èÕÍ•È¹É½±”°4(€€€€€€€ƒ¦Šc–êLèÄ¹‰…¹¬°4(€€€€€€€ƒ~—¢¾
+äèÄ¹­¹½İ±•‘•A½¥¹Ğ°4(€€€€€€€ƒ¦Šcn¸èÄ¹ÅÕ•ÍÑ¥½¸°4(€€€€€€€ƒ¦Rg¦$èÄ¹Í•±•Ñ•°4(€€€€€€€ƒš¶†»¶Sš† è€‘íÄ¹…¹Íİ•Éô€‘í‘¥ÍÁ±…å¹Íİ•ÉQ•áĞ¡Ä¥õ€°4(€€€€€€€ƒ¢šz@è‘¥ÍÁ±…åáÁ±…¹…Ñ¥½¸¡Ä¤°4(€€€€€€€ƒ¢ºÃ–öWš^Û¦^ĞèÄ¹Í…Ù•‘Ğ°4(€€€€€ô¤¤¤ì4(€‘½İ¹±½…‘Q•áĞ¡ƒ¦G–Â+¦Rg¦Šc¢ºÃ–öU|‘íÑ½‘…å-•ä ¥ô¹ÍÙ€°Ñ½ÍØ¡l‹–O–B4ˆ°€‹š&/šrë–>Üˆ°€‹–Ê_’ö4ˆ°€‹¦Šc–êLˆ°€‹~—¢¾
+äˆ°€‹¦Šcn¸ˆ°€‹¦Rg¦$ˆ°€‹š¶†»¶Sš† ˆ°€‹¢šz@ˆ°€‹¢ºÃ–öWš^Û¦^Ğ‰t°É½İÌ¤¤ì4)ô4(4)™Õ¹Ñ¥½¸Íİ¥Ñ¡Y¥•Ü¡Ù¥•Ü¤ì4(€¥˜€ …ÍÑ…Ñ”¹•á…µ¥¹¥Í¡•€˜˜ÍÑ…Ñ”¹•á…µQåÁ”€ôôô€‰™½Éµ…°ˆ€˜˜Ù¥•Ü€„ôô€‰ÅÕ¥èˆ¤É•ÑÕÉ¸ì4(€¥˜€¡Ù¥•Ü€ôôô€‰…‘µ¥¸ˆ€˜˜€…¥Í‘µ¥¹UÍ•È ¤¤ì4(€€€Ù¥•Ü€ô€‰‘…Í¡‰½…Éˆì4(€ô4(€ÍÑ…Ñ”¹ÕÉÉ•¹ÑY¥•Ü€ôÙ¥•Üì4(€•±Ì¹¹…ÙQ…‰Ì¹™½É…  ¡Ñ…ˆ¤€ôøÑ…ˆ¹±…ÍÍ1¥ÍĞ¹Ñ½±” ‰…Ñ¥Ù”ˆ°Ñ…ˆ¹‘…Ñ…Í•Ğ¹Ù¥•Ü€ôôôÙ¥•Ü¤¤ì4(€=‰©•Ğ¹•¹ÑÉ¥•Ì¡•±Ì¹Ù¥•İÌ¤¹™½É…  ¡m¹…µ”°•±•µ•¹Ñt¤€ôø•±•µ•¹Ğ¹±…ÍÍ1¥ÍĞ¹Ñ½±” ‰…Ñ¥Ù”ˆ°¹…µ”€ôôôÙ¥•Ü¤¤ì4(€•±Ì¹Á…•Q¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôÁ…•Q¥Ñ±•ÍmÙ¥•İtì4(€¥˜€¡Ù¥•Ü€ôôô€‰ÅÕ¥èˆ€˜˜€…ÍÑ…Ñ”¹ÅÕ¥è¹±•¹Ñ ¤ì4(€€€•±Ì¹ÅÕ¥éM•ÑÕÀ¹±…ÍÍ1¥ÍĞ¹É•µ½Ù” ‰¡¥‘‘•¸ˆ¤ì4(€€€•±Ì¹ÅÕ¥éIÕ¹¹•È¹±…ÍÍ1¥ÍĞ¹…‘ ‰¡¥‘‘•¸ˆ¤ì4(€€€•±Ì¹ÅÕ¥éI•ÍÕ±Ğ¹±…ÍÍ1¥ÍĞ¹…‘ ‰¡¥‘‘•¸ˆ¤ì4(€ô4(€¥˜€¡Ù¥•Ü€ôôô€‰É…¹­¥¹œˆ¤É•¹‘•ÉI…¹­¥¹œ ¤ì4(€¥˜€¡Ù¥•Ü€ôôô€‰µ¥ÍÑ…­•Ìˆ¤É•¹‘•É5¥ÍÑ…­•Ì ¤ì4(€¥˜€¡Ù¥•Ü€ôôô€‰…‘µ¥¸ˆ¤ì4(€€€±½…‘±½Õ‘MÑ…ÑÌ ¤¹Ñ¡•¸¡É•¹‘•É‘µ¥¸¤ì4(€€€É•¹‘•É‘µ¥¸ ¤ì4(€ô4)ô4(4)™Õ¹Ñ¥½¸É•¹‘•É±° ¤ì4(€É•¹‘•ÉMÑ…ÑÌ ¤ì4(€É•¹‘•É…Í¡‰½…É ¤ì4(€É•¹‘•É1•…É¹¥±Ñ•È ¤ì4(€É•¹‘•É1•…É¹1¥ÍĞ ¤ì4(€É•¹‘•É5¥ÍÑ…­•Ì ¤ì4(€É•¹‘•É‘µ¥¸ ¤ì4)ô4(4)™Õ¹Ñ¥½¸É•¹‘•ÉUÍ•È ¤ì4(€…ÁÁ±å‘µ¥¹•ÍÌ ¤ì4(€¥˜€ …ÍÑ…Ñ”¹ÕÉÉ•¹ÑUÍ•È¤ì4(€€€•±Ì¹ÕÍ•É9…µ”¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹šr«fï–öTˆì4(€€€•±Ì¹ÕÍ•É5•Ñ„¹Ñ•áÑ½¹Ñ•¹Ğ€ô€ˆ´ˆì4(€€€É•ÑÕÉ¸ì4(€ô4(€•±Ì¹ÕÍ•É9…µ”¹Ñ•áÑ½¹Ñ•¹Ğ€ôÍÑ…Ñ”¹ÕÉÉ•¹ÑUÍ•È¹¹…µ”ì4(€•±Ì¹ÕÍ•É5•Ñ„¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘íÍÑ…Ñ”¹ÕÉÉ•¹ÑUÍ•È¹É½±•ôƒ
+Ü€‘íÍÑ…Ñ”¹ÕÉÉ•¹ÑUÍ•È¹Á¡½¹•õ€ì4)ô4(4)™Õ¹Ñ¥½¸¹½Éµ…±¥é•A¡½¹”¡Ù…±Õ”¤ì4(€É•ÑÕÉ¸MÑÉ¥¹œ¡Ù…±Õ”ñğ€ˆˆ¤¹É•Á±…” ½q½œ°€ˆˆ¤ì4)ô4(4)™Õ¹Ñ¥½¸±½…‘ÕÉÉ•¹ÑUÍ•È ¤ì4(€½¹ÍĞÁ¡½¹”€ôÕÍ•ÉMÑ½É”¹ÕÉÉ•¹ÑA¡½¹”ì4(€½¹ÍĞÕÍ•ÉÌ€ôÕÍ•ÉMÑ½É”¹ÕÍ•ÉÌì4(€ÍÑ…Ñ”¹ÕÉÉ•¹ÑUÍ•È€ôÁ¡½¹”€˜˜ÕÍ•ÉÍmÁ¡½¹•t€üÕÍ•ÉÍmÁ¡½¹•t€è¹Õ±°ì4)ô4(4)™Õ¹Ñ¥½¸Í¡½İÕÑ ¡Ù¥Í¥‰±”¤ì4(€•±Ì¹…ÕÑ¡Y¥•Ü¹±…ÍÍ1¥ÍĞ¹Ñ½±” ‰¡¥‘‘•¸ˆ°€…Ù¥Í¥‰±”¤ì4(€‘½Õµ•¹Ğ¹‰½‘ä¹±…ÍÍ1¥ÍĞ¹Ñ½±” ‰…ÕÑ µ±½­•ˆ°Ù¥Í¥‰±”¤ì4)ô4(4)™Õ¹Ñ¥½¸Í…Ù•UÍ•ÉÉ½µ½É´¡•Ù•¹Ğ¤ì4(€•Ù•¹Ğ¹ÁÉ•Ù•¹Ñ•™…Õ±Ğ ¤ì4(€½¹ÍĞ¹…µ”€ô•±Ì¹…ÕÑ¡9…µ”¹Ù…±Õ”¹ÑÉ¥´ ¤ì4(€½¹ÍĞÁ¡½¹”€ô¹½Éµ…±¥é•A¡½¹”¡•±Ì¹…ÕÑ¡A¡½¹”¹Ù…±Õ”¤ì4(€½¹ÍĞÉ½±”€ô•±Ì¹…ÕÑ¡I½±”¹Ù…±Õ”ì4(€¥˜€ …¹…µ”¤ì4(€€€•±Ì¹…ÕÑ¡ÉÉ½È¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹¢¾ß–†¯–g–O–B7ˆì4(€€€É•ÑÕÉ¸ì4(€ô4(€¥˜€¡Á¡½¹”¹±•¹Ñ €„ôô€ÄÄ¤ì4(€€€•±Ì¹…ÕÑ¡ÉÉ½È¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹¢¾ß¢úO–”€ÄÄƒ’ö7š&/šrë–>ßˆì4(€€€É•ÑÕÉ¸ì4(€ô4(€½¹ÍĞÕÍ•ÉÌ€ôÕÍ•ÉMÑ½É”¹ÕÍ•ÉÌì4(€½¹ÍĞÕÍ•È€ôì4(€€€¹…µ”°4(€€€Á¡½¹”°4(€€€É½±”°4(€€€ÕÁ‘…Ñ•‘Ğè¹•Ü…Ñ” ¤¹Ñ½%M=MÑÉ¥¹œ ¤°4(€ôì4(€ÕÍ•ÉÍmÁ¡½¹•t€ôÕÍ•Èì4(€ÕÍ•ÉMÑ½É”¹ÕÍ•ÉÌ€ôÕÍ•ÉÌì4(€ÕÍ•ÉMÑ½É”¹ÕÉÉ•¹ÑA¡½¹”€ôÁ¡½¹”ì4(€ÍÑ…Ñ”¹ÕÉÉ•¹ÑUÍ•È€ôÕÍ•Èì4(€É•½¹¥±•MÑ½É•‘EÕ•ÍÑ¥½¹Ì ¤ì4(€…ÁÁ±å‘µ¥¹•ÍÌ ¤ì4(€•±Ì¹…ÕÑ¡ÉÉ½È¹Ñ•áÑ½¹Ñ•¹Ğ€ô€ˆˆì4(€Í¡½İÕÑ ¡™…±Í”¤ì4(€Íå¹1…Ñ•È ‰±½¥¸ˆ°ìÕÍ•Èô¤ì4(€™±ÕÍ¡Må¹EÕ•Õ” ¤ì4(€É•¹‘•É±° ¤ì4)ô4(4)™Õ¹Ñ¥½¸±½½ÕĞ ¤ì4(€ÍÑ½ÁQ¥µ•È ¤ì4(€ÍÑ…Ñ”¹•á…µ¥¹¥Í¡•€ôÑÉÕ”ì4(€Í•Ñá…µ1½­•¡™…±Í”¤ì4(€ÕÍ•ÉMÑ½É”¹ÕÉÉ•¹ÑA¡½¹”€ô€ˆˆì4(€ÍÑ…Ñ”¹ÕÉÉ•¹ÑUÍ•È€ô¹Õ±°ì4(€…ÁÁ±å‘µ¥¹•ÍÌ ¤ì4(€ÍÑ…Ñ”¹ÅÕ¥è€ômtì4(€ÍÑ…Ñ”¹ÅÕ¥é%¹‘•à€ô€Àì4(€ÍÑ…Ñ”¹Í½É”€ô€Àì4(€•±Ì¹…ÕÑ¡A¡½¹”¹Ù…±Õ”€ô€ˆˆì4(€•±Ì¹…ÕÑ¡9…µ”¹Ù…±Õ”€ô€ˆˆì4(€Í¡½İÕÑ ¡ÑÉÕ”¤ì4(€É•¹‘•É±° ¤ì4)ô4(4)™Õ¹Ñ¥½¸‰¥¹‘Ù•¹ÑÌ ¤ì4(€•±Ì¹¹…ÙQ…‰Ì¹™½É…  ¡Ñ…ˆ¤€ôøÑ…ˆ¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰±¥¬ˆ°€ ¤€ôøÍİ¥Ñ¡Y¥•Ü¡Ñ…ˆ¹‘…Ñ…Í•Ğ¹Ù¥•Ü¤¤¤ì4(€•±Ì¹‰…¹­M•±•Ğ¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰¡…¹”ˆ°€ ¤€ôøì4(€€€ÍÑ…Ñ”¹ÕÉÉ•¹Ñ	…¹¬€ô•±Ì¹‰…¹­M•±•Ğ¹Ù…±Õ”ì4(€€€ÍÑ…Ñ”¹±•…É¹A…”€ô€Äì4(€€€É•¹‘•É±° ¤ì4(€ô¤ì4(€•±Ì¹Í•…É¡%¹ÁÕĞ¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰¥¹ÁÕĞˆ°€ ¤€ôøì4(€€€ÍÑ…Ñ”¹±•…É¹A…”€ô€Äì4(€€€É•¹‘•É±° ¤ì4(€ô¤ì4(€•±Ì¹ÍÑ…ÉÑEÕ¥é	Ñ¸¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰±¥¬ˆ°ÍÑ…ÉÑEÕ¥è¤ì4(€•±Ì¹É•ÑÉå5¥ÍÑ…­•Í	Ñ¸¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰±¥¬ˆ°ÍÑ…ÉÑ5¥ÍÑ…­•EÕ¥è¤ì4(€•±Ì¹•áÁ½ÉÑI•½É‘Í	Ñ¸¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰±¥¬ˆ°•áÁ½ÉÑI•½É‘Ì¤ì4(€•±Ì¹•áÁ½ÉÑ5¥ÍÑ…­•Í	Ñ¸¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰±¥¬ˆ°•áÁ½ÉÑ5¥ÍÑ…­•Ì¤ì4(€‘½Õµ•¹Ğ¹ÅÕ•ÉåM•±•Ñ½É±° ˆ¹µ½‘”µÑ…ˆˆ¤¹™½É…  ¡Ñ…ˆ¤€ôøì4(€€€Ñ…ˆ¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰±¥¬ˆ°€ ¤€ôøì4(€€€€€ÍÑ…Ñ”¹ÅÕ¥é5½‘”€ôÑ…ˆ¹‘…Ñ…Í•Ğ¹µ½‘”ì4(€€€€€‘½Õµ•¹Ğ¹ÅÕ•ÉåM•±•Ñ½É±° ˆ¹µ½‘”µÑ…ˆˆ¤¹™½É…  ¡Ğ¤€ôø4(€€€€€€€Ğ¹±…ÍÍ1¥ÍĞ¹Ñ½±” ‰…Ñ¥Ù”ˆ°Ğ€ôôôÑ…ˆ¤4(€€€€€€¤ì4(€€€€€•±Ì¹µ½‘•I…¹‘½´¹±…ÍÍ1¥ÍĞ¹Ñ½±” ‰¡¥‘‘•¸ˆ°ÍÑ…Ñ”¹ÅÕ¥é5½‘”€„ôô€‰É…¹‘½´ˆ¤ì4(€€€€€•±Ì¹µ½‘•AÉ½‘ÕĞ¹±…ÍÍ1¥ÍĞ¹Ñ½±” ‰¡¥‘‘•¸ˆ°ÍÑ…Ñ”¹ÅÕ¥é5½‘”€„ôô€‰ÁÉ½‘ÕĞˆ¤ì4(€€€€€•±Ì¹µ½‘•I½±”¹±…ÍÍ1¥ÍĞ¹Ñ½±” ‰¡¥‘‘•¸ˆ°ÍÑ…Ñ”¹ÅÕ¥é5½‘”€„ôô€‰É½±”ˆ¤ì4(€€€ô¤ì4(€ô¤ì4(€•±Ì¹±•…É5¥ÍÑ…­•Í	Ñ¸¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰±¥¬ˆ°€ ¤€ôøì4(€€€¥˜€ …İ¥¹‘½Ü¹½¹™¥É´ ‹†»–ºkšâ¦ë–öO–&7¢Ò›–>ßj–£¦£¦Rg¦Šc–B_¾òš¶“šN7’ös’â7¢÷šJ“¦Rˆ¤¤É•ÑÕÉ¸ì4(€€€ÍÑ½É…”¹µ¥ÍÑ…­•Ì€ômtì4(€€€É•¹‘•É±° ¤ì4(€ô¤ì4(€•±Ì¹É•Í•Ñ	Ñ¸¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰±¥¬ˆ°€ ¤€ôøì4(€€€¥˜€ …İ¥¹‘½Ü¹½¹™¥É´ ‹†»–ºkšâ¦ë–öO–&7¢Ò›–>ßjš¶†»:¦Rg¦Šc–J3–£¦£¢¢¾W¢ºÃ–öW–B_¾òš¶“šN7’ös’â7¢÷šJ“¦Rˆ¤¤É•ÑÕÉ¸ì4(€€€ÍÑ½É…”¹…ÑÑ•µÁÑÌ€ô€Àì4(€€€ÍÑ½É…”¹½ÉÉ•Ğ€ô€Àì4(€€€ÍÑ½É…”¹µ¥ÍÑ…­•Ì€ômtì4(€€€ÍÑ½É…”¹•á…µI•½É‘Ì€ômtì4(€€€±½…±MÑ½É…”¹É•µ½Ù•%Ñ•´ ‰©é}Íå¹}ÅÕ•Õ”ˆ¤ì4(€€€É•¹‘•É±° ¤ì4(€ô¤ì4(€•±Ì¹…ÕÑ¡½É´¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰ÍÕ‰µ¥Ğˆ°Í…Ù•UÍ•ÉÉ½µ½É´¤ì4(€•±Ì¹±½½ÕÑ	Ñ¸¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰±¥¬ˆ°±½½ÕĞ¤ì4(€•±Ì¹µ½‰¥±•M¥‘•‰…ÉQ½±”ü¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰±¥¬ˆ°€ ¤€ôøì4(€€€½¹ÍĞ½Á•¸€ô€…•±Ì¹Í¥‘•‰…ÉQ½½±Ì¹±…ÍÍ1¥ÍĞ¹½¹Ñ…¥¹Ì ‰µ½‰¥±”µ½Á•¸ˆ¤ì4(€€€•±Ì¹Í¥‘•‰…ÉQ½½±Ì¹±…ÍÍ1¥ÍĞ¹Ñ½±” ‰µ½‰¥±”µ½Á•¸ˆ°½Á•¸¤ì4(€€€•±Ì¹µ½‰¥±•M¥‘•‰…ÉQ½±”¹Í•ÑÑÑÉ¥‰ÕÑ” ‰…É¥„µ•áÁ…¹‘•ˆ°MÑÉ¥¹œ¡½Á•¸¤¤ì4(€ô¤ì4(€İ¥¹‘½Ü¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È ‰‰•™½É•Õ¹±½…ˆ°€¡•Ù•¹Ğ¤€ôøì4(€€€¥˜€ …ÍÑ…Ñ”¹•á…µ¥¹¥Í¡•€˜˜ÍÑ…Ñ”¹•á…µQåÁ”€ôôô€‰™½Éµ…°ˆ¤ì4(€€€€€•Ù•¹Ğ¹ÁÉ•Ù•¹Ñ•™…Õ±Ğ ¤ì4(€€€€€•Ù•¹Ğ¹É•ÑÕÉ¹Y…±Õ”€ô€ˆˆì4(€€€ô4(€ô¤ì4)ô4(4)…Íå¹Œ™Õ¹Ñ¥½¸¥¹¥Ğ ¤ì4(€ÑÉäì4(€€€…İ…¥Ğ±½…‘EÕ•ÍÑ¥½¹Ì ¤ì4(€€€±½…‘ÕÉÉ•¹ÑUÍ•È ¤ì4(€€€É•½¹¥±•MÑ½É•‘EÕ•ÍÑ¥½¹Ì ¤ì4(€€€É•¹‘•É	…¹­M•±•Ğ ¤ì4(€€€É•¹‘•ÉEÕ¥éM•ÑÕÀ ¤ì4(€€€¥¹¥ÑM±½…¸ ¤ì4(€€€‰¥¹‘Ù•¹ÑÌ ¤ì4(€€€…ÁÁ±å‘µ¥¹•ÍÌ ¤ì4(€€€…İ…¥Ğ™±ÕÍ¡Må¹EÕ•Õ” ¤ì4(€€€…İ…¥Ğ±½…‘±½Õ‘MÑ…ÑÌ ¤ì4(€€€É•¹‘•É±° ¤ì4(€€€Í¡½İÕÑ  …ÍÑ…Ñ”¹ÕÉÉ•¹ÑUÍ•È¤ì4(€ô…Ñ €¡•ÉÉ½È¤ì4(€€€‘½Õµ•¹Ğ¹‰½‘ä¹¥¹¹•É!Q50€ô€ñ‘¥Ø±…ÍÌô‰•µÁÑäˆû¦Šc–êO–*ƒ¢ö÷–’Ç¢Ò—¾òh‘í•Í…Á•!Ñµ°¡•ÉÉ½È¹µ•ÍÍ…”¥ôğ½‘¥Øù€ì4(€€€Ñ¡É½Ü•ÉÉ½Èì4(€ô4)ô4(4)¥¹¥Ğ ¤ì4(
