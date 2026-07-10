@@ -1,9 +1,9 @@
-const BUILD_VERSION = "20260710";
+const BUILD_VERSION = "20260710-cloud";
 const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
-const API_BASES = [];
-const API_BASE = "";
-const CLOUD_ENABLED = false;
+const API_BASE = "https://jinzun-knowledge.vercel.app";
+const API_BASES = [API_BASE];
+const CLOUD_ENABLED = true;
 const ADMIN_PHONES = ["13750353689", "13538004509"];
 const state = {
   allQuestions: [],
