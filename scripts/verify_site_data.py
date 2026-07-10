@@ -92,12 +92,12 @@ def main() -> None:
     index_text = (ROOT / "index.html").read_text(encoding="utf-8")
     app_text = (ROOT / "app.js").read_text(encoding="utf-8")
     api_text = (ROOT / "api" / "cloud.js").read_text(encoding="utf-8")
-    if 'app.js?v=20260710' not in index_text or 'const BUILD_VERSION = "20260710";' not in app_text:
+    if 'app.js?v=20260710-cloud' not in index_text or 'const BUILD_VERSION = "20260710-cloud";' not in app_text:
         fail("首页与脚本版本号不一致", errors)
-    if "JZ_ADMIN_PHONES" in index_text or "jinzun-knowledge.vercel.app" in app_text:
-        fail("网页仍包含公开管理员号码或云端地址", errors)
-    if "const CLOUD_ENABLED = false;" not in app_text:
-        fail("网页端云同步未关闭", errors)
+    if "JZ_ADMIN_PHONES" in index_text:
+        fail("网页仍包含公开管理员号码配置", errors)
+    if 'const API_BASE = "https://jinzun-knowledge.vercel.app";' not in app_text or "const CLOUD_ENABLED = true;" not in app_text:
+        fail("网页端云同步未启用或云端地址未配置", errors)
     if "INTERNAL_API_TOKEN" not in api_text or "Unauthorized" not in api_text:
         fail("云端接口未启用服务器鉴权", errors)
 
@@ -132,3 +132,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
