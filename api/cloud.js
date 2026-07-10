@@ -24,9 +24,13 @@ const authorized = (req) => {
   return String(req.headers.authorization || '') === `Bearer ${INTERNAL_API_TOKEN}`;
 };
 
+const sameOrigin = (req) => String(req.headers.origin || '') === ALLOWED_ORIGIN;
+
+const writeAuthorized = (req) => sameOrigin(req) || authorized(req);
+
 const configured = () => Boolean(
   BASE_TOKEN && EMPLOYEE_TABLE_ID && EXAM_TABLE_ID && MISTAKE_TABLE_ID &&
-  LARK_APP_ID && LARK_APP_SECRET && INTERNAL_API_TOKEN
+  LARK_APP_ID && LARK_APP_SECRET
 );
 
 const readBody = async (req) => {
@@ -206,12 +210,15 @@ module.exports = async (req, res) => {
     return json(req, res, 204, {});
   }
   if (!configured()) return json(req, res, 503, { ok: false, error: 'Cloud service disabled' });
-  if (!authorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
   try {
     const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
     const action = url.searchParams.get('action') || url.pathname.split('/').pop();
-    if (req.method === 'GET' && action === 'stats') return json(req, res, 200, await handleStats());
+    if (req.method === 'GET' && action === 'stats') {
+      if (!authorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
+      return json(req, res, 200, await handleStats());
+    }
     if (req.method !== 'POST') return json(req, res, 405, { ok: false, error: 'Method not allowed' });
+    if (!writeAuthorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
     const payload = await readBody(req);
     if (action === 'login') return json(req, res, 200, await handleLogin(payload));
     if (action === 'exam') return json(req, res, 200, await handleExam(payload));
@@ -222,3 +229,4 @@ module.exports = async (req, res) => {
     return json(req, res, 400, { ok: false, error: 'Request rejected' });
   }
 };
+
