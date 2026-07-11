@@ -837,7 +837,7 @@ async function handleStats() {
 module.exports = async (req, res) => {
   const origin = String(req.headers.origin || '');
   if (req.method === 'OPTIONS') {
-    if (origin && origin !== ALLOWED_ORIGIN) return json(req, res, 403, { ok: false, error: 'Origin not allowed' });
+    if (origin && !ALLOWED_ORIGINS.has(origin)) return json(req, res, 403, { ok: false, error: 'Origin not allowed' });
     return json(req, res, 204, {});
   }
   if (!configured()) return json(req, res, 503, { ok: false, error: 'Cloud service disabled' });
