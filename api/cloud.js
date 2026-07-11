@@ -327,12 +327,19 @@ const verifyToken = (token) => {
 const passwordHash = (password) => bcrypt.hash(`${password}${PASSWORD_PEPPER}`, 12);
 const passwordMatches = (password, hash) => bcrypt.compare(`${password}${PASSWORD_PEPPER}`, hash);
 
+const adminFlag = (value) => {
+  if (Array.isArray(value)) return value.some((item) => adminFlag(item));
+  if (value && typeof value === 'object') return adminFlag(value.value ?? value.text ?? value.checked);
+  return ['true', '1', 'yes', 'y', '是', '是的', '管理员', '已勾选', 'checked', 'on']
+    .includes(String(value ?? '').trim().toLowerCase());
+};
+
 const authUserFromRecord = (record) => ({
   id: record['员工ID'] || record.record_id,
   name: record['姓名'] || '',
   phone: cleanPhone(record['手机号']),
   role: record['岗位'] || '',
-  isAdmin: String(record['是否管理员']).toLowerCase() === 'true',
+  isAdmin: adminFlag(record['是否管理员']),
   sessionVersion: String(record['会话版本'] || '1'),
 });
 
@@ -418,7 +425,7 @@ async function handleRegister(payload) {
     '岗位': role,
     '密码哈希': hash,
     '账号状态': '正常',
-    '是否管理员': String(existing?.['是否管理员']).toLowerCase() === 'true' ? 'true' : 'false',
+    '是否管理员': adminFlag(existing?.['是否管理员']) ? 'true' : 'false',
     '注册时间': existing?.['注册时间'] || dt(new Date()),
     '最后登录时间': dt(new Date()),
     '登录失败次数': '0',
@@ -525,7 +532,7 @@ async function requireActiveUser(req, payload) {
   if (String(record['会话版本'] || '1') !== String(user.sessionVersion || '1')) {
     throw httpError(401, '登录状态已更新，请重新登录');
   }
-  const currentIsAdmin = String(record['是否管理员']).toLowerCase() === 'true';
+  const currentIsAdmin = adminFlag(record['是否管理员']);
   if (currentIsAdmin !== user.isAdmin) throw httpError(401, '账号权限已更新，请重新登录');
   return authUserFromRecord(record);
 }
