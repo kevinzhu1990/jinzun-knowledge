@@ -11,6 +11,7 @@ const LARK_APP_ID = process.env.LARK_APP_ID || '';
 const LARK_APP_SECRET = process.env.LARK_APP_SECRET || '';
 const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN || '';
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://kevinzhu1990.github.io';
+const ALLOWED_ORIGINS = new Set([ALLOWED_ORIGIN, 'https://jinzun-knowledge.vercel.app']);
 const AUTH_SECRET = process.env.AUTH_SECRET || '';
 const EMPLOYEE_REGISTER_CODE = process.env.EMPLOYEE_REGISTER_CODE || '';
 const PASSWORD_PEPPER = process.env.PASSWORD_PEPPER || '';
@@ -22,7 +23,7 @@ const json = (req, res, status, body) => {
   const origin = String(req.headers.origin || '');
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  if (origin === ALLOWED_ORIGIN) res.setHeader('Access-Control-Allow-Origin', origin);
+  if (ALLOWED_ORIGINS.has(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type');
@@ -35,7 +36,7 @@ const authorized = (req) => {
   return String(req.headers.authorization || '') === `Bearer ${INTERNAL_API_TOKEN}`;
 };
 
-const sameOrigin = (req) => String(req.headers.origin || '') === ALLOWED_ORIGIN;
+const sameOrigin = (req) => ALLOWED_ORIGINS.has(String(req.headers.origin || ''));
 
 const writeAuthorized = (req) => sameOrigin(req) || authorized(req);
 
