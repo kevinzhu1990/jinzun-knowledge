@@ -321,6 +321,22 @@
           </div>
           <div class="admin-alert">管理员数据来自服务端身份校验，员工注册不会自动获得管理权限。</div>
           <div id="adminDataWarning" class="admin-alert hidden"></div>
+          <div class="admin-panel admin-account-tools">
+            <h4>员工账号管理</h4>
+            <form id="adminEmployeeForm" class="admin-account-form">
+              <input id="adminEmployeeName" class="text-input" required maxlength="30" placeholder="员工姓名" />
+              <input id="adminEmployeePhone" class="text-input" required maxlength="11" inputmode="numeric" placeholder="手机号" />
+              <select id="adminEmployeeRole" class="select" required>
+                <option value="">选择岗位</option>
+                <option>运营</option><option>客服</option><option>美工</option><option>主播</option><option>中控</option>
+                <option>采购</option><option>财务</option><option>行政</option><option>审单</option><option>仓储</option><option>管理</option><option>新员工</option>
+              </select>
+              <input id="adminEmployeePassword" class="text-input" required minlength="8" placeholder="初始密码：至少8位，含字母和数字" />
+              <button class="primary-btn" type="submit">添加员工</button>
+            </form>
+            <p id="adminAccountStatus" class="form-error"></p>
+            <div id="adminEmployeeList" class="admin-table"></div>
+          </div>
           <div id="adminMetrics" class="summary-grid"></div>
           <div class="admin-grid">
             <div class="admin-panel">
