@@ -527,7 +527,6 @@ async function requireActiveUser(req, payload) {
     throw httpError(401, '登录状态已更新，请重新登录');
   }
   const currentIsAdmin = isAdminValue(record['是否管理员']);
-  if (currentIsAdmin !== user.isAdmin) throw httpError(401, '账号权限已更新，请重新登录');
   return authUserFromRecord(record);
 }
 
@@ -853,6 +852,10 @@ module.exports = async (req, res) => {
     if (!writeAuthorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
     const payload = await readBody(req);
     enforceRateLimit(req, action);
+    if (action === 'session') {
+      const user = await requireActiveUser(req, payload);
+      return json(req, res, 200, { ok: true, token: authTokenFor(user), user });
+    }
     if (action.startsWith('admin-')) {
       const user = await requireAdmin(req, payload);
       if (action === 'admin-list') return json(req, res, 200, await handleAdminList());
