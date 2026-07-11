@@ -4,26 +4,85 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>金尊知识库学习考核</title>
-    <link rel="stylesheet" href="./styles.css?v=20260710-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260711-syncfix1" />
   </head>
   <body>
     <section id="authView" class="auth-view">
       <div class="auth-card">
-        <p class="eyebrow">Mobile Access</p>
-        <h1>本机学习账号</h1>
-        <p class="auth-note">员工用姓名、手机号和岗位进入学习。学习记录仅保存在当前设备的浏览器中，不会上传姓名、手机号、成绩或错题。</p>
-        <form id="authForm" class="auth-form">
+        <p class="eyebrow">Employee Access</p>
+        <h1>金尊员工学习账号</h1>
+        <div class="auth-tabs" role="tablist" aria-label="账号入口">
+          <button id="showLoginTab" class="auth-tab active" type="button">员工登录</button>
+          <button id="showRegisterTab" class="auth-tab" type="button">员工注册</button>
+        </div>
+        <p class="auth-note">首次使用请先注册；已注册手机号可用公司口令重新设置密码。姓名、手机号、岗位、考试成绩和错题会上传至公司内部系统；密码不会保存为明文。</p>
+        <form id="loginForm" class="auth-form">
           <label>
-            姓名
-            <input id="authName" class="text-input" type="text" autocomplete="name" required placeholder="请输入姓名" />
+            姓名或手机号
+            <input id="loginAccount" class="text-input" type="text" autocomplete="username" required placeholder="请输入姓名或手机号" />
+          </label>
+          <label>
+            密码
+            <div class="password-field">
+              <input id="loginPassword" class="text-input" type="password" autocomplete="current-password" required placeholder="请输入密码" />
+              <button class="password-toggle" type="button" data-target="loginPassword">显示</button>
+            </div>
+          </label>
+          <p id="loginError" class="form-error"></p>
+          <button class="primary-btn" type="submit">登录</button>
+          <button id="showResetForm" class="auth-link-btn" type="button">忘记密码？使用公司口令重置</button>
+        </form>
+        <form id="registerForm" class="auth-form hidden">
+          <label>
+            真实姓名
+            <input id="registerName" class="text-input" type="text" autocomplete="name" maxlength="30" required placeholder="请输入真实姓名" />
           </label>
           <label>
             手机号
-            <input id="authPhone" class="text-input" type="tel" inputmode="numeric" autocomplete="tel" required placeholder="请输入手机号" />
+            <input id="registerPhone" class="text-input" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" required placeholder="请输入11位手机号" />
           </label>
           <label>
             岗位
-            <select id="authRole" class="select">
+            <select id="registerRole" class="select" required>
+              <option value="">请选择岗位</option>
+              <option value="运营">运营</option><option value="客服">客服</option><option value="美工">美工</option>
+              <option value="主播">主播</option><option value="中控">中控</option><option value="采购">采购</option>
+              <option value="财务">财务</option><option value="行政">行政</option><option value="审单">审单</option>
+              <option value="仓储">仓储</option><option value="管理">管理</option><option value="新员工">新员工</option>
+            </select>
+          </label>
+          <label>
+            设置密码
+            <div class="password-field">
+              <input id="registerPassword" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="至少8位，包含字母和数字" />
+              <button class="password-toggle" type="button" data-target="registerPassword">显示</button>
+            </div>
+          </label>
+          <label>
+            确认密码
+            <input id="registerPasswordConfirm" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="请再次输入密码" />
+          </label>
+          <label>
+            公司注册口令
+            <input id="registerCode" class="text-input" type="password" autocomplete="off" required placeholder="请输入公司内部注册口令" />
+          </label>
+          <p id="registerError" class="form-error"></p>
+          <button class="primary-btn" type="submit">注册并进入学习</button>
+        </form>
+        <form id="resetForm" class="auth-form hidden">
+          <p class="auth-form-note">公司内部口令由负责人统一提供，仅限内部员工使用，请勿对外传播。</p>
+          <label>
+            真实姓名
+            <input id="resetName" class="text-input" type="text" autocomplete="name" maxlength="30" required placeholder="请输入真实姓名" />
+          </label>
+          <label>
+            手机号
+            <input id="resetPhone" class="text-input" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" required placeholder="请输入已注册手机号" />
+          </label>
+          <label>
+            岗位
+            <select id="resetRole" class="select" required>
+              <option value="">请选择岗位</option>
               <option value="运营">运营</option>
               <option value="客服">客服</option>
               <option value="美工">美工</option>
@@ -38,8 +97,24 @@
               <option value="新员工">新员工</option>
             </select>
           </label>
-          <p id="authError" class="form-error"></p>
-          <button class="primary-btn" type="submit">进入学习</button>
+          <label>
+            新密码
+            <div class="password-field">
+              <input id="resetPassword" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="至少8位，包含字母和数字" />
+              <button class="password-toggle" type="button" data-target="resetPassword">显示</button>
+            </div>
+          </label>
+          <label>
+            确认新密码
+            <input id="resetPasswordConfirm" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="请再次输入新密码" />
+          </label>
+          <label>
+            公司注册口令
+            <input id="resetCode" class="text-input" type="password" autocomplete="off" required placeholder="请输入公司内部注册口令" />
+          </label>
+          <p id="resetError" class="form-error"></p>
+          <button class="primary-btn" type="submit">重置密码并登录</button>
+          <button id="backToLogin" class="auth-link-btn" type="button">返回员工登录</button>
         </form>
       </div>
     </section>
@@ -154,7 +229,7 @@
             <div>
               <p class="eyebrow">Quiz</p>
               <h3>开始考核</h3>
-              <p>练习模式答后显示解析；正式模式在交卷后统一显示结果。</p>
+              <p>选择答案后自动进入下一题。练习模式会短暂显示解析，正式考试在完成后统一显示结果。</p>
             </div>
             <div class="quiz-mode-tabs">
               <button class="mode-tab active" data-mode="random">随机混合</button>
@@ -212,6 +287,8 @@
               <span class="quiz-stat-item stat-wrong" id="quizWrongCount">✗ 错误 0 题</span>
             </div>
             <article id="quizCard" class="quiz-card"></article>
+            <div id="examSubmitStatus" class="form-error exam-submit-status" role="status"></div>
+            <button id="retryExamSubmitBtn" class="primary-btn hidden" type="button">重新提交成绩</button>
           </div>
 
           <div id="quizResult" class="result-card hidden"></div>
@@ -242,7 +319,24 @@
               <button id="exportMistakesBtn" class="secondary-btn">导出错题</button>
             </div>
           </div>
-          <div class="admin-alert">当前为安全的本机模式，数据仅保存在本设备。全员统计需在完成可靠身份验证后再启用。</div>
+          <div class="admin-alert">管理员数据来自服务端身份校验，员工注册不会自动获得管理权限。</div>
+          <div id="adminDataWarning" class="admin-alert hidden"></div>
+          <div class="admin-panel admin-account-tools">
+            <h4>员工账号管理</h4>
+            <form id="adminEmployeeForm" class="admin-account-form">
+              <input id="adminEmployeeName" class="text-input" required maxlength="30" placeholder="员工姓名" />
+              <input id="adminEmployeePhone" class="text-input" required maxlength="11" inputmode="numeric" placeholder="手机号" />
+              <select id="adminEmployeeRole" class="select" required>
+                <option value="">选择岗位</option>
+                <option>运营</option><option>客服</option><option>美工</option><option>主播</option><option>中控</option>
+                <option>采购</option><option>财务</option><option>行政</option><option>审单</option><option>仓储</option><option>管理</option><option>新员工</option>
+              </select>
+              <input id="adminEmployeePassword" class="text-input" required minlength="8" placeholder="初始密码：至少8位，含字母和数字" />
+              <button class="primary-btn" type="submit">添加员工</button>
+            </form>
+            <p id="adminAccountStatus" class="form-error"></p>
+            <div id="adminEmployeeList" class="admin-table"></div>
+          </div>
           <div id="adminMetrics" class="summary-grid"></div>
           <div class="admin-grid">
             <div class="admin-panel">
@@ -259,6 +353,7 @@
     </div>
 
     <script src="./mooncake-filter.js?v=af8d1d9"></script>
-    <script src="./app.js?v=20260711-cloud" type="module"></script>
+    <script src="./app.js?v=20260711-syncfix1" type="module"></script>
   </body>
 </html>
+
