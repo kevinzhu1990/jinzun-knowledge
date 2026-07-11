@@ -67,6 +67,7 @@ const dt = (value = new Date()) => {
 
 const cleanPhone = (value) => String(value || '').replace(/\D/g, '');
 const num = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const isAdminValue = (value) => ['true', '是', 'yes', '1'].includes(String(value || '').trim().toLowerCase());
 
 let cachedToken = null;
 let cachedTokenExpireAt = 0;
@@ -332,7 +333,7 @@ const authUserFromRecord = (record) => ({
   name: record['姓名'] || '',
   phone: cleanPhone(record['手机号']),
   role: record['岗位'] || '',
-  isAdmin: String(record['是否管理员']).toLowerCase() === 'true',
+  isAdmin: isAdminValue(record['是否管理员']),
   sessionVersion: String(record['会话版本'] || '1'),
 });
 
@@ -418,7 +419,7 @@ async function handleRegister(payload) {
     '岗位': role,
     '密码哈希': hash,
     '账号状态': '正常',
-    '是否管理员': String(existing?.['是否管理员']).toLowerCase() === 'true' ? 'true' : 'false',
+    '是否管理员': isAdminValue(existing?.['是否管理员']) ? '是' : '否',
     '注册时间': existing?.['注册时间'] || dt(new Date()),
     '最后登录时间': dt(new Date()),
     '登录失败次数': '0',
@@ -525,9 +526,46 @@ async function requireActiveUser(req, payload) {
   if (String(record['会话版本'] || '1') !== String(user.sessionVersion || '1')) {
     throw httpError(401, '登录状态已更新，请重新登录');
   }
-  const currentIsAdmin = String(record['是否管理员']).toLowerCase() === 'true';
+  const currentIsAdmin = isAdminValue(record['是否管理员']);
   if (currentIsAdmin !== user.isAdmin) throw httpError(401, '账号权限已更新，请重新登录');
   return authUserFromRecord(record);
+}
+
+async function requireAdmin(req, payload) {
+  const user = await requireActiveUser(req, payload);
+  if (!user.isAdmin) throw httpError(403, '管理员权限不足');
+  return user;
+}
+const adminEmployeeView = (record) => ({ record_id: record.record_id, name: record['姓名'] || '', phone: cleanPhone(record['手机号']), role: record['岗位'] || '', status: record['账号状态'] || '正常', isAdmin: isAdminValue(record['是否管理员']), registeredAt: record['注册时间'] || '' });
+async function handleAdminList() {
+  const tableId = await accountTableId();
+  return { ok: true, employees: (await listRecords(tableId)).map(adminEmployeeView) };
+}
+async function handleAdminAdd(payload) {
+  const name = normalizeName(payload.name), phone = cleanPhone(payload.phone), role = normalizeName(payload.role), password = String(payload.password || '');
+  if (!name || !/^1\d{10}$/.test(phone) || !allowedRoles.has(role) || !validatePassword(password)) throw httpError(400, '请填写正确的姓名、手机号、岗位和密码');
+  const tableId = await accountTableId();
+  if (await findAccountByPhone(phone)) throw httpError(409, '该手机号已经存在');
+  const now = dt(new Date());
+  const record = await createRecord(tableId, { '员工ID': crypto.randomUUID(), '姓名': name, '手机号': phone, '岗位': role, '密码哈希': await passwordHash(password), '账号状态': '正常', '是否管理员': '否', '注册时间': now, '登录失败次数': '0', '锁定截止时间': '', '密码更新时间': now, '客户端标识': '管理员添加', '会话版本': '1', '备注': '管理员添加员工账号' });
+  return { ok: true, employee: adminEmployeeView({ ...record, '姓名': name, '手机号': phone, '岗位': role, '账号状态': '正常', '是否管理员': '否', '注册时间': now }) };
+}
+async function handleAdminDelete(payload, user) {
+  const phone = cleanPhone(payload.phone);
+  if (!phone) throw httpError(400, '手机号不正确');
+  if (phone === cleanPhone(user.phone)) throw httpError(400, '不能删除当前管理员账号');
+  const tableId = await accountTableId(), record = await findAccountByPhone(phone);
+  if (!record) throw httpError(404, '未找到员工账号');
+  await deleteRecord(tableId, record.record_id);
+  return { ok: true, phone };
+}
+async function handleAdminPassword(payload) {
+  const phone = cleanPhone(payload.phone), password = String(payload.password || '');
+  if (!phone || !validatePassword(password)) throw httpError(400, '密码至少8位，并包含字母和数字');
+  const tableId = await accountTableId(), record = await findAccountByPhone(phone);
+  if (!record) throw httpError(404, '未找到员工账号');
+  await updateRecord(tableId, record.record_id, { '密码哈希': await passwordHash(password), '登录失败次数': '0', '锁定截止时间': '', '密码更新时间': dt(new Date()), '会话版本': nextSessionVersion(record), '备注': '管理员修改员工密码' });
+  return { ok: true, phone };
 }
 
 async function createRecord(tableId, fields) {
@@ -548,6 +586,11 @@ async function updateRecord(tableId, recordId, fields) {
     body: JSON.stringify({ fields }),
   });
   return data?.data?.record || data?.data;
+}
+
+async function deleteRecord(tableId, recordId) {
+  const token = await getTenantToken();
+  await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records/${recordId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
 }
 
 async function searchRecords(tableId, fieldName, fieldValue) {
@@ -810,6 +853,13 @@ module.exports = async (req, res) => {
     if (!writeAuthorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
     const payload = await readBody(req);
     enforceRateLimit(req, action);
+    if (action.startsWith('admin-')) {
+      const user = await requireAdmin(req, payload);
+      if (action === 'admin-list') return json(req, res, 200, await handleAdminList());
+      if (action === 'admin-add') return json(req, res, 200, await handleAdminAdd(payload));
+      if (action === 'admin-delete') return json(req, res, 200, await handleAdminDelete(payload, user));
+      if (action === 'admin-password') return json(req, res, 200, await handleAdminPassword(payload));
+    }
     if (action === 'reset') return json(req, res, 200, await handlePasswordReset(payload));
     if (action === 'register') return json(req, res, 200, await handleRegister(payload));
     if (action === 'login' && Object.prototype.hasOwnProperty.call(payload, 'account')) {
