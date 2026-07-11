@@ -3,114 +3,118 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>閲戝皧鐭ヨ瘑搴撳涔犺€冩牳</title>
+    <title>金尊知识库学习考核</title>
     <link rel="stylesheet" href="./styles.css?v=20260711-round5" />
   </head>
   <body>
     <section id="authView" class="auth-view">
       <div class="auth-card">
         <p class="eyebrow">Employee Access</p>
-        <h1>閲戝皧鍛樺伐瀛︿範璐﹀彿</h1>
-        <div class="auth-tabs" role="tablist" aria-label="璐﹀彿鍏ュ彛">
-          <button id="showLoginTab" class="auth-tab active" type="button">鍛樺伐鐧诲綍</button>
-          <button id="showRegisterTab" class="auth-tab" type="button">鍛樺伐娉ㄥ唽</button>
+        <h1>金尊员工学习账号</h1>
+        <div class="auth-tabs" role="tablist" aria-label="账号入口">
+          <button id="showLoginTab" class="auth-tab active" type="button">员工登录</button>
+          <button id="showRegisterTab" class="auth-tab" type="button">员工注册</button>
         </div>
-        <p class="auth-note">棣栨浣跨敤璇峰厛娉ㄥ唽锛涘凡娉ㄥ唽鎵嬫満鍙峰彲鐢ㄥ叕鍙稿彛浠ら噸鏂拌缃瘑鐮併€傚鍚嶃€佹墜鏈哄彿銆佸矖浣嶃€佽€冭瘯鎴愮哗鍜岄敊棰樹細涓婁紶鑷冲叕鍙稿唴閮ㄧ郴缁燂紱瀵嗙爜涓嶄細淇濆瓨涓烘槑鏂囥€?/p>
+        <p class="auth-note">首次使用请先注册；已注册手机号可用公司口令重新设置密码。姓名、手机号、岗位、考试成绩和错题会上传至公司内部系统；密码不会保存为明文。</p>
         <form id="loginForm" class="auth-form">
           <label>
-            濮撳悕鎴栨墜鏈哄彿
-            <input id="loginAccount" class="text-input" type="text" autocomplete="username" required placeholder="璇疯緭鍏ュ鍚嶆垨鎵嬫満鍙? />
+            姓名或手机号
+            <input id="loginAccount" class="text-input" type="text" autocomplete="username" required placeholder="请输入姓名或手机号" />
           </label>
           <label>
-            瀵嗙爜
+            密码
             <div class="password-field">
-              <input id="loginPassword" class="text-input" type="password" autocomplete="current-password" required placeholder="璇疯緭鍏ュ瘑鐮? />
-              <button class="password-toggle" type="button" data-target="loginPassword">鏄剧ず</button>
+              <input id="loginPassword" class="text-input" type="password" autocomplete="current-password" required placeholder="请输入密码" />
+              <button class="password-toggle" type="button" data-target="loginPassword">显示</button>
             </div>
           </label>
           <p id="loginError" class="form-error"></p>
-          <button class="primary-btn" type="submit">鐧诲綍</button>
-          <button id="showResetForm" class="auth-link-btn" type="button">蹇樿瀵嗙爜锛熶娇鐢ㄥ叕鍙稿彛浠ら噸缃?/button>
+          <button class="primary-btn" type="submit">登录</button>
+          <button id="showResetForm" class="auth-link-btn" type="button">忘记密码？使用公司口令重置</button>
         </form>
         <form id="registerForm" class="auth-form hidden">
           <label>
-            鐪熷疄濮撳悕
-            <input id="registerName" class="text-input" type="text" autocomplete="name" maxlength="30" required placeholder="璇疯緭鍏ョ湡瀹炲鍚? />
+            真实姓名
+            <input id="registerName" class="text-input" type="text" autocomplete="name" maxlength="30" required placeholder="请输入真实姓名" />
           </label>
           <label>
-            鎵嬫満鍙?            <input id="registerPhone" class="text-input" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" required placeholder="璇疯緭鍏?1浣嶆墜鏈哄彿" />
+            手机号
+            <input id="registerPhone" class="text-input" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" required placeholder="请输入11位手机号" />
           </label>
           <label>
-            宀椾綅
+            岗位
             <select id="registerRole" class="select" required>
-              <option value="">璇烽€夋嫨宀椾綅</option>
-              <option value="杩愯惀">杩愯惀</option><option value="瀹㈡湇">瀹㈡湇</option><option value="缇庡伐">缇庡伐</option>
-              <option value="涓绘挱">涓绘挱</option><option value="涓帶">涓帶</option><option value="閲囪喘">閲囪喘</option>
-              <option value="璐㈠姟">璐㈠姟</option><option value="琛屾斂">琛屾斂</option><option value="瀹″崟">瀹″崟</option>
-              <option value="浠撳偍">浠撳偍</option><option value="绠＄悊">绠＄悊</option><option value="鏂板憳宸?>鏂板憳宸?/option>
+              <option value="">请选择岗位</option>
+              <option value="运营">运营</option><option value="客服">客服</option><option value="美工">美工</option>
+              <option value="主播">主播</option><option value="中控">中控</option><option value="采购">采购</option>
+              <option value="财务">财务</option><option value="行政">行政</option><option value="审单">审单</option>
+              <option value="仓储">仓储</option><option value="管理">管理</option><option value="新员工">新员工</option>
             </select>
           </label>
           <label>
-            璁剧疆瀵嗙爜
+            设置密码
             <div class="password-field">
-              <input id="registerPassword" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="鑷冲皯8浣嶏紝鍖呭惈瀛楁瘝鍜屾暟瀛? />
-              <button class="password-toggle" type="button" data-target="registerPassword">鏄剧ず</button>
+              <input id="registerPassword" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="至少8位，包含字母和数字" />
+              <button class="password-toggle" type="button" data-target="registerPassword">显示</button>
             </div>
           </label>
           <label>
-            纭瀵嗙爜
-            <input id="registerPasswordConfirm" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="璇峰啀娆¤緭鍏ュ瘑鐮? />
+            确认密码
+            <input id="registerPasswordConfirm" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="请再次输入密码" />
           </label>
           <label>
-            鍏徃娉ㄥ唽鍙ｄ护
-            <input id="registerCode" class="text-input" type="password" autocomplete="off" required placeholder="璇疯緭鍏ュ叕鍙稿唴閮ㄦ敞鍐屽彛浠? />
+            公司注册口令
+            <input id="registerCode" class="text-input" type="password" autocomplete="off" required placeholder="请输入公司内部注册口令" />
           </label>
           <p id="registerError" class="form-error"></p>
-          <button class="primary-btn" type="submit">娉ㄥ唽骞惰繘鍏ュ涔?/button>
+          <button class="primary-btn" type="submit">注册并进入学习</button>
         </form>
         <form id="resetForm" class="auth-form hidden">
-          <p class="auth-form-note">鍏徃鍐呴儴鍙ｄ护鐢辫礋璐ｄ汉缁熶竴鎻愪緵锛屼粎闄愬唴閮ㄥ憳宸ヤ娇鐢紝璇峰嬁瀵瑰浼犳挱銆?/p>
+          <p class="auth-form-note">公司内部口令由负责人统一提供，仅限内部员工使用，请勿对外传播。</p>
           <label>
-            鐪熷疄濮撳悕
-            <input id="resetName" class="text-input" type="text" autocomplete="name" maxlength="30" required placeholder="璇疯緭鍏ョ湡瀹炲鍚? />
+            真实姓名
+            <input id="resetName" class="text-input" type="text" autocomplete="name" maxlength="30" required placeholder="请输入真实姓名" />
           </label>
           <label>
-            鎵嬫満鍙?            <input id="resetPhone" class="text-input" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" required placeholder="璇疯緭鍏ュ凡娉ㄥ唽鎵嬫満鍙? />
+            手机号
+            <input id="resetPhone" class="text-input" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" required placeholder="请输入已注册手机号" />
           </label>
           <label>
-            宀椾綅
+            岗位
             <select id="resetRole" class="select" required>
-              <option value="">璇烽€夋嫨宀椾綅</option>
-              <option value="杩愯惀">杩愯惀</option>
-              <option value="瀹㈡湇">瀹㈡湇</option>
-              <option value="缇庡伐">缇庡伐</option>
-              <option value="涓绘挱">涓绘挱</option>
-              <option value="涓帶">涓帶</option>
-              <option value="閲囪喘">閲囪喘</option>
-              <option value="璐㈠姟">璐㈠姟</option>
-              <option value="琛屾斂">琛屾斂</option>
-              <option value="瀹″崟">瀹″崟</option>
-              <option value="浠撳偍">浠撳偍</option>
-              <option value="绠＄悊">绠＄悊</option>
-              <option value="鏂板憳宸?>鏂板憳宸?/option>
+              <option value="">请选择岗位</option>
+              <option value="运营">运营</option>
+              <option value="客服">客服</option>
+              <option value="美工">美工</option>
+              <option value="主播">主播</option>
+              <option value="中控">中控</option>
+              <option value="采购">采购</option>
+              <option value="财务">财务</option>
+              <option value="行政">行政</option>
+              <option value="审单">审单</option>
+              <option value="仓储">仓储</option>
+              <option value="管理">管理</option>
+              <option value="新员工">新员工</option>
             </select>
           </label>
           <label>
-            鏂板瘑鐮?            <div class="password-field">
-              <input id="resetPassword" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="鑷冲皯8浣嶏紝鍖呭惈瀛楁瘝鍜屾暟瀛? />
-              <button class="password-toggle" type="button" data-target="resetPassword">鏄剧ず</button>
+            新密码
+            <div class="password-field">
+              <input id="resetPassword" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="至少8位，包含字母和数字" />
+              <button class="password-toggle" type="button" data-target="resetPassword">显示</button>
             </div>
           </label>
           <label>
-            纭鏂板瘑鐮?            <input id="resetPasswordConfirm" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="璇峰啀娆¤緭鍏ユ柊瀵嗙爜" />
+            确认新密码
+            <input id="resetPasswordConfirm" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="64" required placeholder="请再次输入新密码" />
           </label>
           <label>
-            鍏徃娉ㄥ唽鍙ｄ护
-            <input id="resetCode" class="text-input" type="password" autocomplete="off" required placeholder="璇疯緭鍏ュ叕鍙稿唴閮ㄦ敞鍐屽彛浠? />
+            公司注册口令
+            <input id="resetCode" class="text-input" type="password" autocomplete="off" required placeholder="请输入公司内部注册口令" />
           </label>
           <p id="resetError" class="form-error"></p>
-          <button class="primary-btn" type="submit">閲嶇疆瀵嗙爜骞剁櫥褰?/button>
-          <button id="backToLogin" class="auth-link-btn" type="button">杩斿洖鍛樺伐鐧诲綍</button>
+          <button class="primary-btn" type="submit">重置密码并登录</button>
+          <button id="backToLogin" class="auth-link-btn" type="button">返回员工登录</button>
         </form>
       </div>
     </section>
@@ -118,44 +122,44 @@
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
-          <div class="brand-mark"><img src="assets/brand/jinzun-logo.png" alt="閲戝皧 Logo" /></div>
+          <div class="brand-mark"><img src="assets/brand/jinzun-logo.png" alt="金尊 Logo" /></div>
           <div>
-            <h1>閲戝皧鐭ヨ瘑搴?/h1>
-            <p>瀛︿範 路 缁冧範 路 鑰冩牳</p>
+            <h1>金尊知识库</h1>
+            <p>学习 · 练习 · 考核</p>
           </div>
         </div>
 
-        <nav class="nav-tabs" aria-label="涓诲鑸?>
-          <button class="nav-tab active" data-view="dashboard">鎬昏</button>
-          <button class="nav-tab" data-view="ranking">鎺掕</button>
-          <button class="nav-tab" data-view="learn">瀛︿範</button>
-          <button class="nav-tab" data-view="quiz">鑰冩牳</button>
-          <button class="nav-tab" data-view="mistakes">閿欓</button>
-          <button class="nav-tab hidden" data-view="admin" aria-hidden="true">绠＄悊</button>
+        <nav class="nav-tabs" aria-label="主导航">
+          <button class="nav-tab active" data-view="dashboard">总览</button>
+          <button class="nav-tab" data-view="ranking">排行</button>
+          <button class="nav-tab" data-view="learn">学习</button>
+          <button class="nav-tab" data-view="quiz">考核</button>
+          <button class="nav-tab" data-view="mistakes">错题</button>
+          <button class="nav-tab hidden" data-view="admin" aria-hidden="true">管理</button>
         </nav>
 
-        <button id="mobileSidebarToggle" class="mobile-sidebar-toggle" type="button" aria-expanded="false" aria-controls="sidebarTools">绛涢€変笌璐﹀彿</button>
+        <button id="mobileSidebarToggle" class="mobile-sidebar-toggle" type="button" aria-expanded="false" aria-controls="sidebarTools">筛选与账号</button>
         <div id="sidebarTools" class="sidebar-tools">
         <div class="side-panel">
-          <p class="side-label">褰撳墠鍛樺伐</p>
+          <p class="side-label">当前员工</p>
           <div class="user-panel">
-            <strong id="userName">鏈櫥褰?/strong>
+            <strong id="userName">未登录</strong>
             <span id="userMeta">-</span>
-            <button id="logoutBtn" class="text-btn" type="button">鍒囨崲璐﹀彿</button>
+            <button id="logoutBtn" class="text-btn" type="button">切换账号</button>
           </div>
         </div>
 
         <div class="side-panel">
-          <p class="side-label">棰樺簱绛涢€?/p>
+          <p class="side-label">题库筛选</p>
           <select id="bankSelect" class="select"></select>
           <div class="mini-stats">
             <div>
               <span id="bankCount">0</span>
-              <small>褰撳墠棰橀噺</small>
+              <small>当前题量</small>
             </div>
             <div>
               <span id="mistakeCount">0</span>
-              <small>閿欓璁板綍</small>
+              <small>错题记录</small>
             </div>
           </div>
         </div>
@@ -166,11 +170,11 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">New Employee Training</p>
-            <h2 id="pageTitle">瀛︿範鎬昏</h2>
+            <h2 id="pageTitle">学习总览</h2>
           </div>
           <div class="top-actions">
-            <input id="searchInput" class="search" type="search" placeholder="鎼滅储璐у彿銆侀鐩€佷骇鍝佸悕" />
-            <button id="resetBtn" class="icon-btn" type="button" title="娓呯┖鏈満瀛︿範璁板綍" aria-label="娓呯┖鏈満瀛︿範璁板綍">鈫?/button>
+            <input id="searchInput" class="search" type="search" placeholder="搜索货号、题目、产品名" />
+            <button id="resetBtn" class="icon-btn" type="button" title="清空本机学习记录" aria-label="清空本机学习记录">↺</button>
           </div>
         </header>
 
@@ -183,7 +187,7 @@
             </div>
             <div class="score-ring">
               <strong id="accuracyText">0%</strong>
-              <span>涓汉姝ｇ‘鐜?/span>
+              <span>个人正确率</span>
             </div>
           </div>
 
@@ -196,12 +200,12 @@
           <div class="section-head">
             <div>
               <p class="eyebrow">Leaderboard</p>
-              <h3>鏈満鎺掕姒?/h3>
-              <p class="section-note">浠呯粺璁″綋鍓嶈澶囨祻瑙堝櫒涓繚瀛樼殑璐﹀彿鍜屾垚缁┿€?/p>
+              <h3>本机排行榜</h3>
+              <p class="section-note">仅统计当前设备浏览器中保存的账号和成绩。</p>
             </div>
             <div class="rank-sort-btns">
-              <button class="rank-sort-btn active" data-sort="score">鎸夊垎鏁?/button>
-              <button class="rank-sort-btn" data-sort="time">鎸夌敤鏃?/button>
+              <button class="rank-sort-btn active" data-sort="score">按分数</button>
+              <button class="rank-sort-btn" data-sort="time">按用时</button>
             </div>
           </div>
           <div id="rankingList" class="ranking-list"></div>
@@ -211,9 +215,9 @@
           <div class="section-head">
             <div>
               <p class="eyebrow">Learn</p>
-              <h3>瀛︿範棰樺簱</h3>
+              <h3>学习题库</h3>
             </div>
-            <span id="learnCount" class="pill">0 閬撻</span>
+            <span id="learnCount" class="pill">0 道题</span>
           </div>
           <div id="learnFilter" class="learn-filter"></div>
           <div id="learnList" class="learn-list"></div>
@@ -224,67 +228,67 @@
           <div id="quizSetup" class="quiz-setup">
             <div>
               <p class="eyebrow">Quiz</p>
-              <h3>寮€濮嬭€冩牳</h3>
-              <p>閫夋嫨绛旀鍚庤嚜鍔ㄨ繘鍏ヤ笅涓€棰樸€傜粌涔犳ā寮忎細鐭殏鏄剧ず瑙ｆ瀽锛屾寮忚€冭瘯鍦ㄥ畬鎴愬悗缁熶竴鏄剧ず缁撴灉銆?/p>
+              <h3>开始考核</h3>
+              <p>选择答案后自动进入下一题。练习模式会短暂显示解析，正式考试在完成后统一显示结果。</p>
             </div>
             <div class="quiz-mode-tabs">
-              <button class="mode-tab active" data-mode="random">闅忔満娣峰悎</button>
-              <button class="mode-tab" data-mode="product">浜у搧棰樺簱</button>
-              <button class="mode-tab" data-mode="role">宀椾綅鑰冭瘯</button>
+              <button class="mode-tab active" data-mode="random">随机混合</button>
+              <button class="mode-tab" data-mode="product">产品题库</button>
+              <button class="mode-tab" data-mode="role">岗位考试</button>
             </div>
             <div id="modeRandom" class="mode-panel">
-              <p class="mode-desc">浠庢湀楗笺€佹棩甯稿勾璐у拰涓氬姟鍦烘櫙棰樺簱涓殢鏈烘娊棰樸€傛悳绱㈡垨渚ц竟鏍忕瓫閫夌敓鏁堟椂锛屼紭鍏堜娇鐢ㄥ綋鍓嶇瓫閫夌粨鏋溿€?/p>
+              <p class="mode-desc">从月饼、日常年货和业务场景题库中随机抽题。搜索或侧边栏筛选生效时，优先使用当前筛选结果。</p>
             </div>
             <div id="modeProduct" class="mode-panel hidden">
               <label class="mode-label">
-                閫夋嫨浜у搧棰樺簱
+                选择产品题库
                 <select id="productBankSelect" class="select"></select>
               </label>
-              <p class="mode-desc">鎸夋墍閫夋暟閲忛殢鏈烘娊棰橈紝棰橀噺涓嶈冻鏃朵娇鐢ㄨ棰樺簱鍏ㄩ儴棰樼洰銆?/p>
+              <p class="mode-desc">按所选数量随机抽题，题量不足时使用该题库全部题目。</p>
             </div>
             <div id="modeRole" class="mode-panel hidden">
               <label class="mode-label">
-                閫夋嫨宀椾綅
+                选择岗位
                 <select id="roleBankSelect" class="select"></select>
               </label>
-              <p class="mode-desc">浠呮娊鍙栨墍閫夊矖浣嶉搴擄紝閬垮厤宀椾綅棰樹笉瓒虫椂琚ぇ閲忎骇鍝侀鏇夸唬銆?/p>
+              <p class="mode-desc">仅抽取所选岗位题库，避免岗位题不足时被大量产品题替代。</p>
             </div>
             <div class="quiz-start-row">
               <label class="mode-label">
-                鑰冩牳绫诲瀷
+                考核类型
                 <select id="examType" class="select quiz-size-select">
-                  <option value="practice">缁冧範妯″紡锛氱瓟鍚庢樉绀鸿В鏋?/option>
-                  <option value="formal">姝ｅ紡妯″紡锛氫氦鍗峰悗缁熶竴鍑烘垚缁?/option>
+                  <option value="practice">练习模式：答后显示解析</option>
+                  <option value="formal">正式模式：交卷后统一出成绩</option>
                 </select>
               </label>
               <label class="mode-label">
-                鎶介鏁伴噺
+                抽题数量
                 <select id="quizSize" class="select quiz-size-select">
-                  <option value="10">10 棰?/option>
-                  <option value="20">20 棰?/option>
-                  <option value="30">30 棰?/option>
-                  <option value="50" selected>50 棰?/option>
-                  <option value="100">100 棰?/option>
+                  <option value="10">10 题</option>
+                  <option value="20">20 题</option>
+                  <option value="30">30 题</option>
+                  <option value="50" selected>50 题</option>
+                  <option value="100">100 题</option>
                 </select>
               </label>
-              <button id="startQuizBtn" class="primary-btn">寮€濮嬬瓟棰?/button>
+              <button id="startQuizBtn" class="primary-btn">开始答题</button>
             </div>
             <p id="quizSetupStatus" class="form-error quiz-setup-status" role="status"></p>
           </div>
 
           <div id="quizRunner" class="quiz-runner hidden">
             <div class="quiz-progress">
-              <span id="quizStep">绗?1 棰?/span>
+              <span id="quizStep">第 1 题</span>
               <div class="progress-track"><div id="progressBar"></div></div>
-              <span id="quizScore">0 鍒?/span>
+              <span id="quizScore">0 分</span>
             </div>
             <div class="quiz-stats-bar">
-              <span class="quiz-stat-item" id="quizTimer">鈴?00:00</span>
-              <span class="quiz-stat-item stat-wrong" id="quizWrongCount">鉁?閿欒 0 棰?/span>
+              <span class="quiz-stat-item" id="quizTimer">⏱ 00:00</span>
+              <span class="quiz-stat-item stat-wrong" id="quizWrongCount">✗ 错误 0 题</span>
             </div>
             <article id="quizCard" class="quiz-card"></article>
             <div id="examSubmitStatus" class="form-error exam-submit-status" role="status"></div>
-            <button id="retryExamSubmitBtn" class="primary-btn hidden" type="button">閲嶆柊鎻愪氦鎴愮哗</button>
+            <button id="retryExamSubmitBtn" class="primary-btn hidden" type="button">重新提交成绩</button>
           </div>
 
           <div id="quizResult" class="result-card hidden"></div>
@@ -294,11 +298,11 @@
           <div class="section-head">
             <div>
               <p class="eyebrow">Review</p>
-              <h3>閿欓鏈?/h3>
+              <h3>错题本</h3>
             </div>
             <div class="section-actions">
-              <button id="retryMistakesBtn" class="primary-btn">閲嶇粌閿欓</button>
-              <button id="clearMistakesBtn" class="secondary-btn">娓呯┖閿欓</button>
+              <button id="retryMistakesBtn" class="primary-btn">重练错题</button>
+              <button id="clearMistakesBtn" class="secondary-btn">清空错题</button>
             </div>
           </div>
           <div id="mistakeList" class="learn-list"></div>
@@ -308,23 +312,23 @@
           <div class="section-head">
             <div>
               <p class="eyebrow">Admin</p>
-              <h3>绠＄悊鐪嬫澘</h3>
+              <h3>管理看板</h3>
             </div>
             <div class="section-actions">
-              <button id="exportRecordsBtn" class="primary-btn">瀵煎嚭鑰冭瘯璁板綍</button>
-              <button id="exportMistakesBtn" class="secondary-btn">瀵煎嚭閿欓</button>
+              <button id="exportRecordsBtn" class="primary-btn">导出考试记录</button>
+              <button id="exportMistakesBtn" class="secondary-btn">导出错题</button>
             </div>
           </div>
-          <div class="admin-alert">绠＄悊鍛樻暟鎹潵鑷湇鍔＄韬唤鏍￠獙锛屽憳宸ユ敞鍐屼笉浼氳嚜鍔ㄨ幏寰楃鐞嗘潈闄愩€?/div>
+          <div class="admin-alert">管理员数据来自服务端身份校验，员工注册不会自动获得管理权限。</div>
           <div id="adminDataWarning" class="admin-alert hidden"></div>
           <div id="adminMetrics" class="summary-grid"></div>
           <div class="admin-grid">
             <div class="admin-panel">
-              <h4>鍛樺伐鎴愮哗姒傝</h4>
+              <h4>员工成绩概览</h4>
               <div id="adminUserTable" class="admin-table"></div>
             </div>
             <div class="admin-panel">
-              <h4>楂橀閿欓 / 钖勫急鐭ヨ瘑鐐?/h4>
+              <h4>高频错题 / 薄弱知识点</h4>
               <div id="adminWeakList" class="admin-table"></div>
             </div>
           </div>
@@ -336,5 +340,4 @@
     <script src="./app.js?v=20260711-round5" type="module"></script>
   </body>
 </html>
-
 
