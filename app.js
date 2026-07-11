@@ -2,8 +2,8 @@ const BUILD_VERSION = "20260711-syncfix1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
-const productUrl = `./outputs/product_quiz/閲戝皧浜у搧鐭ヨ瘑搴撻搴?json?v=${BUILD_VERSION}`;
-const roleUrl = `./outputs/role_quiz/宀椾綅瀛︿範鑰冩牳棰樺簱.json?v=${BUILD_VERSION}`;
+const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
+const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
 const API_BASE = "https://jinzun-knowledge.vercel.app";
 const API_BASES = [API_BASE];
 const CLOUD_ENABLED = true;
@@ -11,7 +11,7 @@ const CLOUD_TIMEOUT_MS = 60000;
 const state = {
   allQuestions: [],
   filtered: [],
-  currentBank: "鍏ㄩ儴棰樺簱",
+  currentBank: "全部题库",
   currentView: "dashboard",
   quiz: [],
   quizIndex: 0,
@@ -175,10 +175,10 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = CLOUD_TIMEOUT_MS)
   } catch (error) {
     const message = String(error?.message || "").toLowerCase();
     if (error?.name === "AbortError" || message.includes("aborted")) {
-      throw new Error("鏈嶅姟鍣ㄥ搷搴旇秴杩?0绉掞紝璇风◢鍚庨噸鏂版彁浜?);
+      throw new Error("服务器响应超过60秒，请稍后重新提交");
     }
     if (error instanceof TypeError || message.includes("failed to fetch") || message.includes("networkerror")) {
-      throw new Error("鏆傛椂鏃犳硶杩炴帴鏈嶅姟鍣紝璇锋鏌ョ綉缁滃悗閲嶈瘯");
+      throw new Error("暂时无法连接服务器，请检查网络后重试");
     }
     throw error;
   } finally {
@@ -253,13 +253,13 @@ const storage = {
 };
 
 const slogans = [
-  "浠ヤ笓涓氱煡璇嗙瓚鐗㈤樀鍦版牴鍩猴紝鐢ㄦ瘡娆＄粌涔犺В閿佹垚闀垮媼绔犮€?,
-  "鐢ㄧ煡璇嗘媺婊″矖浣嶆垬鏂楀姏锛屽湪杩欓噷鎸戞垬鍏充箮灞炰簬浣犵殑楂樺厜鏃跺埢锛?,
-  "姣忎竴娆＄簿鍑嗙殑缁冧範涓庢矇娣€锛岄兘鍦ㄨ璇佷綘鏇村嚭鑹茬殑涓撲笟铚曞彉銆?,
-  "鑱氶泦鍥㈤槦鐐规淮涓撲笟鏅烘収锛岃祴鑳芥瘡涓€涓墿璧勭殑璧风偣锛岃鎴戜滑鍦ㄥ苟鑲╁墠琛屼腑鍏卞悓铚曞彉銆?,
-  "瑙ｉ攣宀椾綅鏍稿績鎶€鑳斤紝涓庝紭绉€鐨勫墠杈堝苟鑲╁墠琛岋紝鍦ㄨ繖閲屽紑鍚綘鐨勮亴鍦鸿湑鍙樹箣鏃呫€?,
-  "鐭ヨ瘑鍏变韩锛岃兘鍔涘叡杩涖€傚嚌鑱氭瘡涓€涓汉鐨勭偣婊磋繘姝ワ紝鍏卞垱灞炰簬鎴戜滑鐨勭簿褰╂湭鏉ャ€?,
-  "杩欓噷鏄垜浠殑涓撲笟鍔犳补绔欙紝鐢ㄧ煡璇嗘棤澶勪笉璧嬭兘锛屽湪骞惰偐鎸戞垬涓悜涓婅湑鍙樸€?,
+  "以专业知识筑牢阵地根基，用每次练习解锁成长勋章。",
+  "用知识拉满岗位战斗力，在这里挑战关乎属于你的高光时刻！",
+  "每一次精准的练习与沉淀，都在见证你更出色的专业蜕变。",
+  "聚集团队点滴专业智慧，赋能每一个物资的起点，让我们在并肩前行中共同蜕变。",
+  "解锁岗位核心技能，与优秀的前辈并肩前行，在这里开启你的职场蜕变之旅。",
+  "知识共享，能力共进。凝聚每一个人的点滴进步，共创属于我们的精彩未来。",
+  "这里是我们的专业加油站，用知识无处不赋能，在并肩挑战中向上蜕变。",
 ];
 
 let sloganIndex = 0;
@@ -271,7 +271,7 @@ function initSlogan() {
   if (!el || !dots) return;
 
   dots.innerHTML = slogans.map((_, i) =>
-    `<button class="slogan-dot${i === 0 ? " active" : ""}" data-i="${i}" aria-label="鏌ョ湅绗?${i + 1} 鏉″涔犳彁绀?></button>`
+    `<button class="slogan-dot${i === 0 ? " active" : ""}" data-i="${i}" aria-label="查看第 ${i + 1} 条学习提示"></button>`
   ).join("");
 
   dots.querySelectorAll(".slogan-dot").forEach((btn) => {
@@ -305,12 +305,12 @@ function nextSlogan() {
 }
 
 const pageTitles = {
-  dashboard: "瀛︿範鎬昏",
-  ranking: "鎺掕姒?,
-  learn: "瀛︿範棰樺簱",
-  quiz: "瀛︿範鑰冩牳",
-  mistakes: "閿欓澶嶄範",
-  admin: "绠＄悊鐪嬫澘",
+  dashboard: "学习总览",
+  ranking: "排行榜",
+  learn: "学习题库",
+  quiz: "学习考核",
+  mistakes: "错题复习",
+  admin: "管理看板",
 };
 
 const normalize = (value) => String(value ?? "").toLowerCase().trim();
@@ -320,13 +320,13 @@ const shelfLifeDays = (value) => {
   const digits = text.match(/\d+/)?.[0];
   if (!digits) return null;
   const number = Number(digits);
-  if (text.includes("澶?)) return number;
-  return text.includes("鏈?) ? number * 30 : number;
+  if (text.includes("天")) return number;
+  return text.includes("月") ? number * 30 : number;
 };
 
 const isEquivalentAnswer = (question, selectedLetter) => {
   if (selectedLetter === question.answer) return true;
-  if (question.knowledgePoint !== "淇濊川鏈?) return false;
+  if (question.knowledgePoint !== "保质期") return false;
   const selected = optionEntries(question).find(([letter]) => letter === selectedLetter)?.[1];
   const selectedDays = shelfLifeDays(selected);
   const answerDays = shelfLifeDays(question.answerText);
@@ -334,23 +334,23 @@ const isEquivalentAnswer = (question, selectedLetter) => {
 };
 
 // Strip product code from option text for quiz display.
-// Only applied to 浜у搧鍚嶇О questions where the code in the option text gives away the answer.
+// Only applied to 产品名称 questions where the code in the option text gives away the answer.
 const stripCodeFromOption = (text, question) => {
-  if (question.knowledgePoint !== "浜у搧鍚嶇О" || !text) return text;
+  if (question.knowledgePoint !== "产品名称" || !text) return text;
   const isCorrectAnswer = text === question.answerText;
   const answerStartsWithCurrentCode = normalize(text).startsWith(normalize(question.code));
   if (isCorrectAnswer && !answerStartsWithCurrentCode) return text;
   return text
-    .replace(/^\d{4}[A-Za-z]?\s*/, "") // "2232A 閲戝皧..." / "2421婢抽棬鍏槦..." 鈫?"閲戝皧..." / "婢抽棬鍏槦..."
-    .replace(/銆怺^銆慮+銆?g, "")          // "绀肩洅銆?206銆?鐩掕" 鈫?"绀肩洅2鐩掕"
+    .replace(/^\d{4}[A-Za-z]?\s*/, "") // "2232A 金尊..." / "2421澳门八星..." → "金尊..." / "澳门八星..."
+    .replace(/【[^】]+】/g, "")          // "礼盒【0206】2盒装" → "礼盒2盒装"
     .trim();
 };
 
 const displayAnswerText = (question) => stripCodeFromOption(question.answerText, question);
 const displayExplanation = (question) => {
-  if (question.knowledgePoint !== "浜у搧鍚嶇О") return question.explanation;
+  if (question.knowledgePoint !== "产品名称") return question.explanation;
   const name = displayAnswerText(question);
-  return `${question.code} 瀵瑰簲鐨勪骇鍝佸悕绉版槸锛?{name}銆俙;
+  return `${question.code} 对应的产品名称是：${name}。`;
 };
 
 const imagePath = (src) => (src ? `./${src}` : "");
@@ -429,7 +429,7 @@ function showConnectionStatus() {
   const target = existing || document.createElement("div");
   target.id = "cloudSyncStatus";
   target.className = "cloud-sync-status info";
-  target.textContent = "姝ｅ湪杩炴帴鍏徃璐﹀彿绯荤粺锛岃鍕垮叧闂〉闈⑩€︹€?;
+  target.textContent = "正在连接公司账号系统，请勿关闭页面……";
   if (!existing) document.body.appendChild(target);
   clearTimeout(target._timer);
   target._timer = null;
@@ -454,8 +454,8 @@ async function cloudRequest(action, payload) {
         body,
       }, CLOUD_TIMEOUT_MS);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `浜戠鍚屾澶辫触锛?{res.status}`);
-      if (!data.ok) throw new Error(data.error || "浜戠鍚屾澶辫触");
+      if (!res.ok) throw new Error(data.error || `云端同步失败：${res.status}`);
+      if (!data.ok) throw new Error(data.error || "云端同步失败");
       if (accountAction) hideConnectionStatus();
       return data;
     } catch (error) {
@@ -463,25 +463,25 @@ async function cloudRequest(action, payload) {
     }
   }
   if (accountAction) hideConnectionStatus();
-  throw lastError || new Error("浜戠鍚屾澶辫触");
+  throw lastError || new Error("云端同步失败");
 }
 
 async function syncLater(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   try {
     const data = await cloudRequest(action, payload);
-    if (action === "exam" && !data.record_id) throw new Error("鏈嶅姟鍣ㄦ湭杩斿洖鑰冭瘯璁板綍ID");
+    if (action === "exam" && !data.record_id) throw new Error("服务器未返回考试记录ID");
     if (action === "mistakes" && payload.items?.length && (!Array.isArray(data.record_ids) || data.record_ids.length < payload.items.length)) {
-      throw new Error("鏈嶅姟鍣ㄦ湭杩斿洖瀹屾暣閿欓璁板綍ID");
+      throw new Error("服务器未返回完整错题记录ID");
     }
-    if (action === "exam") setSyncStatus("姝ｅ紡鑰冭瘯宸插悓姝ュ埌椋炰功", "success");
-    if (action === "mistakes" && payload.items?.length) setSyncStatus("閿欓宸叉壒閲忓悓姝ュ埌椋炰功", "success");
+    if (action === "exam") setSyncStatus("正式考试已同步到飞书", "success");
+    if (action === "mistakes" && payload.items?.length) setSyncStatus("错题已批量同步到飞书", "success");
     return data;
   } catch (error) {
     const queue = safeJsonArray("jz_sync_queue");
     queue.push({ action, payload, createdAt: new Date().toISOString(), error: error.message });
     localStorage.setItem("jz_sync_queue", JSON.stringify(queue.slice(-300)));
-    setSyncStatus(`浜戠鍚屾澶辫触锛屽凡鏆傚瓨鏈満锛?{error.message}`, "error");
+    setSyncStatus(`云端同步失败，已暂存本机：${error.message}`, "error");
     return { ok: false, error: error.message };
   }
 }
@@ -523,14 +523,14 @@ async function loadCloudStats() {
 async function loadQuestions() {
   const [productRes, roleRes] = await Promise.all([fetch(productUrl), fetch(roleUrl)]);
   if (!productRes.ok || !roleRes.ok) {
-    throw new Error(`棰樺簱鏂囦欢璇锋眰澶辫触锛堜骇鍝?${productRes.status} / 宀椾綅 ${roleRes.status}锛塦);
+    throw new Error(`题库文件请求失败（产品 ${productRes.status} / 岗位 ${roleRes.status}）`);
   }
   const [productQuestions, roleQuestions] = await Promise.all([productRes.json(), roleRes.json()]);
   state.allQuestions = [...productQuestions, ...roleQuestions].map((question) => ({
     ...question,
     role: question.role || question.category || "",
     module: question.module || question.productLine || "",
-    source: question.source || "浜у搧鐭ヨ瘑搴?,
+    source: question.source || "产品知识库",
     note: question.note || "",
   }));
 }
@@ -574,13 +574,13 @@ function reconcileStoredQuestions() {
 }
 
 function banks() {
-  return ["鍏ㄩ儴棰樺簱", ...new Set(state.allQuestions.map((question) => question.bank))];
+  return ["全部题库", ...new Set(state.allQuestions.map((question) => question.bank))];
 }
 
 function bankQuestions() {
   const keyword = normalize(els.searchInput.value);
   return state.allQuestions.filter((question) => {
-    const bankMatch = state.currentBank === "鍏ㄩ儴棰樺簱" || question.bank === state.currentBank;
+    const bankMatch = state.currentBank === "全部题库" || question.bank === state.currentBank;
     if (!bankMatch) return false;
     if (!keyword) return true;
     return [
@@ -624,16 +624,16 @@ function renderDashboard() {
 
   els.taskPanel.innerHTML = `
     <div class="task-card ${todayRecords.length ? "done" : ""}">
-      <span>${todayRecords.length ? "鉁? : "1"}</span>
-      <div><strong>瀹屾垚浠婃棩鑰冩牳</strong><small>${todayRecords.length ? `浠婃棩宸插畬鎴?${todayRecords.length} 娆 : "寤鸿鍏堝仛 30-50 棰樻寮忚€冩牳"}</small></div>
+      <span>${todayRecords.length ? "✓" : "1"}</span>
+      <div><strong>完成今日考核</strong><small>${todayRecords.length ? `今日已完成 ${todayRecords.length} 次` : "建议先做 30-50 题正式考核"}</small></div>
     </div>
     <div class="task-card ${mistakes.length === 0 ? "done" : ""}">
-      <span>${mistakes.length === 0 ? "鉁? : "2"}</span>
-      <div><strong>澶嶄範閿欓</strong><small>${mistakes.length ? `杩樻湁 ${mistakes.length} 閬撻敊棰樺緟閲嶇粌` : "褰撳墠娌℃湁寰呭涔犻敊棰?}</small></div>
+      <span>${mistakes.length === 0 ? "✓" : "2"}</span>
+      <div><strong>复习错题</strong><small>${mistakes.length ? `还有 ${mistakes.length} 道错题待重练` : "当前没有待复习错题"}</small></div>
     </div>
     <div class="task-card ${best >= 90 ? "done" : ""}">
-      <span>${best >= 90 ? "鉁? : "3"}</span>
-      <div><strong>鍐插埡浼樼</strong><small>${best >= 90 ? `鏈€浣虫垚缁?${best} 鍒哷 : `璺濈浼樼杩樺樊 ${Math.max(0, 90 - best)} 鍒哷}</small></div>
+      <span>${best >= 90 ? "✓" : "3"}</span>
+      <div><strong>冲刺优秀</strong><small>${best >= 90 ? `最佳成绩 ${best} 分` : `距离优秀还差 ${Math.max(0, 90 - best)} 分`}</small></div>
     </div>
   `;
 
@@ -641,14 +641,14 @@ function renderDashboard() {
   const productTotal = state.allQuestions.filter((q) => PRODUCT_BANKS.includes(q.bank)).length;
   const roleTotal = total - productTotal;
   els.summaryCards.innerHTML = `
-    <div class="summary-card"><span>棰樺簱鎬婚噺</span><strong>${total}</strong><small>瑕嗙洊浜у搧涓庡矖浣?/small></div>
-    <div class="summary-card"><span>浜у搧璧勬枡棰?/span><strong>${productTotal}</strong><small>浜у搧 / 鍦烘櫙 / 鍝佺墝 / 鍟嗗缂栫爜</small></div>
-    <div class="summary-card"><span>宀椾綅棰?/span><strong>${roleTotal}</strong><small>杩愯惀 / 瀹㈡湇 / 缇庡伐绛?/small></div>
-    <div class="summary-card"><span>鏈€杩戞垚缁?/span><strong>${last ? `${last.percent}鍒哷 : "--"}</strong><small>${last ? examTimeLabel(last.finishedAt) : "鏆傛棤鑰冭瘯璁板綍"}</small></div>
+    <div class="summary-card"><span>题库总量</span><strong>${total}</strong><small>覆盖产品与岗位</small></div>
+    <div class="summary-card"><span>产品资料题</span><strong>${productTotal}</strong><small>产品 / 场景 / 品牌 / 商家编码</small></div>
+    <div class="summary-card"><span>岗位题</span><strong>${roleTotal}</strong><small>运营 / 客服 / 美工等</small></div>
+    <div class="summary-card"><span>最近成绩</span><strong>${last ? `${last.percent}分` : "--"}</strong><small>${last ? examTimeLabel(last.finishedAt) : "暂无考试记录"}</small></div>
   `;
 
   const grouped = banks()
-    .filter((bank) => bank !== "鍏ㄩ儴棰樺簱")
+    .filter((bank) => bank !== "全部题库")
     .map((bank) => ({
       bank,
       count: state.allQuestions.filter((question) => question.bank === bank).length,
@@ -660,7 +660,7 @@ function renderDashboard() {
       (item) => `
         <button class="bank-card" data-bank="${escapeHtml(item.bank)}">
           <h4>${escapeHtml(item.bank)}</h4>
-          <p>${item.imageCount ? `${item.imageCount} 閬撳浘鐗囬` : "宀椾綅涓庣煡璇嗙偣缁冧範"}</p>
+          <p>${item.imageCount ? `${item.imageCount} 道图片题` : "岗位与知识点练习"}</p>
           <strong>${item.count}</strong>
         </button>
       `
@@ -688,7 +688,7 @@ function examTimeLabel(value) {
 
 function renderQuestionImages(question) {
   if (!question.questionImage) return "";
-  return `<img class="thumb" src="${imagePath(question.questionImage)}" alt="棰樼洰鍥剧墖" loading="lazy" />`;
+  return `<img class="thumb" src="${imagePath(question.questionImage)}" alt="题目图片" loading="lazy" />`;
 }
 
 function renderOptionImages(question) {
@@ -700,7 +700,7 @@ function renderOptionImages(question) {
         .map(
           ([letter, text, img, imageWidth]) => `
             <figure>
-              <img src="${imagePath(img)}" alt="閫夐」${letter}鍥剧墖" loading="lazy" ${imageWidth ? `style="max-width:${imageWidth}px"` : ""} />
+              <img src="${imagePath(img)}" alt="选项${letter}图片" loading="lazy" ${imageWidth ? `style="max-width:${imageWidth}px"` : ""} />
               <figcaption>${letter} ${escapeHtml(text)}</figcaption>
             </figure>
           `
@@ -711,7 +711,7 @@ function renderOptionImages(question) {
 }
 
 function renderLearnFilter() {
-  const allBanks = banks().filter((b) => b !== "鍏ㄩ儴棰樺簱");
+  const allBanks = banks().filter((b) => b !== "全部题库");
   const productBankSet = new Set(PRODUCT_BANKS);
   const productGroup = allBanks.filter((b) => productBankSet.has(b));
   const roleGroup = allBanks.filter((b) => !productBankSet.has(b));
@@ -722,7 +722,7 @@ function renderLearnFilter() {
   };
 
   els.learnFilter.innerHTML = `
-    ${makeBtn("鍏ㄩ儴", "鍏ㄩ儴棰樺簱")}
+    ${makeBtn("全部", "全部题库")}
     <span class="filter-sep"></span>
     ${productGroup.map((b) => makeBtn(b, b)).join("")}
     <span class="filter-sep"></span>
@@ -745,9 +745,9 @@ function renderLearnList() {
   state.learnPage = Math.min(state.learnPage, totalPages);
   const start = (state.learnPage - 1) * state.learnPageSize;
   const items = state.filtered.slice(start, start + state.learnPageSize);
-  els.learnCount.textContent = `${state.filtered.length} 閬撻`;
+  els.learnCount.textContent = `${state.filtered.length} 道题`;
   if (!items.length) {
-    els.learnList.innerHTML = `<div class="empty">娌℃湁鎵惧埌鍖归厤鐨勯鐩€?/div>`;
+    els.learnList.innerHTML = `<div class="empty">没有找到匹配的题目。</div>`;
     els.learnPagination.innerHTML = "";
     return;
   }
@@ -763,7 +763,7 @@ function renderLearnList() {
               <span>${escapeHtml(question.knowledgePoint)}</span>
             </div>
             <h4>${escapeHtml(question.question)}</h4>
-            <p class="answer-line">绛旀锛?{escapeHtml(question.answer)}锝?{escapeHtml(displayAnswerText(question))}</p>
+            <p class="answer-line">答案：${escapeHtml(question.answer)}｜${escapeHtml(displayAnswerText(question))}</p>
             <p class="explain">${escapeHtml(displayExplanation(question))}</p>
             ${renderOptionImages(question)}
           </div>
@@ -773,9 +773,9 @@ function renderLearnList() {
     )
     .join("");
   els.learnPagination.innerHTML = `
-    <button class="secondary-btn" data-page="prev" ${state.learnPage <= 1 ? "disabled" : ""}>涓婁竴椤?/button>
-    <span>绗?${state.learnPage} / ${totalPages} 椤?/span>
-    <button class="secondary-btn" data-page="next" ${state.learnPage >= totalPages ? "disabled" : ""}>涓嬩竴椤?/button>
+    <button class="secondary-btn" data-page="prev" ${state.learnPage <= 1 ? "disabled" : ""}>上一页</button>
+    <span>第 ${state.learnPage} / ${totalPages} 页</span>
+    <button class="secondary-btn" data-page="next" ${state.learnPage >= totalPages ? "disabled" : ""}>下一页</button>
   `;
   els.learnPagination.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
@@ -786,8 +786,8 @@ function renderLearnList() {
   });
 }
 
-const PRODUCT_BANKS = ["鏈堥ゼ棰樺簱", "鏃ュ父骞磋揣棰樺簱", "涓氬姟鍦烘櫙棰樺簱", "鍝佺墝鐭ヨ瘑棰樺簱", "鍟嗗缂栫爜棰樺簱"];
-const CORE_EXAM_BANKS = ["鏈堥ゼ棰樺簱", "鏃ュ父骞磋揣棰樺簱", "涓氬姟鍦烘櫙棰樺簱"];
+const PRODUCT_BANKS = ["月饼题库", "日常年货题库", "业务场景题库", "品牌知识题库", "商家编码题库"];
+const CORE_EXAM_BANKS = ["月饼题库", "日常年货题库", "业务场景题库"];
 
 let timerInterval = null;
 let timerSeconds = 0;
@@ -801,13 +801,13 @@ function formatTime(s) {
 }
 
 function quizTimeLimit(size) {
-  // 50棰?20鍒嗛挓锛屾寜姣斾緥缁欐椂闂达細姣忛24绉掞紱10棰?4鍒嗛挓銆?
+  // 50题=20分钟，按比例给时间：每题24秒；10题=4分钟。
   return Math.max(60, Math.round(size * 24));
 }
 
 function updateTimerText() {
   const remaining = Math.max(0, timerLimitSeconds - timerSeconds);
-  els.quizTimer.textContent = `鈴?鍓╀綑 ${formatTime(remaining)}`;
+  els.quizTimer.textContent = `⏳ 剩余 ${formatTime(remaining)}`;
 }
 
 function startTimer(limitSeconds) {
@@ -833,11 +833,11 @@ function stopTimer() {
 
 function updateWrongCount() {
   if (state.examType === "formal" && !state.examFinished) {
-    els.quizWrongCount.textContent = "姝ｅ紡妯″紡涓嶆樉绀哄閿?;
+    els.quizWrongCount.textContent = "正式模式不显示对错";
     els.quizWrongCount.classList.remove("has-wrong");
     return;
   }
-  els.quizWrongCount.textContent = `鉁?閿欒 ${state.quizWrong} 棰榒;
+  els.quizWrongCount.textContent = `✗ 错误 ${state.quizWrong} 题`;
   els.quizWrongCount.classList.toggle("has-wrong", state.quizWrong > 0);
 }
 const EXAM_SIZE = 50;
@@ -855,20 +855,20 @@ function renderQuizSetup() {
     state.allQuestions.some((q) => q.bank === bank)
   );
   const roleBanks = banks().filter(
-    (bank) => bank !== "鍏ㄩ儴棰樺簱" && !PRODUCT_BANKS.includes(bank)
+    (bank) => bank !== "全部题库" && !PRODUCT_BANKS.includes(bank)
   );
 
   els.productBankSelect.innerHTML = productBanks
     .map((bank) => {
       const count = state.allQuestions.filter((q) => q.bank === bank).length;
-      return `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}锛?{count} 棰橈級</option>`;
+      return `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}（${count} 题）</option>`;
     })
     .join("");
 
   els.roleBankSelect.innerHTML = roleBanks
     .map((bank) => {
       const count = state.allQuestions.filter((q) => q.bank === bank).length;
-      return `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}锛?{count} 棰橈級</option>`;
+      return `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}（${count} 题）</option>`;
     })
     .join("");
 }
@@ -895,38 +895,39 @@ async function startQuiz() {
     try {
       const data = await cloudRequest("exam-start", { mode, bank, size });
       if (!data.sessionToken || !data.examId || !Array.isArray(data.questions) || !data.questions.length) {
-        throw new Error("鏈嶅姟鍣ㄦ湭杩斿洖鏈夋晥鑰冭瘯棰樼洰");
+        throw new Error("服务器未返回有效考试题目");
       }
       state.examId = data.examId;
       state.examSessionToken = data.sessionToken;
       state.submissionId = crypto.randomUUID();
       state.quiz = data.questions;
-      state.examLabelOverride = data.bank || bank || "缁煎悎浜у搧棰樺簱";
+      state.examLabelOverride = data.bank || bank || "综合产品题库";
     } catch (error) {
-      els.quizSetupStatus.textContent = `姝ｅ紡鑰冭瘯鍚姩澶辫触锛?{error.message}`;
+      els.quizSetupStatus.textContent = `正式考试启动失败：${error.message}`;
       return;
     }
   } else {
-    // 缁冧範妯″紡涔熷彧浠庤€冭瘯鎺т欢閫夋嫨鐨勯搴撳彇棰橈紝涓嶅彈鎼滅储妗嗗拰宸︿晶瀛︿範绛涢€夊奖鍝嶃€?    if (state.quizMode === "product") {
+    // 练习模式也只从考试控件选择的题库取题，不受搜索框和左侧学习筛选影响。
+    if (state.quizMode === "product") {
       const bank = els.productBankSelect.value;
       pool = state.allQuestions.filter((q) => q.bank === bank);
       state.examLabelOverride = bank;
     } else if (state.quizMode === "role") {
       const bank = els.roleBankSelect.value;
-      pool = state.allQuestions.filter((q) => q.bank === bank && (q.role === state.currentUser?.role || q.role === "鍏ㄥ憳"));
+      pool = state.allQuestions.filter((q) => q.bank === bank && (q.role === state.currentUser?.role || q.role === "全员"));
       state.examLabelOverride = bank;
     } else {
       pool = state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank));
-      state.examLabelOverride = "缁煎悎浜у搧棰樺簱";
+      state.examLabelOverride = "综合产品题库";
     }
     state.quiz = shuffle(pool).slice(0, Math.min(size, pool.length));
   }
   if (!state.quiz.length) {
-    els.quizSetupStatus.textContent = "褰撳墠绛涢€夋病鏈夊彲鐢ㄤ簬鑰冩牳鐨勯鐩紝璇疯皟鏁存悳绱㈡垨棰樺簱绛涢€夈€?;
+    els.quizSetupStatus.textContent = "当前筛选没有可用于考核的题目，请调整搜索或题库筛选。";
     return;
   }
   els.quizSetupStatus.textContent = state.quiz.length < size
-    ? `褰撳墠棰樺簱鍙湁 ${state.quiz.length} 棰橈紝鏈灏嗗叏閮ㄤ娇鐢ㄣ€俙
+    ? `当前题库只有 ${state.quiz.length} 题，本次将全部使用。`
     : "";
   state.quizIndex = 0;
   state.score = 0;
@@ -978,10 +979,10 @@ function renderQuizCard() {
     return;
   }
   const progress = ((state.quizIndex + 1) / state.quiz.length) * 100;
-  els.quizStep.textContent = `绗?${state.quizIndex + 1} 棰榒;
+  els.quizStep.textContent = `第 ${state.quizIndex + 1} 题`;
   els.quizScore.textContent = state.examType === "formal"
-    ? `宸茬瓟 ${state.answeredCount} 棰榒
-    : `绛斿 ${state.score} 棰榒;
+    ? `已答 ${state.answeredCount} 题`
+    : `答对 ${state.score} 题`;
   els.progressBar.style.width = `${progress}%`;
   const options = optionEntries(question);
   els.quizCard.innerHTML = `
@@ -994,7 +995,7 @@ function renderQuizCard() {
     ${question.questionImage ? (() => {
       const sourceWidth = Math.max(120, Number(question.questionImageWidth) || 520);
       return `<div class="quiz-img-wrap" style="width:min(${sourceWidth}px, 100%)">
-        <img src="${imagePath(question.questionImage)}" alt="棰樼洰鍥剧墖" />
+        <img src="${imagePath(question.questionImage)}" alt="题目图片" />
       </div>`;
     })() : ""}
     <div class="options">
@@ -1005,7 +1006,7 @@ function renderQuizCard() {
               <strong>${letter}</strong>${escapeHtml(stripCodeFromOption(text, question))}
               ${img ? (() => {
                 return `<div class="quiz-opt-img" ${imageWidth ? `style="max-width:${Math.max(120, imageWidth)}px"` : ""}>
-                  <img src="${imagePath(img)}" alt="閫夐」${letter}鍥剧墖" />
+                  <img src="${imagePath(img)}" alt="选项${letter}图片" />
                 </div>`;
               })() : ""}
             </button>
@@ -1038,8 +1039,8 @@ function chooseAnswer(letter) {
     if (state.examType === "practice") updateWrongCount();
   }
   els.quizScore.textContent = state.examType === "formal"
-    ? `宸茬瓟 ${state.answeredCount} 棰榒
-    : `绛斿 ${state.score} 棰榒;
+    ? `已答 ${state.answeredCount} 题`
+    : `答对 ${state.score} 题`;
   els.quizCard.querySelectorAll(".option-btn").forEach((button) => {
     button.disabled = true;
     if (state.examType === "practice" && button.dataset.letter === question.answer) button.classList.add("correct");
@@ -1050,13 +1051,13 @@ function chooseAnswer(letter) {
   feedback.classList.remove("hidden");
   const isLast = state.quizIndex + 1 >= state.quiz.length;
   feedback.innerHTML = state.examType === "formal" ? `
-    <strong>宸蹭綔绛?/strong>
-    <p class="explain">${isLast ? "姝ｅ湪鎻愪氦璇曞嵎鈥? : "鍗冲皢杩涘叆涓嬩竴棰樷€?}</p>
+    <strong>已作答</strong>
+    <p class="explain">${isLast ? "正在提交试卷…" : "即将进入下一题…"}</p>
   ` : `
-    <strong>${correct ? "鍥炵瓟姝ｇ‘" : "鍥炵瓟閿欒"}</strong>
-    <p class="explain">姝ｇ‘绛旀锛?{escapeHtml(question.answer)}锝?{escapeHtml(displayAnswerText(question))}</p>
+    <strong>${correct ? "回答正确" : "回答错误"}</strong>
+    <p class="explain">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(displayAnswerText(question))}</p>
     <p class="explain">${escapeHtml(displayExplanation(question))}</p>
-    <p class="auto-next-hint">${isLast ? "鍗冲皢鏄剧ず鎴愮哗鈥? : "鍗冲皢杩涘叆涓嬩竴棰樷€?}</p>
+    <p class="auto-next-hint">${isLast ? "即将显示成绩…" : "即将进入下一题…"}</p>
   `;
   scheduleAutoNext();
 }
@@ -1075,13 +1076,13 @@ async function submitFormalExam() {
     submissionId: state.submissionId,
     answers: [...state.answers.entries()].map(([id, answer]) => ({ id, answer })),
   });
-  if (!data.record_id) throw new Error("鏈嶅姟鍣ㄦ湭杩斿洖姝ｅ紡鑰冭瘯璁板綍ID");
+  if (!data.record_id) throw new Error("服务器未返回正式考试记录ID");
   state.score = Number(data.correct || 0);
   state.quizWrong = Number(data.wrong || 0);
   state.serverRecordId = data.record_id;
   state.serverDuration = Number.isFinite(Number(data.duration)) ? Number(data.duration) : null;
   state.wrongDetails = Array.isArray(data.wrong_details) ? data.wrong_details : [];
-  state.wrongDetails.forEach((item) => saveMistake(item, item.selected || "鏈綔绛?));
+  state.wrongDetails.forEach((item) => saveMistake(item, item.selected || "未作答"));
   return data;
 }
 
@@ -1099,7 +1100,7 @@ async function finishQuiz() {
       state.examFinished = false;
       setExamLocked(true);
       if (els.examSubmitStatus) {
-        els.examSubmitStatus.textContent = `鎴愮哗鎻愪氦澶辫触锛?{error.message}`;
+        els.examSubmitStatus.textContent = `成绩提交失败：${error.message}`;
         els.retryExamSubmitBtn.classList.remove("hidden");
       }
       return;
@@ -1112,8 +1113,8 @@ async function finishQuiz() {
     if (unansweredQuestions.length) {
       storage.attempts += unansweredQuestions.length;
       unansweredQuestions.forEach((question) => {
-        state.wrongDetails.push({ ...question, selected: "鏈綔绛?, savedAt: new Date().toISOString() });
-        saveMistake(question, "鏈綔绛?);
+        state.wrongDetails.push({ ...question, selected: "未作答", savedAt: new Date().toISOString() });
+        saveMistake(question, "未作答");
       });
       state.quizWrong += unansweredQuestions.length;
     }
@@ -1129,40 +1130,41 @@ async function finishQuiz() {
   const percent = state.quiz.length ? Math.round((state.score / state.quiz.length) * 100) : 0;
   const timeStr = formatTime(state.serverDuration ?? timerSeconds);
   const examSyncSuccess = state.examType === "formal" && state.serverRecordId
-    ? `<p class="exam-sync-success" role="status">姝ｅ紡鑰冭瘯宸插悓姝ュ埌椋炰功</p>`
+    ? `<p class="exam-sync-success" role="status">正式考试已同步到飞书</p>`
     : "";
   saveExamRecord(percent);
   els.quizRunner.classList.add("hidden");
   els.quizResult.classList.remove("hidden");
   const wrongReview = state.wrongDetails.length ? `
     <div class="wrong-review">
-      <h4>鏈閿欓瑙ｆ瀽</h4>
+      <h4>本次错题解析</h4>
       ${state.wrongDetails.slice(0, 8).map((q, i) => `
         <div class="wrong-review-item">
           <strong>${i + 1}. ${escapeHtml(q.question)}</strong>
-          <p>閿欓€夛細${escapeHtml(q.selected)}锝滄纭細${escapeHtml(q.answer)} ${escapeHtml(displayAnswerText(q))}</p>
+          <p>错选：${escapeHtml(q.selected)}｜正确：${escapeHtml(q.answer)} ${escapeHtml(displayAnswerText(q))}</p>
           <small>${escapeHtml(displayExplanation(q))}</small>
         </div>
       `).join("")}
-      ${state.wrongDetails.length > 8 ? `<p class="explain">鏇村閿欓宸茶繘鍏ラ敊棰樻湰銆?/p>` : ""}
+      ${state.wrongDetails.length > 8 ? `<p class="explain">更多错题已进入错题本。</p>` : ""}
     </div>
   ` : "";
   els.quizResult.innerHTML = `
     ${examSyncSuccess}
-    <p class="eyebrow">Result 路 ${escapeHtml(examLabel())} 路 ${state.examType === "formal" ? "姝ｅ紡鑰冭瘯" : "缁冧範妯″紡"}</p>
-    <h3>${percent} 鍒?/h3>
-    ${timerExpired ? `<p class="explain result-wrong">鏃堕棿鍒帮紝宸茶嚜鍔ㄤ氦鍗枫€?/p>` : ""}
+
+    <p class="eyebrow">Result · ${escapeHtml(examLabel())} · ${state.examType === "formal" ? "正式考试" : "练习模式"}</p>
+    <h3>${percent} 分</h3>
+    ${timerExpired ? `<p class="explain result-wrong">时间到，已自动交卷。</p>` : ""}
     <div class="result-meta">
-      <span>鉁?绛斿 ${state.score} 棰?/span>
-      <span class="${state.quizWrong > 0 ? "result-wrong" : ""}">鉁?绛旈敊 ${state.quizWrong} 棰?/span>
-      <span>鈴?鐢ㄦ椂 ${timeStr}</span>
-      <span>${percent >= 80 ? "宸查€氳繃" : "鏈€氳繃"}</span>
+      <span>✓ 答对 ${state.score} 题</span>
+      <span class="${state.quizWrong > 0 ? "result-wrong" : ""}">✗ 答错 ${state.quizWrong} 题</span>
+      <span>⏱ 用时 ${timeStr}</span>
+      <span>${percent >= 80 ? "已通过" : "未通过"}</span>
     </div>
-    <p class="explain">${percent >= 90 ? "琛ㄧ幇寰堢ǔ锛屽彲浠ヨ繘鍏ヤ笅涓€缁勯搴撱€? : percent >= 80 ? "宸茶揪鍒板悎鏍肩嚎锛屽缓璁户缁噸缁冮敊棰樺啿鍒轰紭绉€銆? : "寤鸿鍏堝涔犻敊棰橈紝鍐嶉噸鏂拌€冧竴娆°€?}</p>
+    <p class="explain">${percent >= 90 ? "表现很稳，可以进入下一组题库。" : percent >= 80 ? "已达到合格线，建议继续重练错题冲刺优秀。" : "建议先复习错题，再重新考一次。"}</p>
     ${wrongReview}
     <div class="result-actions">
-      <button class="primary-btn" id="retryQuizBtn">閲嶆柊鑰冩牳</button>
-      <button class="secondary-btn" id="reviewMistakesBtn">鏌ョ湅閿欓</button>
+      <button class="primary-btn" id="retryQuizBtn">重新考核</button>
+      <button class="secondary-btn" id="reviewMistakesBtn">查看错题</button>
     </div>
   `;
   document.querySelector("#retryQuizBtn").addEventListener("click", startQuiz);
@@ -1174,7 +1176,7 @@ function examLabel() {
   if (state.examLabelOverride) return state.examLabelOverride;
   if (state.quizMode === "product") return els.productBankSelect.value;
   if (state.quizMode === "role") return els.roleBankSelect.value;
-  return "缁煎悎浜у搧棰樺簱";
+  return "综合产品题库";
 }
 
 function saveExamRecord(percent) {
@@ -1182,7 +1184,7 @@ function saveExamRecord(percent) {
   records.unshift({
     user: state.currentUser,
     bank: examLabel(),
-    type: state.examType === "formal" ? "姝ｅ紡鑰冭瘯" : "缁冧範妯″紡",
+    type: state.examType === "formal" ? "正式考试" : "练习模式",
     score: state.score,
     total: state.quiz.length,
     wrong: state.quizWrong,
@@ -1201,11 +1203,11 @@ function renderMistakes() {
   const mistakes = storage.mistakes;
   els.retryMistakesBtn.disabled = !mistakes.length;
   if (!mistakes.length) {
-    els.mistakeList.innerHTML = `<div class="empty">鐜板湪杩樻病鏈夐敊棰樿褰曘€?/div>`;
+    els.mistakeList.innerHTML = `<div class="empty">现在还没有错题记录。</div>`;
     return;
   }
   const grouped = mistakes.reduce((acc, q) => {
-    const key = q.knowledgePoint || "鍏朵粬";
+    const key = q.knowledgePoint || "其他";
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
@@ -1213,7 +1215,7 @@ function renderMistakes() {
     .map(([name, count]) => `<span class="pill">${escapeHtml(name)} ${count}</span>`).join("");
   els.mistakeList.innerHTML = `
     <div class="mistake-summary">
-      <strong>寰呭涔?${mistakes.length} 閬?/strong>
+      <strong>待复习 ${mistakes.length} 道</strong>
       <div>${topTags}</div>
     </div>
     ${mistakes
@@ -1224,10 +1226,10 @@ function renderMistakes() {
               <div class="meta">
                 <span>${escapeHtml(question.bank)}</span>
                 <span>${escapeHtml(question.knowledgePoint)}</span>
-                <span>閿欓€夛細${escapeHtml(question.selected)}</span>
+                <span>错选：${escapeHtml(question.selected)}</span>
               </div>
               <h4>${escapeHtml(question.question)}</h4>
-              <p class="answer-line">姝ｇ‘绛旀锛?{escapeHtml(question.answer)}锝?{escapeHtml(displayAnswerText(question))}</p>
+              <p class="answer-line">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(displayAnswerText(question))}</p>
               <p class="explain">${escapeHtml(displayExplanation(question))}</p>
               ${renderOptionImages(question)}
             </div>
@@ -1254,7 +1256,7 @@ function startMistakeQuiz() {
   state.examType = "practice";
   state.examFinished = false;
   state.examSubmitting = false;
-  state.examLabelOverride = "閿欓閲嶇粌";
+  state.examLabelOverride = "错题重练";
   startTimer(quizTimeLimit(state.quiz.length));
   updateWrongCount();
   switchView("quiz");
@@ -1299,25 +1301,25 @@ function renderRanking() {
   }
 
   if (!rows.length) {
-    listEl.innerHTML = `<div class="empty">杩樻病鏈夎€冩牳璁板綍锛屽畬鎴愪竴娆¤€冩牳鍚庡嵆鍙笂姒溿€?/div>`;
+    listEl.innerHTML = `<div class="empty">还没有考核记录，完成一次考核后即可上榜。</div>`;
     return;
   }
 
   const medalClass = (i) => (i === 0 ? " rank-gold" : i === 1 ? " rank-silver" : i === 2 ? " rank-bronze" : "");
-  const medalLabel = (i) => (i === 0 ? "馃" : i === 1 ? "馃" : i === 2 ? "馃" : String(i + 1));
+  const medalLabel = (i) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : String(i + 1));
 
   listEl.innerHTML = rows.map(({ user, best, totalExams }, i) => `
     <div class="rank-row${i < 3 ? " rank-top" : ""}">
       <div class="rank-num${medalClass(i)}">${medalLabel(i)}</div>
       <div class="rank-info">
         <strong>${escapeHtml(user.name)}</strong>
-        <span>${escapeHtml(user.role)} 路 鑰冩牳 ${totalExams} 娆?/span>
+        <span>${escapeHtml(user.role)} · 考核 ${totalExams} 次</span>
       </div>
       <div class="rank-mid">
         <span class="rank-bank">${escapeHtml(best.bank || "")}</span>
-        <span class="rank-detail-time">${best.duration != null ? "鈴?" + formatTime(best.duration) : ""}</span>
+        <span class="rank-detail-time">${best.duration != null ? "⏱ " + formatTime(best.duration) : ""}</span>
       </div>
-      <div class="rank-score${best.percent >= 90 ? " rank-score-high" : ""}">${best.percent}<small>鍒?/small></div>
+      <div class="rank-score${best.percent >= 90 ? " rank-score-high" : ""}">${best.percent}<small>分</small></div>
     </div>
   `).join("");
 
@@ -1336,15 +1338,15 @@ async function refreshAdminEmployees() {
     const data = await cloudRequest("admin-list", {});
     els.adminEmployeeList.innerHTML = (data.employees || []).map((employee) => `
       <div class="admin-employee-row">
-        <div><strong>${escapeHtml(employee.name)}</strong><small>${escapeHtml(employee.phone)} 路 ${escapeHtml(employee.role)} 路 ${escapeHtml(employee.status)}</small></div>
+        <div><strong>${escapeHtml(employee.name)}</strong><small>${escapeHtml(employee.phone)} · ${escapeHtml(employee.role)} · ${escapeHtml(employee.status)}</small></div>
         <div class="admin-employee-actions">
-          <button class="secondary-btn admin-password-btn" type="button" data-phone="${escapeHtml(employee.phone)}">淇敼瀵嗙爜</button>
-          <button class="danger-btn admin-delete-btn" type="button" data-phone="${escapeHtml(employee.phone)}">鍒犻櫎鍛樺伐</button>
+          <button class="secondary-btn admin-password-btn" type="button" data-phone="${escapeHtml(employee.phone)}">修改密码</button>
+          <button class="danger-btn admin-delete-btn" type="button" data-phone="${escapeHtml(employee.phone)}">删除员工</button>
         </div>
       </div>
-    `).join("") || '<div class="empty">鏆傛棤鍛樺伐璐﹀彿銆?/div>';
+    `).join("") || '<div class="empty">暂无员工账号。</div>';
   } catch (error) {
-    if (els.adminAccountStatus) els.adminAccountStatus.textContent = error.message || "鍛樺伐璐﹀彿璇诲彇澶辫触";
+    if (els.adminAccountStatus) els.adminAccountStatus.textContent = error.message || "员工账号读取失败";
   }
 }
 
@@ -1362,10 +1364,10 @@ async function addAdminEmployee(event) {
       password: els.adminEmployeePassword.value,
     });
     els.adminEmployeeForm.reset();
-    els.adminAccountStatus.textContent = "鍛樺伐璐﹀彿宸叉坊鍔?;
+    els.adminAccountStatus.textContent = "员工账号已添加";
     await refreshAdminEmployees();
   } catch (error) {
-    els.adminAccountStatus.textContent = error.message || "娣诲姞鍛樺伐澶辫触";
+    els.adminAccountStatus.textContent = error.message || "添加员工失败";
   } finally {
     button.disabled = false;
   }
@@ -1376,30 +1378,30 @@ async function handleAdminEmployeeAction(event) {
   if (!button) return;
   const phone = button.dataset.phone;
   if (button.classList.contains("admin-delete-btn")) {
-    if (!window.confirm(`纭畾鍒犻櫎鍛樺伐璐﹀彿 ${phone} 鍚楋紵鍒犻櫎鍚庤鍛樺伐闇€瑕侀噸鏂版敞鍐屻€俙)) return;
+    if (!window.confirm(`确定删除员工账号 ${phone} 吗？删除后该员工需要重新注册。`)) return;
     try {
       await cloudRequest("admin-delete", { phone });
-      els.adminAccountStatus.textContent = "鍛樺伐璐﹀彿宸插垹闄?;
+      els.adminAccountStatus.textContent = "员工账号已删除";
       await refreshAdminEmployees();
     } catch (error) {
-      els.adminAccountStatus.textContent = error.message || "鍒犻櫎鍛樺伐澶辫触";
+      els.adminAccountStatus.textContent = error.message || "删除员工失败";
     }
     return;
   }
-  const password = window.prompt("璇疯緭鍏ユ柊瀵嗙爜锛堣嚦灏?浣嶏紝鍖呭惈瀛楁瘝鍜屾暟瀛楋級", "");
+  const password = window.prompt("请输入新密码（至少8位，包含字母和数字）", "");
   if (!password) return;
   try {
     await cloudRequest("admin-password", { phone, password });
-    els.adminAccountStatus.textContent = "鍛樺伐瀵嗙爜宸蹭慨鏀?;
+    els.adminAccountStatus.textContent = "员工密码已修改";
   } catch (error) {
-    els.adminAccountStatus.textContent = error.message || "淇敼瀵嗙爜澶辫触";
+    els.adminAccountStatus.textContent = error.message || "修改密码失败";
   }
 }
 
 function renderAdmin() {
   if (!isAdminUser()) {
     els.adminDataWarning?.classList.add("hidden");
-    els.adminMetrics.innerHTML = `<div class="empty">鏃犳潈闄愯闂鐞嗙湅鏉裤€?/div>`;
+    els.adminMetrics.innerHTML = `<div class="empty">无权限访问管理看板。</div>`;
     els.adminUserTable.innerHTML = "";
     els.adminWeakList.innerHTML = "";
     return;
@@ -1409,22 +1411,22 @@ function renderAdmin() {
   if (els.adminDataWarning) {
     els.adminDataWarning.classList.toggle("hidden", !errors.length);
     els.adminDataWarning.textContent = errors.length
-      ? "閮ㄥ垎椋炰功鏁版嵁璇诲彇澶辫触锛屾湰椤电粺璁″彲鑳戒笉瀹屾暣锛岃鍕跨洿鎺ョ敤浜庤€冩牳缁撹銆?
+      ? "部分飞书数据读取失败，本页统计可能不完整，请勿直接用于考核结论。"
       : "";
   }
   const users = cloud?.employees?.length
-    ? cloud.employees.map((u) => ({ name: u["濮撳悕"], phone: u["鎵嬫満鍙?], role: u["宀椾綅"] }))
+    ? cloud.employees.map((u) => ({ name: u["姓名"], phone: u["手机号"], role: u["岗位"] }))
     : Object.values(userStore.users);
   const rows = users.map((user) => {
     const records = cloud?.exams?.length
-      ? cloud.exams.filter((r) => String(r["鎵嬫満鍙?]) === String(user.phone) && String(r["鑰冩牳绫诲瀷"] || "") === "姝ｅ紡鑰冭瘯").map((r) => ({
-          percent: Number(r["鍒嗘暟"] || 0), score: Number(r["绛斿鏁?] || 0), total: Number(r["鎬婚鏁?] || 0),
-          wrong: Number(r["绛旈敊鏁?] || 0), duration: Number(r["鐢ㄦ椂绉掓暟"] || 0), bank: r["棰樺簱"], type: r["鑰冩牳绫诲瀷"], finishedAt: r["鎻愪氦鏃堕棿"],
+      ? cloud.exams.filter((r) => String(r["手机号"]) === String(user.phone) && String(r["考核类型"] || "") === "正式考试").map((r) => ({
+          percent: Number(r["分数"] || 0), score: Number(r["答对数"] || 0), total: Number(r["总题数"] || 0),
+          wrong: Number(r["答错数"] || 0), duration: Number(r["用时秒数"] || 0), bank: r["题库"], type: r["考核类型"], finishedAt: r["提交时间"],
         })).sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime())
-      : getUserRecords(user.phone).filter((r) => r.type === "姝ｅ紡鑰冭瘯");
+      : getUserRecords(user.phone).filter((r) => r.type === "正式考试");
     records.sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime());
     const mistakes = cloud?.mistakes?.length
-      ? cloud.mistakes.filter((r) => String(r["鎵嬫満鍙?]) === String(user.phone)).map((r) => ({ knowledgePoint: r["鐭ヨ瘑鐐?], bank: r["棰樺簱"] }))
+      ? cloud.mistakes.filter((r) => String(r["手机号"]) === String(user.phone)).map((r) => ({ knowledgePoint: r["知识点"], bank: r["题库"] }))
       : getUserMistakes(user.phone);
     const best = records.reduce((acc, record) => (Number(record.percent) > Number(acc?.percent || -1) ? record : acc), null);
     const latest = records[0];
@@ -1432,93 +1434,93 @@ function renderAdmin() {
   });
   const allRecords = rows.flatMap((row) => row.records.map((record) => ({ ...record, user: row.user })));
   const practiceCount = cloud?.exams?.length
-    ? cloud.exams.filter((r) => String(r["鑰冩牳绫诲瀷"] || "") === "缁冧範妯″紡").length
-    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone)).filter((r) => r.type === "缁冧範妯″紡").length;
+    ? cloud.exams.filter((r) => String(r["考核类型"] || "") === "练习模式").length
+    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone)).filter((r) => r.type === "练习模式").length;
   const avg = allRecords.length ? Math.round(allRecords.reduce((sum, r) => sum + Number(r.percent || 0), 0) / allRecords.length) : 0;
   const passed = allRecords.filter((r) => Number(r.percent) >= 80).length;
   const passRate = allRecords.length ? Math.round((passed / allRecords.length) * 100) : 0;
   const notExam = rows.filter((row) => !row.records.length).length;
 
   els.adminMetrics.innerHTML = `
-    <div class="summary-card"><span>鍛樺伐鏁?/span><strong>${users.length}</strong><small>${cloud?.employees?.length ? "椋炰功浜戠鏁版嵁" : "鏈満宸茬櫥褰曡处鍙?}</small></div>
-    <div class="summary-card"><span>姝ｅ紡鑰冭瘯娆℃暟</span><strong>${allRecords.length}</strong><small>浠呯敤浜庡憳宸ヨ€冩牳</small></div>
-    <div class="summary-card"><span>姝ｅ紡鑰冭瘯骞冲潎鍒?/span><strong>${avg}</strong><small>缁冧範鏁版嵁涓嶈鍏?/small></div>
-    <div class="summary-card"><span>姝ｅ紡鑰冭瘯閫氳繃鐜?/span><strong>${passRate}%</strong><small>缁冧範娆℃暟 ${practiceCount}锛屾湭鑰?${notExam} 浜?/small></div>
+    <div class="summary-card"><span>员工数</span><strong>${users.length}</strong><small>${cloud?.employees?.length ? "飞书云端数据" : "本机已登录账号"}</small></div>
+    <div class="summary-card"><span>正式考试次数</span><strong>${allRecords.length}</strong><small>仅用于员工考核</small></div>
+    <div class="summary-card"><span>正式考试平均分</span><strong>${avg}</strong><small>练习数据不计入</small></div>
+    <div class="summary-card"><span>正式考试通过率</span><strong>${passRate}%</strong><small>练习次数 ${practiceCount}，未考 ${notExam} 人</small></div>
   `;
 
   els.adminUserTable.innerHTML = rows.length ? `
     <table>
-      <thead><tr><th>濮撳悕</th><th>宀椾綅</th><th>娆℃暟</th><th>鏈€浣?/th><th>鏈€杩?/th><th>閿欓</th></tr></thead>
+      <thead><tr><th>姓名</th><th>岗位</th><th>次数</th><th>最佳</th><th>最近</th><th>错题</th></tr></thead>
       <tbody>
         ${rows.map(({ user, records, mistakes, best, latest }) => `
           <tr>
             <td>${escapeHtml(user.name)}</td>
             <td>${escapeHtml(user.role)}</td>
             <td>${records.length}</td>
-            <td>${best ? `${best.percent}鍒哷 : "鏈€?}</td>
-            <td>${latest ? `${latest.percent}鍒?路 ${examTimeLabel(latest.finishedAt)}` : "--"}</td>
+            <td>${best ? `${best.percent}分` : "未考"}</td>
+            <td>${latest ? `${latest.percent}分 · ${examTimeLabel(latest.finishedAt)}` : "--"}</td>
             <td>${mistakes.length}</td>
           </tr>
         `).join("")}
       </tbody>
     </table>
-  ` : `<div class="empty">鏆傛棤鍛樺伐璁板綍銆?/div>`;
+  ` : `<div class="empty">暂无员工记录。</div>`;
 
   const allMistakes = rows.flatMap((row) => row.mistakes);
   const weak = allMistakes.reduce((acc, q) => {
-    const key = q.knowledgePoint || q.bank || "鍏朵粬";
+    const key = q.knowledgePoint || q.bank || "其他";
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
   const weakRows = Object.entries(weak).sort((a, b) => b[1] - a[1]).slice(0, 12);
   els.adminWeakList.innerHTML = weakRows.length ? `
-    <table><thead><tr><th>鐭ヨ瘑鐐?/th><th>閿欓鏁?/th></tr></thead><tbody>
+    <table><thead><tr><th>知识点</th><th>错题数</th></tr></thead><tbody>
       ${weakRows.map(([name, count]) => `<tr><td>${escapeHtml(name)}</td><td>${count}</td></tr>`).join("")}
     </tbody></table>
-  ` : `<div class="empty">鏆傛棤閿欓缁熻銆?/div>`;
+  ` : `<div class="empty">暂无错题统计。</div>`;
 }
 
 function exportRecords() {
   const rows = state.cloudStats?.exams?.length
     ? state.cloudStats.exams.map((r) => ({
-        濮撳悕: r["濮撳悕"], 鎵嬫満鍙? r["鎵嬫満鍙?], 宀椾綅: r["宀椾綅"], 鑰冭瘯鍚嶇О: r["鑰冭瘯鍚嶇О"], 鑰冩牳绫诲瀷: r["鑰冩牳绫诲瀷"], 棰樺簱: r["棰樺簱"], 鍒嗘暟: r["鍒嗘暟"], 绛斿鏁? r["绛斿鏁?], 鎬婚鏁? r["鎬婚鏁?], 绛旈敊鏁? r["绛旈敊鏁?], 鏄惁閫氳繃: r["鏄惁閫氳繃"], 鐢ㄦ椂绉掓暟: r["鐢ㄦ椂绉掓暟"], 鎻愪氦鏃堕棿: r["鎻愪氦鏃堕棿"], 鑰冭瘯浼氳瘽ID: r["鑰冭瘯浼氳瘽ID"],
+        姓名: r["姓名"], 手机号: r["手机号"], 岗位: r["岗位"], 考试名称: r["考试名称"], 考核类型: r["考核类型"], 题库: r["题库"], 分数: r["分数"], 答对数: r["答对数"], 总题数: r["总题数"], 答错数: r["答错数"], 是否通过: r["是否通过"], 用时秒数: r["用时秒数"], 提交时间: r["提交时间"], 考试会话ID: r["考试会话ID"],
       }))
     : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).map((record) => ({
-        濮撳悕: user.name,
-        鎵嬫満鍙? user.phone,
-        宀椾綅: user.role,
-        鑰冩牳绫诲瀷: record.type || "缁冧範妯″紡",
-        棰樺簱: record.bank,
-        鍒嗘暟: record.percent,
-        鑰冭瘯鍚嶇О: "閲戝皧浜у搧鐭ヨ瘑搴撳涔犺€冩牳",
-        绛斿鏁? record.score,
-        鎬婚鏁? record.total,
-        绛旈敊鏁? record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
-        鏄惁閫氳繃: Number(record.percent) >= 80 ? "鏄? : "鍚?,
-        鐢ㄦ椂绉掓暟: record.duration,
-        鎻愪氦鏃堕棿: record.finishedAt,
+        姓名: user.name,
+        手机号: user.phone,
+        岗位: user.role,
+        考核类型: record.type || "练习模式",
+        题库: record.bank,
+        分数: record.percent,
+        考试名称: "金尊产品知识库学习考核",
+        答对数: record.score,
+        总题数: record.total,
+        答错数: record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
+        是否通过: Number(record.percent) >= 80 ? "是" : "否",
+        用时秒数: record.duration,
+        提交时间: record.finishedAt,
       })));
-  downloadText(`閲戝皧鑰冭瘯璁板綍_${todayKey()}.csv`, toCsv(["濮撳悕", "鎵嬫満鍙?, "宀椾綅", "鑰冭瘯鍚嶇О", "鑰冩牳绫诲瀷", "棰樺簱", "鍒嗘暟", "绛斿鏁?, "鎬婚鏁?, "绛旈敊鏁?, "鏄惁閫氳繃", "鐢ㄦ椂绉掓暟", "鎻愪氦鏃堕棿", "鑰冭瘯浼氳瘽ID"], rows));
+  downloadText(`金尊考试记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "考试名称", "考核类型", "题库", "分数", "答对数", "总题数", "答错数", "是否通过", "用时秒数", "提交时间", "考试会话ID"], rows));
 }
 
 function exportMistakes() {
   const rows = state.cloudStats?.mistakes?.length
     ? state.cloudStats.mistakes.map((q) => ({
-        濮撳悕: q["濮撳悕"], 鎵嬫満鍙? q["鎵嬫満鍙?], 宀椾綅: q["宀椾綅"], 棰樺簱: q["棰樺簱"], 鐭ヨ瘑鐐? q["鐭ヨ瘑鐐?], 棰樼洰: q["棰樼洰"], 閿欓€? q["閿欓€?], 姝ｇ‘绛旀: q["姝ｇ‘绛旀"], 瑙ｆ瀽: q["瑙ｆ瀽"], 璁板綍鏃堕棿: q["璁板綍鏃堕棿"],
+        姓名: q["姓名"], 手机号: q["手机号"], 岗位: q["岗位"], 题库: q["题库"], 知识点: q["知识点"], 题目: q["题目"], 错选: q["错选"], 正确答案: q["正确答案"], 解析: q["解析"], 记录时间: q["记录时间"],
       }))
     : Object.values(userStore.users).flatMap((user) => getUserMistakes(user.phone).map((q) => ({
-        濮撳悕: user.name,
-        鎵嬫満鍙? user.phone,
-        宀椾綅: user.role,
-        棰樺簱: q.bank,
-        鐭ヨ瘑鐐? q.knowledgePoint,
-        棰樼洰: q.question,
-        閿欓€? q.selected,
-        姝ｇ‘绛旀: `${q.answer} ${displayAnswerText(q)}`,
-        瑙ｆ瀽: displayExplanation(q),
-        璁板綍鏃堕棿: q.savedAt,
+        姓名: user.name,
+        手机号: user.phone,
+        岗位: user.role,
+        题库: q.bank,
+        知识点: q.knowledgePoint,
+        题目: q.question,
+        错选: q.selected,
+        正确答案: `${q.answer} ${displayAnswerText(q)}`,
+        解析: displayExplanation(q),
+        记录时间: q.savedAt,
       })));
-  downloadText(`閲戝皧閿欓璁板綍_${todayKey()}.csv`, toCsv(["濮撳悕", "鎵嬫満鍙?, "宀椾綅", "棰樺簱", "鐭ヨ瘑鐐?, "棰樼洰", "閿欓€?, "姝ｇ‘绛旀", "瑙ｆ瀽", "璁板綍鏃堕棿"], rows));
+  downloadText(`金尊错题记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "题库", "知识点", "题目", "错选", "正确答案", "解析", "记录时间"], rows));
 }
 
 function switchView(view) {
@@ -1556,12 +1558,12 @@ function renderAll() {
 function renderUser() {
   applyAdminAccess();
   if (!state.currentUser) {
-    els.userName.textContent = "鏈櫥褰?;
+    els.userName.textContent = "未登录";
     els.userMeta.textContent = "-";
     return;
   }
   els.userName.textContent = state.currentUser.name;
-  els.userMeta.textContent = `${state.currentUser.role} 路 ${state.currentUser.phone}`;
+  els.userMeta.textContent = `${state.currentUser.role} · ${state.currentUser.phone}`;
 }
 
 function normalizePhone(value) {
@@ -1616,9 +1618,9 @@ function saveAuthenticatedUser(data) {
 }
 
 const passwordError = (password) => {
-  if (password.length < 8) return "瀵嗙爜涓嶈兘灏戜簬8浣?;
-  if (!/[A-Za-z]/.test(password)) return "瀵嗙爜蹇呴』鍖呭惈瀛楁瘝";
-  if (!/\d/.test(password)) return "瀵嗙爜蹇呴』鍖呭惈鏁板瓧";
+  if (password.length < 8) return "密码不能少于8位";
+  if (!/[A-Za-z]/.test(password)) return "密码必须包含字母";
+  if (!/\d/.test(password)) return "密码必须包含数字";
   return "";
 };
 
@@ -1628,24 +1630,24 @@ async function loginEmployee(event) {
   const password = els.loginPassword.value;
   els.loginError.textContent = "";
   if (!account || !password) {
-    els.loginError.textContent = "璇疯緭鍏ュ鍚嶆垨鎵嬫満鍙峰拰瀵嗙爜";
+    els.loginError.textContent = "请输入姓名或手机号和密码";
     return;
   }
   const button = els.loginForm.querySelector('button[type="submit"]');
   button.disabled = true;
-  button.textContent = "姝ｅ湪鐧诲綍...";
+  button.textContent = "正在登录...";
   try {
     const data = await cloudRequest("login", { account, password, clientId: getClientId() });
-    if (!data.token || !data.user) throw new Error("璐﹀彿鎴栧瘑鐮侀敊璇?);
+    if (!data.token || !data.user) throw new Error("账号或密码错误");
     saveAuthenticatedUser(data);
     els.loginPassword.value = "";
     showAuth(false);
     renderAll();
   } catch (error) {
-    els.loginError.textContent = error.message || "璐﹀彿鎴栧瘑鐮侀敊璇?;
+    els.loginError.textContent = error.message || "账号或密码错误";
   } finally {
     button.disabled = false;
-    button.textContent = "鐧诲綍";
+    button.textContent = "登录";
   }
 }
 
@@ -1658,31 +1660,31 @@ async function registerEmployee(event) {
   const confirm = els.registerPasswordConfirm.value;
   const registerCode = els.registerCode.value.trim();
   els.registerError.textContent = "";
-  if (!name) return void (els.registerError.textContent = "璇峰～鍐欑湡瀹炲鍚?);
-  if (!/^1\d{10}$/.test(phone)) return void (els.registerError.textContent = "璇疯緭鍏ユ纭殑11浣嶆墜鏈哄彿");
-  if (!role) return void (els.registerError.textContent = "璇烽€夋嫨宀椾綅");
+  if (!name) return void (els.registerError.textContent = "请填写真实姓名");
+  if (!/^1\d{10}$/.test(phone)) return void (els.registerError.textContent = "请输入正确的11位手机号");
+  if (!role) return void (els.registerError.textContent = "请选择岗位");
   const error = passwordError(password);
   if (error) return void (els.registerError.textContent = error);
-  if (password !== confirm) return void (els.registerError.textContent = "涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷?);
-  if (!registerCode) return void (els.registerError.textContent = "璇疯緭鍏ュ叕鍙告敞鍐屽彛浠?);
+  if (password !== confirm) return void (els.registerError.textContent = "两次输入的密码不一致");
+  if (!registerCode) return void (els.registerError.textContent = "请输入公司注册口令");
   const button = els.registerForm.querySelector('button[type="submit"]');
   button.disabled = true;
-  button.textContent = "姝ｅ湪娉ㄥ唽...";
+  button.textContent = "正在注册...";
   try {
     const data = await cloudRequest("register", { name, phone, role, password, registerCode, clientId: getClientId() });
-    if (!data.token || !data.user) throw new Error("娉ㄥ唽澶辫触");
+    if (!data.token || !data.user) throw new Error("注册失败");
     saveAuthenticatedUser(data);
     els.registerForm.reset();
     showAuth(false);
     renderAll();
   } catch (requestError) {
-    const message = requestError.message || "娉ㄥ唽澶辫触锛岃绋嶅悗閲嶈瘯";
-    els.registerError.textContent = message.includes("宸茬粡娉ㄥ唽")
-      ? `${message}锛岃鍒囨崲鍒扳€滃憳宸ョ櫥褰曗€漙
+    const message = requestError.message || "注册失败，请稍后重试";
+    els.registerError.textContent = message.includes("已经注册")
+      ? `${message}，请切换到“员工登录”`
       : message;
   } finally {
     button.disabled = false;
-    button.textContent = "娉ㄥ唽骞惰繘鍏ュ涔?;
+    button.textContent = "注册并进入学习";
   }
 }
 
@@ -1695,28 +1697,28 @@ async function resetPassword(event) {
   const confirm = els.resetPasswordConfirm.value;
   const registerCode = els.resetCode.value.trim();
   els.resetError.textContent = "";
-  if (!name) return void (els.resetError.textContent = "璇疯緭鍏ョ湡瀹炲鍚?);
-  if (!/^1\d{10}$/.test(phone)) return void (els.resetError.textContent = "璇疯緭鍏ユ纭殑11浣嶆墜鏈哄彿");
-  if (!role) return void (els.resetError.textContent = "璇烽€夋嫨宀椾綅");
+  if (!name) return void (els.resetError.textContent = "请输入真实姓名");
+  if (!/^1\d{10}$/.test(phone)) return void (els.resetError.textContent = "请输入正确的11位手机号");
+  if (!role) return void (els.resetError.textContent = "请选择岗位");
   const error = passwordError(password);
   if (error) return void (els.resetError.textContent = error);
-  if (password !== confirm) return void (els.resetError.textContent = "涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷?);
-  if (!registerCode) return void (els.resetError.textContent = "璇疯緭鍏ュ叕鍙告敞鍐屽彛浠?);
+  if (password !== confirm) return void (els.resetError.textContent = "两次输入的密码不一致");
+  if (!registerCode) return void (els.resetError.textContent = "请输入公司注册口令");
   const button = els.resetForm.querySelector('button[type="submit"]');
   button.disabled = true;
-  button.textContent = "姝ｅ湪閲嶇疆...";
+  button.textContent = "正在重置...";
   try {
     const data = await cloudRequest("reset", { name, phone, role, password, registerCode, clientId: getClientId() });
-    if (!data.token || !data.user) throw new Error("瀵嗙爜閲嶇疆澶辫触");
+    if (!data.token || !data.user) throw new Error("密码重置失败");
     saveAuthenticatedUser(data);
     els.resetForm.reset();
     showAuth(false);
     renderAll();
   } catch (requestError) {
-    els.resetError.textContent = requestError.message || "瀵嗙爜閲嶇疆澶辫触锛岃绋嶅悗閲嶈瘯";
+    els.resetError.textContent = requestError.message || "密码重置失败，请稍后重试";
   } finally {
     button.disabled = false;
-    button.textContent = "閲嶇疆瀵嗙爜骞剁櫥褰?;
+    button.textContent = "重置密码并登录";
   }
 }
 
@@ -1770,12 +1772,12 @@ function bindEvents() {
     });
   });
   els.clearMistakesBtn.addEventListener("click", () => {
-    if (!window.confirm("纭畾娓呯┖褰撳墠璐﹀彿鐨勫叏閮ㄩ敊棰樺悧锛熸鎿嶄綔涓嶈兘鎾ら攢銆?)) return;
+    if (!window.confirm("确定清空当前账号的全部错题吗？此操作不能撤销。")) return;
     storage.mistakes = [];
     renderAll();
   });
   els.resetBtn.addEventListener("click", () => {
-    if (!window.confirm("纭畾娓呯┖褰撳墠璐﹀彿鐨勬纭巼銆侀敊棰樺拰鍏ㄩ儴鑰冭瘯璁板綍鍚楋紵姝ゆ搷浣滀笉鑳芥挙閿€銆?)) return;
+    if (!window.confirm("确定清空当前账号的正确率、错题和全部考试记录吗？此操作不能撤销。")) return;
     storage.attempts = 0;
     storage.correct = 0;
     storage.mistakes = [];
@@ -1799,7 +1801,7 @@ function bindEvents() {
       if (!input) return;
       const visible = input.type === "text";
       input.type = visible ? "password" : "text";
-      button.textContent = visible ? "鏄剧ず" : "闅愯棌";
+      button.textContent = visible ? "显示" : "隐藏";
     });
   });
   els.logoutBtn.addEventListener("click", logout);
@@ -1840,11 +1842,10 @@ async function init() {
     renderAll();
     showAuth(!state.currentUser);
   } catch (error) {
-    document.body.innerHTML = `<div class="empty">棰樺簱鍔犺浇澶辫触锛?{escapeHtml(error.message)}</div>`;
+    document.body.innerHTML = `<div class="empty">题库加载失败：${escapeHtml(error.message)}</div>`;
     throw error;
   }
 }
 
 init();
-
 
