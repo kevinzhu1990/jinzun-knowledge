@@ -1,10 +1,13 @@
-const BUILD_VERSION = "20260711-cloud";
+const BUILD_VERSION = "20260711-syncfix1";
+const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
+const FORMAL_AUTO_NEXT_DELAY_MS = 350;
+let autoNextTimer = null;
 const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
 const API_BASE = "https://jinzun-knowledge.vercel.app";
 const API_BASES = [API_BASE];
 const CLOUD_ENABLED = true;
-const ADMIN_PHONES = ["13750353689", "13538004509"];
+const CLOUD_TIMEOUT_MS = 60000;
 const state = {
   allQuestions: [],
   filtered: [],
@@ -26,6 +29,13 @@ const state = {
   answeredQuestionIds: new Set(),
   examFinished: true,
   examLabelOverride: "",
+  examId: "",
+  examSessionToken: "",
+  submissionId: "",
+  serverRecordId: "",
+  serverDuration: null,
+  examSubmitting: false,
+  answers: new Map(),
 };
 
 const els = {
@@ -78,15 +88,44 @@ const els = {
   exportRecordsBtn: document.querySelector("#exportRecordsBtn"),
   exportMistakesBtn: document.querySelector("#exportMistakesBtn"),
   authView: document.querySelector("#authView"),
-  authForm: document.querySelector("#authForm"),
-  authName: document.querySelector("#authName"),
-  authPhone: document.querySelector("#authPhone"),
-  authRole: document.querySelector("#authRole"),
-  authError: document.querySelector("#authError"),
+  loginForm: document.querySelector("#loginForm"),
+  registerForm: document.querySelector("#registerForm"),
+  resetForm: document.querySelector("#resetForm"),
+  showLoginTab: document.querySelector("#showLoginTab"),
+  showRegisterTab: document.querySelector("#showRegisterTab"),
+  showResetForm: document.querySelector("#showResetForm"),
+  backToLogin: document.querySelector("#backToLogin"),
+  loginAccount: document.querySelector("#loginAccount"),
+  loginPassword: document.querySelector("#loginPassword"),
+  loginError: document.querySelector("#loginError"),
+  registerName: document.querySelector("#registerName"),
+  registerPhone: document.querySelector("#registerPhone"),
+  registerRole: document.querySelector("#registerRole"),
+  registerPassword: document.querySelector("#registerPassword"),
+  registerPasswordConfirm: document.querySelector("#registerPasswordConfirm"),
+  registerCode: document.querySelector("#registerCode"),
+  registerError: document.querySelector("#registerError"),
+  resetPhone: document.querySelector("#resetPhone"),
+  resetName: document.querySelector("#resetName"),
+  resetRole: document.querySelector("#resetRole"),
+  resetPassword: document.querySelector("#resetPassword"),
+  resetPasswordConfirm: document.querySelector("#resetPasswordConfirm"),
+  resetCode: document.querySelector("#resetCode"),
+  resetError: document.querySelector("#resetError"),
   userName: document.querySelector("#userName"),
   userMeta: document.querySelector("#userMeta"),
   logoutBtn: document.querySelector("#logoutBtn"),
   quizSetupStatus: document.querySelector("#quizSetupStatus"),
+  examSubmitStatus: document.querySelector("#examSubmitStatus"),
+  retryExamSubmitBtn: document.querySelector("#retryExamSubmitBtn"),
+  adminDataWarning: document.querySelector("#adminDataWarning"),
+  adminEmployeeForm: document.querySelector("#adminEmployeeForm"),
+  adminEmployeeName: document.querySelector("#adminEmployeeName"),
+  adminEmployeePhone: document.querySelector("#adminEmployeePhone"),
+  adminEmployeeRole: document.querySelector("#adminEmployeeRole"),
+  adminEmployeePassword: document.querySelector("#adminEmployeePassword"),
+  adminEmployeeList: document.querySelector("#adminEmployeeList"),
+  adminAccountStatus: document.querySelector("#adminAccountStatus"),
   mobileSidebarToggle: document.querySelector("#mobileSidebarToggle"),
   sidebarTools: document.querySelector("#sidebarTools"),
 };
@@ -102,6 +141,22 @@ const safeJson = (key, fallback) => {
   }
 };
 
+function getClientId() {
+  let clientId = localStorage.getItem("jz_client_id");
+  if (!clientId) {
+    clientId = crypto.randomUUID();
+    localStorage.setItem("jz_client_id", clientId);
+  }
+  return clientId;
+}
+
+function clearAutoNextTimer() {
+  if (autoNextTimer) {
+    clearTimeout(autoNextTimer);
+    autoNextTimer = null;
+  }
+}
+
 const safeJsonArray = (key) => {
   const value = safeJson(key, []);
   return Array.isArray(value) ? value : [];
@@ -111,6 +166,25 @@ const safeJsonObject = (key) => {
   const value = safeJson(key, {});
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 };
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = CLOUD_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    const message = String(error?.message || "").toLowerCase();
+    if (error?.name === "AbortError" || message.includes("aborted")) {
+      throw new Error("服务器响应超过60秒，请稍后重新提交");
+    }
+    if (error instanceof TypeError || message.includes("failed to fetch") || message.includes("networkerror")) {
+      throw new Error("暂时无法连接服务器，请检查网络后重试");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const userStore = {
   get users() {
@@ -132,8 +206,7 @@ const userStore = {
 };
 
 const isAdminUser = (user = state.currentUser) => {
-  const phone = String(user?.phone || "").replace(/\D/g, "");
-  return Boolean(phone && ADMIN_PHONES.includes(phone));
+  return user?.isAdmin === true;
 };
 
 function applyAdminAccess() {
@@ -351,45 +424,45 @@ function setSyncStatus(text, type = "info") {
   target._timer = setTimeout(() => target.remove(), type === "error" ? 8000 : 3000);
 }
 
+function showConnectionStatus() {
+  const existing = document.querySelector("#cloudSyncStatus");
+  const target = existing || document.createElement("div");
+  target.id = "cloudSyncStatus";
+  target.className = "cloud-sync-status info";
+  target.textContent = "正在连接公司账号系统，请勿关闭页面……";
+  if (!existing) document.body.appendChild(target);
+  clearTimeout(target._timer);
+  target._timer = null;
+}
+
+function hideConnectionStatus() {
+  document.querySelector("#cloudSyncStatus")?.remove();
+}
+
 async function cloudRequest(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
-  const body = JSON.stringify({ ...payload, userAgent: navigator.userAgent, deviceId: navigator.userAgent });
+  const accountAction = ["login", "register", "reset"].includes(action);
+  if (accountAction) showConnectionStatus();
+  const token = localStorage.getItem("jz_auth_token") || "";
+  const body = JSON.stringify({ ...payload, token: payload.token || token, userAgent: navigator.userAgent, deviceId: payload.deviceId || getClientId(), clientId: payload.clientId || getClientId() });
   let lastError = null;
   for (const base of API_BASES) {
     try {
-      const res = await fetch(`${base}/api/${action}`, {
+      const res = await fetchWithTimeout(`${base}/api/${action}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body,
-      });
-      if (!res.ok) throw new Error(`云端同步失败：${res.status}`);
-      const data = await res.json();
+      }, CLOUD_TIMEOUT_MS);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `云端同步失败：${res.status}`);
       if (!data.ok) throw new Error(data.error || "云端同步失败");
+      if (accountAction) hideConnectionStatus();
       return data;
     } catch (error) {
       lastError = error;
     }
   }
-  for (const base of API_BASES) {
-    try {
-      if (navigator.sendBeacon) {
-        const blob = new Blob([body], { type: "text/plain;charset=UTF-8" });
-        if (navigator.sendBeacon(`${base}/api/${action}`, blob)) return { ok: true, fallback: true };
-      }
-    } catch {}
-    try {
-      await fetch(`${base}/api/${action}`, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=UTF-8" },
-        body,
-        keepalive: body.length < 60000,
-      });
-      return { ok: true, fallback: true };
-    } catch (error) {
-      lastError = error;
-    }
-  }
+  if (accountAction) hideConnectionStatus();
   throw lastError || new Error("云端同步失败");
 }
 
@@ -397,8 +470,12 @@ async function syncLater(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   try {
     const data = await cloudRequest(action, payload);
-    if (action === "exam") setSyncStatus(data.fallback ? "考试成绩已提交，正在后台同步飞书" : "考试成绩已同步到飞书", "success");
-    if (action === "login") setSyncStatus(data.fallback ? "登录记录已提交，正在后台同步飞书" : (data.warning || "登录联系记录已同步"), data.warning ? "warn" : "success");
+    if (action === "exam" && !data.record_id) throw new Error("服务器未返回考试记录ID");
+    if (action === "mistakes" && payload.items?.length && (!Array.isArray(data.record_ids) || data.record_ids.length < payload.items.length)) {
+      throw new Error("服务器未返回完整错题记录ID");
+    }
+    if (action === "exam") setSyncStatus("正式考试已同步到飞书", "success");
+    if (action === "mistakes" && payload.items?.length) setSyncStatus("错题已批量同步到飞书", "success");
     return data;
   } catch (error) {
     const queue = safeJsonArray("jz_sync_queue");
@@ -418,6 +495,7 @@ async function flushSyncQueue() {
   if (!queue.length) return;
   const remain = [];
   for (const item of queue) {
+    if (!['mistakes'].includes(item.action)) continue;
     try {
       await cloudRequest(item.action, item.payload);
     } catch (error) {
@@ -433,7 +511,8 @@ async function loadCloudStats() {
     return;
   }
   try {
-    const res = await fetch(`${API_BASE}/api/stats`);
+    const token = localStorage.getItem("jz_auth_token") || "";
+    const res = await fetchWithTimeout(`${API_BASE}/api/stats`, token ? { headers: { Authorization: `Bearer ${token}` } } : {}, CLOUD_TIMEOUT_MS);
     const data = await res.json();
     if (data.ok) state.cloudStats = data;
   } catch {
@@ -590,6 +669,7 @@ function renderDashboard() {
 
   els.bankCards.querySelectorAll(".bank-card").forEach((card) => {
     card.addEventListener("click", () => {
+      clearAutoNextTimer();
       state.currentBank = card.dataset.bank;
       state.learnPage = 1;
       els.bankSelect.value = state.currentBank;
@@ -651,6 +731,7 @@ function renderLearnFilter() {
 
   els.learnFilter.querySelectorAll(".learn-filter-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
+      clearAutoNextTimer();
       state.currentBank = btn.dataset.bank;
       state.learnPage = 1;
       els.bankSelect.value = state.currentBank;
@@ -792,27 +873,55 @@ function renderQuizSetup() {
     .join("");
 }
 
-function startQuiz() {
+async function startQuiz() {
+  clearAutoNextTimer();
   const size = Number(els.quizSize.value) || EXAM_SIZE;
-  let pool;
-  const keyword = normalize(els.searchInput.value);
-  const hasCurrentFilter = Boolean(keyword) || state.currentBank !== "全部题库";
+  state.examType = els.examType?.value || "practice";
   state.examLabelOverride = "";
-  if (hasCurrentFilter) {
-    pool = bankQuestions();
-    state.examLabelOverride = keyword
-      ? `当前搜索：${els.searchInput.value.trim()}`
-      : state.currentBank;
-  } else if (state.quizMode === "product") {
-    const bank = els.productBankSelect.value;
-    pool = state.allQuestions.filter((q) => q.bank === bank);
-  } else if (state.quizMode === "role") {
-    const bank = els.roleBankSelect.value;
-    pool = state.allQuestions.filter((q) => q.bank === bank);
+  state.examId = "";
+  state.examSessionToken = "";
+  state.submissionId = "";
+  state.serverRecordId = "";
+  state.serverDuration = null;
+  state.examSubmitting = false;
+  state.answers = new Map();
+  let pool = [];
+  if (state.examType === "formal") {
+    const allowedModes = ["random", "product", "role"];
+    const mode = allowedModes.includes(state.quizMode) ? state.quizMode : "random";
+    let bank = "";
+    if (mode === "product") bank = els.productBankSelect.value;
+    if (mode === "role") bank = els.roleBankSelect.value;
+    try {
+      const data = await cloudRequest("exam-start", { mode, bank, size });
+      if (!data.sessionToken || !data.examId || !Array.isArray(data.questions) || !data.questions.length) {
+        throw new Error("服务器未返回有效考试题目");
+      }
+      state.examId = data.examId;
+      state.examSessionToken = data.sessionToken;
+      state.submissionId = crypto.randomUUID();
+      state.quiz = data.questions;
+      state.examLabelOverride = data.bank || bank || "综合产品题库";
+    } catch (error) {
+      els.quizSetupStatus.textContent = `正式考试启动失败：${error.message}`;
+      return;
+    }
   } else {
-    pool = state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank));
+    // 练习模式也只从考试控件选择的题库取题，不受搜索框和左侧学习筛选影响。
+    if (state.quizMode === "product") {
+      const bank = els.productBankSelect.value;
+      pool = state.allQuestions.filter((q) => q.bank === bank);
+      state.examLabelOverride = bank;
+    } else if (state.quizMode === "role") {
+      const bank = els.roleBankSelect.value;
+      pool = state.allQuestions.filter((q) => q.bank === bank && (q.role === state.currentUser?.role || q.role === "全员"));
+      state.examLabelOverride = bank;
+    } else {
+      pool = state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank));
+      state.examLabelOverride = "综合产品题库";
+    }
+    state.quiz = shuffle(pool).slice(0, Math.min(size, pool.length));
   }
-  state.quiz = shuffle(pool).slice(0, Math.min(size, pool.length));
   if (!state.quiz.length) {
     els.quizSetupStatus.textContent = "当前筛选没有可用于考核的题目，请调整搜索或题库筛选。";
     return;
@@ -827,8 +936,9 @@ function startQuiz() {
   state.answeredQuestionIds = new Set();
   state.quizWrong = 0;
   state.wrongDetails = [];
-  state.examType = els.examType?.value || "practice";
   state.examFinished = false;
+  if (els.examSubmitStatus) els.examSubmitStatus.textContent = "";
+  if (els.retryExamSubmitBtn) els.retryExamSubmitBtn.classList.add("hidden");
   setExamLocked(state.examType === "formal");
   startTimer(quizTimeLimit(state.quiz.length));
   updateWrongCount();
@@ -836,6 +946,30 @@ function startQuiz() {
   els.quizResult.classList.add("hidden");
   els.quizRunner.classList.remove("hidden");
   renderQuizCard();
+}
+
+function goToNextQuestion() {
+  clearAutoNextTimer();
+  if (state.quizIndex + 1 >= state.quiz.length) {
+    finishQuiz();
+    return;
+  }
+  state.quizIndex += 1;
+  state.answered = false;
+  renderQuizCard();
+  renderStats();
+  requestAnimationFrame(() => {
+    els.quizCard?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  });
+}
+
+function scheduleAutoNext() {
+  clearAutoNextTimer();
+  const delay = state.examType === "formal" ? FORMAL_AUTO_NEXT_DELAY_MS : PRACTICE_AUTO_NEXT_DELAY_MS;
+  autoNextTimer = setTimeout(goToNextQuestion, delay);
 }
 
 function renderQuizCard() {
@@ -859,10 +993,8 @@ function renderQuizCard() {
     </div>
     <h3>${escapeHtml(question.question)}</h3>
     ${question.questionImage ? (() => {
-      const isMooncake = question.questionImage.includes('/mooncake/');
-      const isDailyProduct = question.questionImage.includes('/daily/');
       const sourceWidth = Math.max(120, Number(question.questionImageWidth) || 520);
-      return `<div class="quiz-img-wrap${isMooncake ? ' quiz-img-crop-moon' : ''}${isDailyProduct ? ' quiz-img-crop-daily' : ''}" style="width:min(${sourceWidth}px, 100%)">
+      return `<div class="quiz-img-wrap" style="width:min(${sourceWidth}px, 100%)">
         <img src="${imagePath(question.questionImage)}" alt="题目图片" />
       </div>`;
     })() : ""}
@@ -873,9 +1005,7 @@ function renderQuizCard() {
             <button class="option-btn" data-letter="${letter}">
               <strong>${letter}</strong>${escapeHtml(stripCodeFromOption(text, question))}
               ${img ? (() => {
-                const isMooncake = img.includes('/mooncake/');
-                const isDailyProduct = img.includes('/daily/');
-                return `<div class="quiz-opt-img${isMooncake ? ' quiz-img-crop-moon' : ''}${isDailyProduct ? ' quiz-img-crop-daily' : ''}" ${imageWidth ? `style="max-width:${Math.max(120, imageWidth)}px"` : ""}>
+                return `<div class="quiz-opt-img" ${imageWidth ? `style="max-width:${Math.max(120, imageWidth)}px"` : ""}>
                   <img src="${imagePath(img)}" alt="选项${letter}图片" />
                 </div>`;
               })() : ""}
@@ -897,16 +1027,16 @@ function chooseAnswer(letter) {
   const question = state.quiz[state.quizIndex];
   state.answeredCount += 1;
   state.answeredQuestionIds.add(question.id);
-  const correct = isEquivalentAnswer(question, letter);
+  const correct = state.examType === "formal" ? null : isEquivalentAnswer(question, letter);
+  if (state.examType === "formal") state.answers.set(question.id, letter);
   storage.attempts += 1;
-  if (correct) {
+  if (correct === true) {
     storage.correct += 1;
     state.score += 1;
-  } else {
+  } else if (correct === false) {
     state.quizWrong += 1;
     state.wrongDetails.push({ ...question, selected: letter, savedAt: new Date().toISOString() });
     if (state.examType === "practice") updateWrongCount();
-    saveMistake(question, letter);
   }
   els.quizScore.textContent = state.examType === "formal"
     ? `已答 ${state.answeredCount} 题`
@@ -919,23 +1049,17 @@ function chooseAnswer(letter) {
   });
   const feedback = document.querySelector("#feedback");
   feedback.classList.remove("hidden");
-  const isLast = state.quizIndex + 1 === state.quiz.length;
+  const isLast = state.quizIndex + 1 >= state.quiz.length;
   feedback.innerHTML = state.examType === "formal" ? `
     <strong>已作答</strong>
-    <p class="explain">正式考试模式：交卷后统一展示成绩和错题解析。</p>
-    <button class="primary-btn next-btn" id="nextQuestionBtn">${isLast ? "交卷看成绩" : "下一题"}</button>
+    <p class="explain">${isLast ? "正在提交试卷…" : "即将进入下一题…"}</p>
   ` : `
     <strong>${correct ? "回答正确" : "回答错误"}</strong>
     <p class="explain">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(displayAnswerText(question))}</p>
     <p class="explain">${escapeHtml(displayExplanation(question))}</p>
-    <button class="primary-btn next-btn" id="nextQuestionBtn">${isLast ? "查看成绩" : "下一题"}</button>
+    <p class="auto-next-hint">${isLast ? "即将显示成绩…" : "即将进入下一题…"}</p>
   `;
-  document.querySelector("#nextQuestionBtn").addEventListener("click", () => {
-    state.quizIndex += 1;
-    state.answered = false;
-    renderQuizCard();
-    renderStats();
-  });
+  scheduleAutoNext();
 }
 
 function saveMistake(question, selected) {
@@ -944,26 +1068,67 @@ function saveMistake(question, selected) {
   const item = { ...question, selected, savedAt: new Date().toISOString() };
   mistakes.unshift(item);
   storage.mistakes = mistakes.slice(0, 300);
-  syncLater("mistakes", { user: state.currentUser, items: [item] });
 }
 
-function finishQuiz() {
+async function submitFormalExam() {
+  const data = await cloudRequest("exam-submit", {
+    sessionToken: state.examSessionToken,
+    submissionId: state.submissionId,
+    answers: [...state.answers.entries()].map(([id, answer]) => ({ id, answer })),
+  });
+  if (!data.record_id) throw new Error("服务器未返回正式考试记录ID");
+  state.score = Number(data.correct || 0);
+  state.quizWrong = Number(data.wrong || 0);
+  state.serverRecordId = data.record_id;
+  state.serverDuration = Number.isFinite(Number(data.duration)) ? Number(data.duration) : null;
+  state.wrongDetails = Array.isArray(data.wrong_details) ? data.wrong_details : [];
+  state.wrongDetails.forEach((item) => saveMistake(item, item.selected || "未作答"));
+  return data;
+}
+
+async function finishQuiz() {
   if (state.examFinished || !state.quiz.length) return;
+  if (state.examType === "formal" && state.examSubmitting) return;
+  clearAutoNextTimer();
   stopTimer();
-  const unansweredQuestions = state.quiz.filter((question) => !state.answeredQuestionIds.has(question.id));
-  if (unansweredQuestions.length) {
-    storage.attempts += unansweredQuestions.length;
-    unansweredQuestions.forEach((question) => {
-      state.wrongDetails.push({ ...question, selected: "未作答", savedAt: new Date().toISOString() });
-      saveMistake(question, "未作答");
-    });
-    state.quizWrong += unansweredQuestions.length;
+  if (state.examType === "formal") {
+    state.examSubmitting = true;
+    document.body.classList.add("exam-submitting");
+    try {
+      await submitFormalExam();
+    } catch (error) {
+      state.examFinished = false;
+      setExamLocked(true);
+      if (els.examSubmitStatus) {
+        els.examSubmitStatus.textContent = `成绩提交失败：${error.message}`;
+        els.retryExamSubmitBtn.classList.remove("hidden");
+      }
+      return;
+    } finally {
+      state.examSubmitting = false;
+      document.body.classList.remove("exam-submitting");
+    }
+  } else {
+    const unansweredQuestions = state.quiz.filter((question) => !state.answeredQuestionIds.has(question.id));
+    if (unansweredQuestions.length) {
+      storage.attempts += unansweredQuestions.length;
+      unansweredQuestions.forEach((question) => {
+        state.wrongDetails.push({ ...question, selected: "未作答", savedAt: new Date().toISOString() });
+        saveMistake(question, "未作答");
+      });
+      state.quizWrong += unansweredQuestions.length;
+    }
+    if (state.wrongDetails.length) {
+      await syncLater("mistakes", { user: state.currentUser, items: state.wrongDetails, submissionId: crypto.randomUUID() });
+    }
   }
   state.examFinished = true;
   setExamLocked(false);
+  if (els.examSubmitStatus) els.examSubmitStatus.textContent = "";
+  if (els.retryExamSubmitBtn) els.retryExamSubmitBtn.classList.add("hidden");
   updateWrongCount();
   const percent = state.quiz.length ? Math.round((state.score / state.quiz.length) * 100) : 0;
-  const timeStr = formatTime(timerSeconds);
+  const timeStr = formatTime(state.serverDuration ?? timerSeconds);
   saveExamRecord(percent);
   els.quizRunner.classList.add("hidden");
   els.quizResult.classList.remove("hidden");
@@ -1023,10 +1188,10 @@ function saveExamRecord(percent) {
     duration: timerSeconds,
     finishedAt: new Date().toISOString(),
     buildVersion: BUILD_VERSION,
+    serverRecordId: state.serverRecordId || "",
     wrongDetails: state.wrongDetails.slice(0, 30),
   });
   storage.examRecords = records.slice(0, 100);
-  syncLater("exam", { user: state.currentUser, record: records[0] });
 }
 
 function renderMistakes() {
@@ -1072,6 +1237,7 @@ function renderMistakes() {
 }
 
 function startMistakeQuiz() {
+  clearAutoNextTimer();
   const mistakes = storage.mistakes;
   if (!mistakes.length) return;
   state.quiz = shuffle(mistakes).slice(0, Math.min(30, mistakes.length));
@@ -1084,6 +1250,7 @@ function startMistakeQuiz() {
   state.wrongDetails = [];
   state.examType = "practice";
   state.examFinished = false;
+  state.examSubmitting = false;
   state.examLabelOverride = "错题重练";
   startTimer(quizTimeLimit(state.quiz.length));
   updateWrongCount();
@@ -1160,24 +1327,99 @@ function renderRanking() {
   });
 }
 
+async function refreshAdminEmployees() {
+  if (!isAdminUser() || !els.adminEmployeeList) return;
+  try {
+    const data = await cloudRequest("admin-list", {});
+    els.adminEmployeeList.innerHTML = (data.employees || []).map((employee) => `
+      <div class="admin-employee-row">
+        <div><strong>${escapeHtml(employee.name)}</strong><small>${escapeHtml(employee.phone)} · ${escapeHtml(employee.role)} · ${escapeHtml(employee.status)}</small></div>
+        <div class="admin-employee-actions">
+          <button class="secondary-btn admin-password-btn" type="button" data-phone="${escapeHtml(employee.phone)}">修改密码</button>
+          <button class="danger-btn admin-delete-btn" type="button" data-phone="${escapeHtml(employee.phone)}">删除员工</button>
+        </div>
+      </div>
+    `).join("") || '<div class="empty">暂无员工账号。</div>';
+  } catch (error) {
+    if (els.adminAccountStatus) els.adminAccountStatus.textContent = error.message || "员工账号读取失败";
+  }
+}
+
+async function addAdminEmployee(event) {
+  event.preventDefault();
+  if (!els.adminEmployeeForm) return;
+  els.adminAccountStatus.textContent = "";
+  const button = els.adminEmployeeForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try {
+    await cloudRequest("admin-add", {
+      name: els.adminEmployeeName.value.trim(),
+      phone: normalizePhone(els.adminEmployeePhone.value),
+      role: els.adminEmployeeRole.value,
+      password: els.adminEmployeePassword.value,
+    });
+    els.adminEmployeeForm.reset();
+    els.adminAccountStatus.textContent = "员工账号已添加";
+    await refreshAdminEmployees();
+  } catch (error) {
+    els.adminAccountStatus.textContent = error.message || "添加员工失败";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function handleAdminEmployeeAction(event) {
+  const button = event.target.closest("[data-phone]");
+  if (!button) return;
+  const phone = button.dataset.phone;
+  if (button.classList.contains("admin-delete-btn")) {
+    if (!window.confirm(`确定删除员工账号 ${phone} 吗？删除后该员工需要重新注册。`)) return;
+    try {
+      await cloudRequest("admin-delete", { phone });
+      els.adminAccountStatus.textContent = "员工账号已删除";
+      await refreshAdminEmployees();
+    } catch (error) {
+      els.adminAccountStatus.textContent = error.message || "删除员工失败";
+    }
+    return;
+  }
+  const password = window.prompt("请输入新密码（至少8位，包含字母和数字）", "");
+  if (!password) return;
+  try {
+    await cloudRequest("admin-password", { phone, password });
+    els.adminAccountStatus.textContent = "员工密码已修改";
+  } catch (error) {
+    els.adminAccountStatus.textContent = error.message || "修改密码失败";
+  }
+}
+
 function renderAdmin() {
   if (!isAdminUser()) {
+    els.adminDataWarning?.classList.add("hidden");
     els.adminMetrics.innerHTML = `<div class="empty">无权限访问管理看板。</div>`;
     els.adminUserTable.innerHTML = "";
     els.adminWeakList.innerHTML = "";
     return;
   }
   const cloud = state.cloudStats;
+  const errors = Array.isArray(cloud?.errors) ? cloud.errors : [];
+  if (els.adminDataWarning) {
+    els.adminDataWarning.classList.toggle("hidden", !errors.length);
+    els.adminDataWarning.textContent = errors.length
+      ? "部分飞书数据读取失败，本页统计可能不完整，请勿直接用于考核结论。"
+      : "";
+  }
   const users = cloud?.employees?.length
     ? cloud.employees.map((u) => ({ name: u["姓名"], phone: u["手机号"], role: u["岗位"] }))
     : Object.values(userStore.users);
   const rows = users.map((user) => {
     const records = cloud?.exams?.length
-      ? cloud.exams.filter((r) => String(r["手机号"]) === String(user.phone)).map((r) => ({
-          percent: Number(r["分数"] || 0), score: Number(r["答对题数"] || 0), total: Number(r["总题数"] || 0),
-          wrong: Number(r["错题数"] || 0), duration: Number(r["用时秒"] || 0), bank: r["题库"], type: r["考核类型"], finishedAt: r["完成时间"],
-        }))
-      : getUserRecords(user.phone);
+      ? cloud.exams.filter((r) => String(r["手机号"]) === String(user.phone) && String(r["考核类型"] || "") === "正式考试").map((r) => ({
+          percent: Number(r["分数"] || 0), score: Number(r["答对数"] || 0), total: Number(r["总题数"] || 0),
+          wrong: Number(r["答错数"] || 0), duration: Number(r["用时秒数"] || 0), bank: r["题库"], type: r["考核类型"], finishedAt: r["提交时间"],
+        })).sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime())
+      : getUserRecords(user.phone).filter((r) => r.type === "正式考试");
+    records.sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime());
     const mistakes = cloud?.mistakes?.length
       ? cloud.mistakes.filter((r) => String(r["手机号"]) === String(user.phone)).map((r) => ({ knowledgePoint: r["知识点"], bank: r["题库"] }))
       : getUserMistakes(user.phone);
@@ -1186,6 +1428,9 @@ function renderAdmin() {
     return { user, records, mistakes, best, latest };
   });
   const allRecords = rows.flatMap((row) => row.records.map((record) => ({ ...record, user: row.user })));
+  const practiceCount = cloud?.exams?.length
+    ? cloud.exams.filter((r) => String(r["考核类型"] || "") === "练习模式").length
+    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone)).filter((r) => r.type === "练习模式").length;
   const avg = allRecords.length ? Math.round(allRecords.reduce((sum, r) => sum + Number(r.percent || 0), 0) / allRecords.length) : 0;
   const passed = allRecords.filter((r) => Number(r.percent) >= 80).length;
   const passRate = allRecords.length ? Math.round((passed / allRecords.length) * 100) : 0;
@@ -1193,9 +1438,9 @@ function renderAdmin() {
 
   els.adminMetrics.innerHTML = `
     <div class="summary-card"><span>员工数</span><strong>${users.length}</strong><small>${cloud?.employees?.length ? "飞书云端数据" : "本机已登录账号"}</small></div>
-    <div class="summary-card"><span>考试次数</span><strong>${allRecords.length}</strong><small>正式+练习记录</small></div>
-    <div class="summary-card"><span>平均分</span><strong>${avg}</strong><small>全部考试记录</small></div>
-    <div class="summary-card"><span>通过率</span><strong>${passRate}%</strong><small>80 分以上通过，未考 ${notExam} 人</small></div>
+    <div class="summary-card"><span>正式考试次数</span><strong>${allRecords.length}</strong><small>仅用于员工考核</small></div>
+    <div class="summary-card"><span>正式考试平均分</span><strong>${avg}</strong><small>练习数据不计入</small></div>
+    <div class="summary-card"><span>正式考试通过率</span><strong>${passRate}%</strong><small>练习次数 ${practiceCount}，未考 ${notExam} 人</small></div>
   `;
 
   els.adminUserTable.innerHTML = rows.length ? `
@@ -1233,7 +1478,7 @@ function renderAdmin() {
 function exportRecords() {
   const rows = state.cloudStats?.exams?.length
     ? state.cloudStats.exams.map((r) => ({
-        姓名: r["姓名"], 手机号: r["手机号"], 岗位: r["岗位"], 考核类型: r["考核类型"], 题库: r["题库"], 分数: r["分数"], 答对: r["答对题数"], 总题数: r["总题数"], 错题数: r["错题数"], 是否通过: r["是否通过"], 用时秒: r["用时秒"], 完成时间: r["完成时间"],
+        姓名: r["姓名"], 手机号: r["手机号"], 岗位: r["岗位"], 考试名称: r["考试名称"], 考核类型: r["考核类型"], 题库: r["题库"], 分数: r["分数"], 答对数: r["答对数"], 总题数: r["总题数"], 答错数: r["答错数"], 是否通过: r["是否通过"], 用时秒数: r["用时秒数"], 提交时间: r["提交时间"], 考试会话ID: r["考试会话ID"],
       }))
     : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).map((record) => ({
         姓名: user.name,
@@ -1242,20 +1487,21 @@ function exportRecords() {
         考核类型: record.type || "练习模式",
         题库: record.bank,
         分数: record.percent,
-        答对: record.score,
+        考试名称: "金尊产品知识库学习考核",
+        答对数: record.score,
         总题数: record.total,
-        错题数: record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
+        答错数: record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
         是否通过: Number(record.percent) >= 80 ? "是" : "否",
-        用时秒: record.duration,
-        完成时间: record.finishedAt,
+        用时秒数: record.duration,
+        提交时间: record.finishedAt,
       })));
-  downloadText(`金尊考试记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "考核类型", "题库", "分数", "答对", "总题数", "错题数", "是否通过", "用时秒", "完成时间"], rows));
+  downloadText(`金尊考试记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "考试名称", "考核类型", "题库", "分数", "答对数", "总题数", "答错数", "是否通过", "用时秒数", "提交时间", "考试会话ID"], rows));
 }
 
 function exportMistakes() {
   const rows = state.cloudStats?.mistakes?.length
     ? state.cloudStats.mistakes.map((q) => ({
-        姓名: q["姓名"], 手机号: q["手机号"], 岗位: q["岗位"], 题库: q["题库"], 知识点: q["知识点"], 题目: q["题目"], 错选: q["错选答案"], 正确答案: q["正确答案"], 解析: q["解析"], 记录时间: q["出错时间"],
+        姓名: q["姓名"], 手机号: q["手机号"], 岗位: q["岗位"], 题库: q["题库"], 知识点: q["知识点"], 题目: q["题目"], 错选: q["错选"], 正确答案: q["正确答案"], 解析: q["解析"], 记录时间: q["记录时间"],
       }))
     : Object.values(userStore.users).flatMap((user) => getUserMistakes(user.phone).map((q) => ({
         姓名: user.name,
@@ -1273,6 +1519,7 @@ function exportMistakes() {
 }
 
 function switchView(view) {
+  if (view !== "quiz") clearAutoNextTimer();
   if (!state.examFinished && state.examType === "formal" && view !== "quiz") return;
   if (view === "admin" && !isAdminUser()) {
     view = "dashboard";
@@ -1319,6 +1566,10 @@ function normalizePhone(value) {
 }
 
 function loadCurrentUser() {
+  if (!localStorage.getItem("jz_auth_token")) {
+    state.currentUser = null;
+    return;
+  }
   const phone = userStore.currentPhone;
   const users = userStore.users;
   state.currentUser = phone && users[phone] ? users[phone] : null;
@@ -1329,51 +1580,160 @@ function showAuth(visible) {
   document.body.classList.toggle("auth-locked", visible);
 }
 
-function saveUserFromForm(event) {
-  event.preventDefault();
-  const name = els.authName.value.trim();
-  const phone = normalizePhone(els.authPhone.value);
-  const role = els.authRole.value;
-  if (!name) {
-    els.authError.textContent = "请填写姓名。";
-    return;
-  }
-  if (phone.length !== 11) {
-    els.authError.textContent = "请输入 11 位手机号。";
-    return;
-  }
-  const users = userStore.users;
+function switchAuthMode(mode) {
+  const isLogin = mode === "login";
+  const isRegister = mode === "register";
+  els.loginForm.classList.toggle("hidden", !isLogin);
+  els.registerForm.classList.toggle("hidden", !isRegister);
+  els.resetForm.classList.toggle("hidden", mode !== "reset");
+  els.showLoginTab.classList.toggle("active", isLogin);
+  els.showRegisterTab.classList.toggle("active", isRegister);
+  els.loginError.textContent = "";
+  els.registerError.textContent = "";
+  els.resetError.textContent = "";
+}
+
+function saveAuthenticatedUser(data) {
+  localStorage.setItem("jz_auth_token", data.token);
   const user = {
-    name,
-    phone,
-    role,
+    id: data.user.id,
+    name: data.user.name,
+    phone: data.user.phone,
+    role: data.user.role,
+    isAdmin: data.user.isAdmin === true,
     updatedAt: new Date().toISOString(),
   };
-  users[phone] = user;
+  const users = userStore.users;
+  users[user.phone] = user;
   userStore.users = users;
-  userStore.currentPhone = phone;
+  userStore.currentPhone = user.phone;
   state.currentUser = user;
   reconcileStoredQuestions();
   applyAdminAccess();
-  els.authError.textContent = "";
-  showAuth(false);
-  syncLater("login", { user });
-  flushSyncQueue();
-  renderAll();
+}
+
+const passwordError = (password) => {
+  if (password.length < 8) return "密码不能少于8位";
+  if (!/[A-Za-z]/.test(password)) return "密码必须包含字母";
+  if (!/\d/.test(password)) return "密码必须包含数字";
+  return "";
+};
+
+async function loginEmployee(event) {
+  event.preventDefault();
+  const account = els.loginAccount.value.trim();
+  const password = els.loginPassword.value;
+  els.loginError.textContent = "";
+  if (!account || !password) {
+    els.loginError.textContent = "请输入姓名或手机号和密码";
+    return;
+  }
+  const button = els.loginForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = "正在登录...";
+  try {
+    const data = await cloudRequest("login", { account, password, clientId: getClientId() });
+    if (!data.token || !data.user) throw new Error("账号或密码错误");
+    saveAuthenticatedUser(data);
+    els.loginPassword.value = "";
+    showAuth(false);
+    renderAll();
+  } catch (error) {
+    els.loginError.textContent = error.message || "账号或密码错误";
+  } finally {
+    button.disabled = false;
+    button.textContent = "登录";
+  }
+}
+
+async function registerEmployee(event) {
+  event.preventDefault();
+  const name = els.registerName.value.trim();
+  const phone = normalizePhone(els.registerPhone.value);
+  const role = els.registerRole.value;
+  const password = els.registerPassword.value;
+  const confirm = els.registerPasswordConfirm.value;
+  const registerCode = els.registerCode.value.trim();
+  els.registerError.textContent = "";
+  if (!name) return void (els.registerError.textContent = "请填写真实姓名");
+  if (!/^1\d{10}$/.test(phone)) return void (els.registerError.textContent = "请输入正确的11位手机号");
+  if (!role) return void (els.registerError.textContent = "请选择岗位");
+  const error = passwordError(password);
+  if (error) return void (els.registerError.textContent = error);
+  if (password !== confirm) return void (els.registerError.textContent = "两次输入的密码不一致");
+  if (!registerCode) return void (els.registerError.textContent = "请输入公司注册口令");
+  const button = els.registerForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = "正在注册...";
+  try {
+    const data = await cloudRequest("register", { name, phone, role, password, registerCode, clientId: getClientId() });
+    if (!data.token || !data.user) throw new Error("注册失败");
+    saveAuthenticatedUser(data);
+    els.registerForm.reset();
+    showAuth(false);
+    renderAll();
+  } catch (requestError) {
+    const message = requestError.message || "注册失败，请稍后重试";
+    els.registerError.textContent = message.includes("已经注册")
+      ? `${message}，请切换到“员工登录”`
+      : message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "注册并进入学习";
+  }
+}
+
+async function resetPassword(event) {
+  event.preventDefault();
+  const name = els.resetName.value.trim();
+  const phone = normalizePhone(els.resetPhone.value);
+  const role = els.resetRole.value;
+  const password = els.resetPassword.value;
+  const confirm = els.resetPasswordConfirm.value;
+  const registerCode = els.resetCode.value.trim();
+  els.resetError.textContent = "";
+  if (!name) return void (els.resetError.textContent = "请输入真实姓名");
+  if (!/^1\d{10}$/.test(phone)) return void (els.resetError.textContent = "请输入正确的11位手机号");
+  if (!role) return void (els.resetError.textContent = "请选择岗位");
+  const error = passwordError(password);
+  if (error) return void (els.resetError.textContent = error);
+  if (password !== confirm) return void (els.resetError.textContent = "两次输入的密码不一致");
+  if (!registerCode) return void (els.resetError.textContent = "请输入公司注册口令");
+  const button = els.resetForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = "正在重置...";
+  try {
+    const data = await cloudRequest("reset", { name, phone, role, password, registerCode, clientId: getClientId() });
+    if (!data.token || !data.user) throw new Error("密码重置失败");
+    saveAuthenticatedUser(data);
+    els.resetForm.reset();
+    showAuth(false);
+    renderAll();
+  } catch (requestError) {
+    els.resetError.textContent = requestError.message || "密码重置失败，请稍后重试";
+  } finally {
+    button.disabled = false;
+    button.textContent = "重置密码并登录";
+  }
 }
 
 function logout() {
+  clearAutoNextTimer();
   stopTimer();
   state.examFinished = true;
+  state.examSubmitting = false;
   setExamLocked(false);
   userStore.currentPhone = "";
+  localStorage.removeItem("jz_auth_token");
   state.currentUser = null;
   applyAdminAccess();
   state.quiz = [];
   state.quizIndex = 0;
   state.score = 0;
-  els.authPhone.value = "";
-  els.authName.value = "";
+  els.loginAccount.value = "";
+  els.loginPassword.value = "";
+  els.registerForm.reset();
+  els.resetForm.reset();
   showAuth(true);
   renderAll();
 }
@@ -1381,6 +1741,7 @@ function logout() {
 function bindEvents() {
   els.navTabs.forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
   els.bankSelect.addEventListener("change", () => {
+    clearAutoNextTimer();
     state.currentBank = els.bankSelect.value;
     state.learnPage = 1;
     renderAll();
@@ -1395,6 +1756,7 @@ function bindEvents() {
   els.exportMistakesBtn.addEventListener("click", exportMistakes);
   document.querySelectorAll(".mode-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
+      clearAutoNextTimer();
       state.quizMode = tab.dataset.mode;
       document.querySelectorAll(".mode-tab").forEach((t) =>
         t.classList.toggle("active", t === tab)
@@ -1418,7 +1780,25 @@ function bindEvents() {
     localStorage.removeItem("jz_sync_queue");
     renderAll();
   });
-  els.authForm.addEventListener("submit", saveUserFromForm);
+  els.showLoginTab.addEventListener("click", () => switchAuthMode("login"));
+  els.showRegisterTab.addEventListener("click", () => switchAuthMode("register"));
+  els.showResetForm.addEventListener("click", () => switchAuthMode("reset"));
+  els.backToLogin.addEventListener("click", () => switchAuthMode("login"));
+  els.loginForm.addEventListener("submit", loginEmployee);
+  els.registerForm.addEventListener("submit", registerEmployee);
+  els.resetForm.addEventListener("submit", resetPassword);
+  els.retryExamSubmitBtn?.addEventListener("click", finishQuiz);
+  els.adminEmployeeForm?.addEventListener("submit", addAdminEmployee);
+  els.adminEmployeeList?.addEventListener("click", handleAdminEmployeeAction);
+  document.querySelectorAll(".password-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const input = document.getElementById(button.dataset.target);
+      if (!input) return;
+      const visible = input.type === "text";
+      input.type = visible ? "password" : "text";
+      button.textContent = visible ? "显示" : "隐藏";
+    });
+  });
   els.logoutBtn.addEventListener("click", logout);
   els.mobileSidebarToggle?.addEventListener("click", () => {
     const open = !els.sidebarTools.classList.contains("mobile-open");
@@ -1437,6 +1817,15 @@ async function init() {
   try {
     await loadQuestions();
     loadCurrentUser();
+    if (state.currentUser) {
+      try {
+        const session = await cloudRequest("session", {});
+        if (session?.token && session?.user) saveAuthenticatedUser(session);
+      } catch {
+        localStorage.removeItem("jz_auth_token");
+        state.currentUser = null;
+      }
+    }
     reconcileStoredQuestions();
     renderBankSelect();
     renderQuizSetup();
@@ -1454,3 +1843,4 @@ async function init() {
 }
 
 init();
+
