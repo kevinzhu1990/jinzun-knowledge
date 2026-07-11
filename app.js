@@ -397,11 +397,1366 @@ const todayKey = (value = new Date()) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}×~¶êÚ$z{-®éÜj×G#àĞ¢’æ¦ö–â‚""—ĞĞ¢Â÷F&öG“àĞ¢Â÷F&ÆSàĞ¢¢ÆF—b6Æ73Ò&V×G’#îi¨.izY[z^Šë[Ù^8#ÂöF—cæ°Ğ Ğ¢6öç7BÆÄÖ—7F¶W2Ò&÷w2æfÆDÖ‚‡&÷r’Óâ&÷ræÖ—7F¶W2“°Ğ¢6öç7BvV²ÒÆÄÖ—7F¶W2ç&VGV6R‚†62Â’Óâ°Ğ¢6öç7B¶W’Òæ¶æ÷vÆVFvUö–çBÇÂæ&æ²ÇÂ.X[nK¹b#°Ğ¢65¶¶W•ÒÒ†65¶¶W•ÒÇÂ’²°Ğ¢&WGW&â63°Ğ¢ÒÂ·Ò“°Ğ¢6öç7BvVµ&÷w2Òö&¦V7BæVçG&–W2‡vV²’ç6÷'B‚†Â"’Óâ%³ÒÒ³Ò’ç6Æ–6RƒÂ"“°Ğ¢VÇ2æFÖ–åvV´Æ—7Bæ–ææW$…DÔÂÒvVµ&÷w2æÆVæwF‚ò Ğ¢ÇF&ÆSãÇF†VCãÇG#ãÇFƒîyú^Šønx+“Â÷FƒãÇFƒî™Iš)i[Â÷FƒãÂ÷G#ãÂ÷F†VCãÇF&öG“àĞ¢G·vVµ&÷w2æÖ‚…¶æÖRÂ6÷VçEÒ’ÓâÇG#ãÇFCâG¶W66T‡FÖÂ†æÖR—ÓÂ÷FCãÇFCâG¶6÷VçGÓÂ÷FCãÂ÷G#æ’æ¦ö–â‚""—ĞĞ¢Â÷F&öG“ãÂ÷F&ÆSàĞ¢¢ÆF—b6Æ73Ò&V×G’#îi¨.iz™Iš){¹şŠê8#ÂöF—cæ°Ğ§ĞĞ Ğ¦gVæ7F–öâW‡÷'E&V6÷&G2‚’°Ğ¢6öç7B&÷w2Ò7FFRæ6Æ÷VE7FG3òæW†×3òæÆVæwF€Ğ¢ò7FFRæ6Æ÷VE7FG2æW†×2æÖ‚‡"’Óâ‡°¢Zy>YÓ¢%².Zy>YÒ%ÒÂh˜¾iË®Xûs¢%².h˜¾iË®Xûr%ÒÂ[)~KØÓ¢%².[)~KØÒ%ÒÂˆ>Šù^YŞz{¢%².ˆ>Šù^YŞz{%ÒÂˆ>j{¾Yè³¢%².ˆ>j{¾Yè²%ÒÂš)[©3¢%².š)[©2%ÒÂXˆni[¢%².Xˆni[%ÒÂzÙNZûi[¢%².zÙNZûi[%ÒÂh¾š)i[¢%².h¾š)i[%ÒÂzÙN™Ii[¢%².zÙN™Ii[%ÒÂiŠşY
-n˜	®‹øs¢%².iŠşY
-n˜	®‹ør%ÒÂyJi{nzy.i[¢%².yJi{nzy.i[%ÒÂhùKªNi{n™{C¢%².hùKªNi{n™{B%ÒÂˆ>Šù^KÉ®ŠùÔ”C¢%².ˆ>Šù^KÉ®ŠùÔ”B%ÒÀ¢Ò’Ğ¢¢ö&¦V7BçfÇVW2‡W6W%7F÷&RçW6W'2’æfÆDÖ‚‡W6W"’ÓâvWEW6W%&V6÷&G2‡W6W"ç†öæR’æÖ‚‡&V6÷&B’Óâ‡°Ğ¢Zy>YÓ¢W6W"ææÖRÀĞ¢h˜¾iË®Xûs¢W6W"ç†öæRÀĞ¢[)~KØÓ¢W6W"ç&öÆRÀĞ¢ˆ>j{¾Yè³¢&V6÷&BçG—RÇÂ.{¸>KšjŠ[Èò"ÀĞ¢š)[©3¢&V6÷&Bæ&æ²ÀĞ¢Xˆni[¢&V6÷&BçW&6VçBÀĞ¢ˆ>Šù^YŞz{¢.˜y[®Kª~Y8yú^Šøn[©>ZÚnKšˆ>j‚"À¢zÙNZûi[¢&V6÷&Bç66÷&RÀ¢h¾š)i[¢&V6÷&BçF÷FÂÀ¢zÙN™Ii[¢&V6÷&Bçw&öæróòÖF‚æÖ‚ƒÂçVÖ&W"‡&V6÷&BçF÷FÂÇÂ’ÒçVÖ&W"‡&V6÷&Bç66÷&RÇÂ’’À¢iŠşY
-n˜	®‹øs¢çVÖ&W"‡&V6÷&BçW&6VçB’ãÒƒò.iŠò"¢.Y
-b"ÀĞ¢yJi{nzy.i[¢&V6÷&BæGW&F–öâÀ¢hùKªNi{n™{C¢&V6÷&Bæf–æ—6†VDBÀ¢Ò’’“°¢F÷væÆöEFW‡B†˜y[®ˆ>Šù^Šë[ÙUòG·FöF”¶W’‚—Òæ77fÂFô77b…².Zy>YÒ"Â.h˜¾iË®Xûr"Â.[)~KØÒ"Â.ˆ>Šù^YŞz{"Â.ˆ>j{¾Yè²"Â.š)[©2"Â.Xˆni["Â.zÙNZûi["Â.h¾š)i["Â.zÙN™Ii["Â.iŠşY
-n˜	®‹ør"Â.yJi{nzy.i["Â.hùKªNi{n™{B"Â.ˆ>Šù^KÉ®ŠùÔ”B%ÒÂ&÷w2’“°§ĞĞ Ğ¦gVæ7F–öâW‡÷'DÖ—7F¶W2‚’°Ğ¢6öç7B&÷w2Ò7FFRæ6Æ÷VE7FG3òæÖ—7F¶W3òæÆVæwF€Ğ¢ò7FFRæ6Æ÷VE7FG2æÖ—7F¶W2æÖ‚‡’Óâ‡°¢Zy>YÓ¢².Zy>YÒ%ÒÂh˜¾iË®Xûs¢².h˜¾iË®Xûr%ÒÂ[)~KØÓ¢².[)~KØÒ%ÒÂš)[©3¢².š)[©2%ÒÂyú^Šønx+“¢².yú^Šønx+’%ÒÂš)yºã¢².š)yºâ%ÒÂ™I˜“¢².™I˜’%ÒÂjÚ>zîzÙNjƒ¢².jÚ>zîzÙNj‚%ÒÂŠz>ié¢².Šz>ié%ÒÂŠë[Ù^i{n™{C¢².Šë[Ù^i{n™{B%ÒÀ¢Ò’Ğ¢¢ö&¦V7BçfÇVW2‡W6W%7F÷&RçW6W'2’æfÆDÖ‚‡W6W"’ÓâvWEW6W$Ö—7F¶W2‡W6W"ç†öæR’æÖ‚‡’Óâ‡°Ğ¢Zy>YÓ¢W6W"ææÖRÀĞ¢h˜¾iË®Xûs¢W6W"ç†öæRÀĞ¢[)~KØÓ¢W6W"ç&öÆRÀĞ¢š)[©3¢æ&æ²ÀĞ¢yú^Šønx+“¢æ¶æ÷vÆVFvUö–çBÀĞ¢š)yºã¢çVW7F–öâÀĞ¢™I˜“¢ç6VÆV7FVBÀĞ¢jÚ>zîzÙNjƒ¢G·æç7vW'ÒG¶F—7Æ”ç7vW%FW‡B‡—ÖÀĞ¢Šz>ié¢F—7Æ”W‡ÆæF–öâ‡’ÀĞ¢Šë[Ù^i{n™{C¢ç6fVDBÀĞ¢Ò’’“°Ğ¢F÷væÆöEFW‡B†˜y[®™Iš)Šë[ÙUòG·FöF”¶W’‚—Òæ77fÂFô77b…².Zy>YÒ"Â.h˜¾iË®Xûr"Â.[)~KØÒ"Â.š)[©2"Â.yú^Šønx+’"Â.š)yºâ"Â.™I˜’"Â.jÚ>zîzÙNj‚"Â.Šz>ié"Â.Šë[Ù^i{n™{B%ÒÂ&÷w2’“°Ğ§ĞĞ Ğ¦gVæ7F–öâ7v—F6…f–Wr‡f–Wr’°¢–b‡f–WrÓÒ'V—¢"’6ÆV$WFôæW‡EF–ÖW"‚“°¢–b‚7FFRæW†Ôf–æ—6†VBbb7FFRæW†ÕG—RÓÓÒ&f÷&ÖÂ"bbf–WrÓÒ'V—¢"’&WGW&ã°¢–b‡f–WrÓÓÒ&FÖ–â"bb—4FÖ–åW6W"‚’’°Ğ¢f–WrÒ&F6†&ö&B#°Ğ¢ĞĞ¢7FFRæ7W'&VçEf–WrÒf–Ws°Ğ¢VÇ2ææeF'2æf÷$V6‚‚‡F"’ÓâF"æ6Æ74Æ—7BçFövvÆR‚&7F—fR"ÂF"æFF6WBçf–WrÓÓÒf–Wr’“°Ğ¢ö&¦V7BæVçG&–W2†VÇ2çf–Ww2’æf÷$V6‚‚…¶æÖRÂVÆVÖVçEÒ’ÓâVÆVÖVçBæ6Æ74Æ—7BçFövvÆR‚&7F—fR"ÂæÖRÓÓÒf–Wr’“°Ğ¢VÇ2çvUF—FÆRçFW‡D6öçFVçBÒvUF—FÆW5·f–WuÓ°Ğ¢–b‡f–WrÓÓÒ'V—¢"bb7FFRçV—¢æÆVæwF‚’°Ğ¢VÇ2çV—¥6WGWæ6Æ74Æ—7Bç&VÖ÷fR‚&†–FFVâ"“°Ğ¢VÇ2çV—¥'VææW"æ6Æ74Æ—7BæFB‚&†–FFVâ"“°Ğ¢VÇ2çV—¥&W7VÇBæ6Æ74Æ—7BæFB‚&†–FFVâ"“°Ğ¢ĞĞ¢–b‡f–WrÓÓÒ'&æ¶–ær"’&VæFW%&æ¶–ær‚“°Ğ¢–b‡f–WrÓÓÒ&Ö—7F¶W2"’&VæFW$Ö—7F¶W2‚“°Ğ¢–b‡f–WrÓÓÒ&FÖ–â"’°Ğ¢ÆöD6Æ÷VE7FG2‚’çF†Vâ‡&VæFW$FÖ–â“°Ğ¢&VæFW$FÖ–â‚“°Ğ¢ĞĞ§ĞĞ Ğ¦gVæ7F–öâ&VæFW$ÆÂ‚’°Ğ¢&VæFW%7FG2‚“°Ğ¢&VæFW$F6†&ö&B‚“°Ğ¢&VæFW$ÆV&äf–ÇFW"‚“°Ğ¢&VæFW$ÆV&äÆ—7B‚“°Ğ¢&VæFW$Ö—7F¶W2‚“°Ğ¢&VæFW$FÖ–â‚“°Ğ§ĞĞ Ğ¦gVæ7F–öâ&VæFW%W6W"‚’°Ğ¢Ç”FÖ–ä66W72‚“°Ğ¢–b‚7FFRæ7W'&VçEW6W"’°Ğ¢VÇ2çW6W$æÖRçFW‡D6öçFVçBÒ.iÊ®y›¾[ÙR#°Ğ¢VÇ2çW6W$ÖWFçFW‡D6öçFVçBÒ"Ò#°Ğ¢&WGW&ã°Ğ¢ĞĞ¢VÇ2çW6W$æÖRçFW‡D6öçFVçBÒ7FFRæ7W'&VçEW6W"ææÖS°Ğ¢VÇ2çW6W$ÖWFçFW‡D6öçFVçBÒG·7FFRæ7W'&VçEW6W"ç&öÆWÒ+rG·7FFRæ7W'&VçEW6W"ç†öæWÖ°Ğ§ĞĞ Ğ¦gVæ7F–öâæ÷&ÖÆ—¦U†öæR‡fÇVR’°Ğ¢&WGW&â7G&–ær‡fÇVRÇÂ""’ç&WÆ6R‚õÄBörÂ""“°Ğ§ĞĞ Ğ¦gVæ7F–öâÆöD7W'&VçEW6W"‚’°¢–b‚Æö6Å7F÷&vRævWD—FVÒ‚&§¥öWF…÷Fö¶Vâ"’’°¢7FFRæ7W'&VçEW6W"ÒçVÆÃ°¢&WGW&ã°¢Ğ¢6öç7B†öæRÒW6W%7F÷&Ræ7W'&VçE†öæS°¢6öç7BW6W'2ÒW6W%7F÷&RçW6W'3°¢7FFRæ7W'&VçEW6W"Ò†öæRbbW6W'5·†öæUÒòW6W'5·†öæUÒ¢çVÆÃ°§Ğ Ğ¦gVæ7F–öâ6†÷tWF‚‡f—6–&ÆR’°Ğ¢VÇ2æWF…f–Wræ6Æ74Æ—7BçFövvÆR‚&†–FFVâ"Âf—6–&ÆR“°Ğ¢Fö7VÖVçBæ&öG’æ6Æ74Æ—7BçFövvÆR‚&WF‚ÖÆö6¶VB"Âf—6–&ÆR“°Ğ§ĞĞ Ğ¦gVæ7F–öâ7v—F6„WF„ÖöFR†ÖöFR’°¢6öç7B—4Æöv–âÒÖöFRÓÓÒ&Æöv–â#°¢6öç7B—5&Vv—7FW"ÒÖöFRÓÓÒ'&Vv—7FW"#°¢VÇ2æÆöv–äf÷&Òæ6Æ74Æ—7BçFövvÆR‚&†–FFVâ"Â—4Æöv–â“°¢VÇ2ç&Vv—7FW$f÷&Òæ6Æ74Æ—7BçFövvÆR‚&†–FFVâ"Â—5&Vv—7FW"“°¢VÇ2ç&W6WDf÷&Òæ6Æ74Æ—7BçFövvÆR‚&†–FFVâ"ÂÖöFRÓÒ'&W6WB"“°¢VÇ2ç6†÷tÆöv–åF"æ6Æ74Æ—7BçFövvÆR‚&7F—fR"Â—4Æöv–â“°¢VÇ2ç6†÷u&Vv—7FW%F"æ6Æ74Æ—7BçFövvÆR‚&7F—fR"Â—5&Vv—7FW"“°¢VÇ2æÆöv–äW'&÷"çFW‡D6öçFVçBÒ"#°¢VÇ2ç&Vv—7FW$W'&÷"çFW‡D6öçFVçBÒ"#°¢VÇ2ç&W6WDW'&÷"çFW‡D6öçFVçBÒ"#°§Ğ ¦gVæ7F–öâ6fTWF†VçF–6FVEW6W"†FF’°¢Æö6Å7F÷&vRç6WD—FVÒ‚&§¥öWF…÷Fö¶Vâ"ÂFFçFö¶Vâ“°¢6öç7BW6W"Ò°¢–C¢FFçW6W"æ–BÀ¢æÖS¢FFçW6W"ææÖRÀ¢†öæS¢FFçW6W"ç†öæRÀ¢&öÆS¢FFçW6W"ç&öÆRÀ¢—4FÖ–ã¢FFçW6W"æ—4FÖ–âÓÓÒG'VRÀ¢WFFVDC¢æWrFFR‚’çFô•4õ7G&–ær‚’À¢Ó°¢6öç7BW6W'2ÒW6W%7F÷&RçW6W'3°¢W6W'5·W6W"ç†öæUÒÒW6W#°¢W6W%7F÷&RçW6W'2ÒW6W'3°¢W6W%7F÷&Ræ7W'&VçE†öæRÒW6W"ç†öæS°¢7FFRæ7W'&VçEW6W"ÒW6W#°¢&V6öæ6–ÆU7F÷&VEVW7F–öç2‚“°¢Ç”FÖ–ä66W72‚“°§Ğ ¦6öç7B77v÷&DW'&÷"Ò‡77v÷&B’Óâ°¢–b‡77v÷&BæÆVæwF‚Â‚’&WGW&â.ZønzKˆŞˆ;Ş[	K¨ãKØÒ#°¢–b‚õ´Õ¦×¥ÒòçFW7B‡77v÷&B’’&WGW&â.Zønz[ø^š¾XÈ^Y
-¾ZÙ~jøÒ#°¢–b‚õÆBòçFW7B‡77v÷&B’’&WGW&â.Zønz[ø^š¾XÈ^Y
-¾i[ZÙr#°¢&WGW&â"#°§Ó° ¦7–æ2gVæ7F–öâÆöv–äV×Æ÷–VR†WfVçB’°¢WfVçBç&WfVçDFVfVÇB‚“°¢6öç7B66÷VçBÒVÇ2æÆöv–ä66÷VçBçfÇVRçG&–Ò‚“°¢6öç7B77v÷&BÒVÇ2æÆöv–å77v÷&BçfÇVS°¢VÇ2æÆöv–äW'&÷"çFW‡D6öçFVçBÒ"#°¢–b‚66÷VçBÇÂ77v÷&B’°¢VÇ2æÆöv–äW'&÷"çFW‡D6öçFVçBÒ.Šû~‹é>XZ^Zy>YŞh‰nh˜¾iË®Xû~Y(ÎZønz#°¢&WGW&ã°¢Ğ¢6öç7B'WGFöâÒVÇ2æÆöv–äf÷&ÒçVW'•6VÆV7F÷"‚v'WGFöå·G—SÒ'7V&Ö—B%Òr“°¢'WGFöâæF—6&ÆVBÒG'VS°¢'WGFöâçFW‡D6öçFVçBÒ.jÚ>YÊy›¾[ÙRâââ#°¢G'’°¢6öç7BFFÒv—B6Æ÷VE&WVW7B‚&Æöv–â"Â²66÷VçBÂ77v÷&BÂ6Æ–VçD–C¢vWD6Æ–VçD–B‚’Ò“°¢–b‚FFçFö¶VâÇÂFFçW6W"’F‡&÷ræWrW'&÷"‚.‹JnXû~h‰nZønz™IŠúò"“°¢6fTWF†VçF–6FVEW6W"†FF“°¢VÇ2æÆöv–å77v÷&BçfÇVRÒ"#°¢6†÷tWF‚†fÇ6R“°¢&VæFW$ÆÂ‚“°¢Ò6F6‚†W'&÷"’°¢VÇ2æÆöv–äW'&÷"çFW‡D6öçFVçBÒW'&÷"æÖW76vRÇÂ.‹JnXû~h‰nZønz™IŠúò#°¢Òf–æÆÇ’°¢'WGFöâæF—6&ÆVBÒfÇ6S°¢'WGFöâçFW‡D6öçFVçBÒ.y›¾[ÙR#°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ&Vv—7FW$V×Æ÷–VR†WfVçB’°¢WfVçBç&WfVçDFVfVÇB‚“°¢6öç7BæÖRÒVÇ2ç&Vv—7FW$æÖRçfÇVRçG&–Ò‚“°¢6öç7B†öæRÒæ÷&ÖÆ—¦U†öæR†VÇ2ç&Vv—7FW%†öæRçfÇVR“°¢6öç7B&öÆRÒVÇ2ç&Vv—7FW%&öÆRçfÇVS°¢6öç7B77v÷&BÒVÇ2ç&Vv—7FW%77v÷&BçfÇVS°¢6öç7B6öæf—&ÒÒVÇ2ç&Vv—7FW%77v÷&D6öæf—&ÒçfÇVS°¢6öç7B&Vv—7FW$6öFRÒVÇ2ç&Vv—7FW$6öFRçfÇVRçG&–Ò‚“°¢VÇ2ç&Vv—7FW$W'&÷"çFW‡D6öçFVçBÒ"#°¢–b‚æÖR’&WGW&âfö–B†VÇ2ç&Vv—7FW$W'&÷"çFW‡D6öçFVçBÒ.Šû~Z¾XiyÉşZéîZy>YÒ"“°¢–b‚õãÆG³ÒBòçFW7B‡†öæR’’&WGW&âfö–B†VÇ2ç&Vv—7FW$W'&÷"çFW‡D6öçFVçBÒ.Šû~‹é>XZ^jÚ>zîy¨CKØŞh˜¾iË®Xûr"“°¢–b‚&öÆR’&WGW&âfö–B†VÇ2ç&Vv—7FW$W'&÷"çFW‡D6öçFVçBÒ.Šû~˜hº[)~KØÒ"“°¢6öç7BW'&÷"Ò77v÷&DW'&÷"‡77v÷&B“°¢–b†W'&÷"’&WGW&âfö–B†VÇ2ç&Vv—7FW$W'&÷"çFW‡D6öçFVçBÒW'&÷"“°¢–b‡77v÷&BÓÒ6öæf—&Ò’&WGW&âfö–B†VÇ2ç&Vv—7FW$W'&÷"çFW‡D6öçFVçBÒ.KŠNjÊ‹é>XZ^y¨NZønzKˆŞKˆˆ{B"“°¢–b‚&Vv—7FW$6öFR’&WGW&âfö–B†VÇ2ç&Vv—7FW$W'&÷"çFW‡D6öçFVçBÒ.Šû~‹é>XZ^XZÎXûk:XhÎXú>KºB"“°¢6öç7B'WGFöâÒVÇ2ç&Vv—7FW$f÷&ÒçVW'•6VÆV7F÷"‚v'WGFöå·G—SÒ'7V&Ö—B%Òr“°¢'WGFöâæF—6&ÆVBÒG'VS°¢'WGFöâçFW‡D6öçFVçBÒ.jÚ>YÊk:XhÂâââ#°¢G'’°¢6öç7BFFÒv—B6Æ÷VE&WVW7B‚'&Vv—7FW""Â²æÖRÂ†öæRÂ&öÆRÂ77v÷&BÂ&Vv—7FW$6öFRÂ6Æ–VçD–C¢vWD6Æ–VçD–B‚’Ò“°¢–b‚FFçFö¶VâÇÂFFçW6W"’F‡&÷ræWrW'&÷"‚.k:XhÎZK‹JR"“°¢6fTWF†VçF–6FVEW6W"†FF“°¢VÇ2ç&Vv—7FW$f÷&Òç&W6WB‚“°¢6†÷tWF‚†fÇ6R“°¢&VæFW$ÆÂ‚“°¢Ò6F6‚‡&WVW7DW'&÷"’°¢6öç7BÖW76vRÒ&WVW7DW'&÷"æÖW76vRÇÂ.k:XhÎZK‹J^ûÈÎŠû~zˆŞYî˜xŞŠùR#°¢VÇ2ç&Vv—7FW$W'&÷"çFW‡D6öçFVçBÒÖW76vRæ–æ6ÇVFW2‚.[{.{¸şk:XhÂ"¢òG¶ÖW76vWŞûÈÎŠû~Xˆ~hÚ.X‹(	ÎY[z^y›¾[Ù^(	Ö ¢¢ÖW76vS°¢Òf–æÆÇ’°¢'WGFöâæF—6&ÆVBÒfÇ6S°¢'WGFöâçFW‡D6öçFVçBÒ.k:XhÎ[›n‹ù¾XZ^ZÚnKš#°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ&W6WE77v÷&B†WfVçB’°¢WfVçBç&WfVçDFVfVÇB‚“°¢6öç7BæÖRÒVÇ2ç&W6WDæÖRçfÇVRçG&–Ò‚“°¢6öç7B†öæRÒæ÷&ÖÆ—¦U†öæR†VÇ2ç&W6WE†öæRçfÇVR“°¢6öç7B&öÆRÒVÇ2ç&W6WE&öÆRçfÇVS°¢6öç7B77v÷&BÒVÇ2ç&W6WE77v÷&BçfÇVS°¢6öç7B6öæf—&ÒÒVÇ2ç&W6WE77v÷&D6öæf—&ÒçfÇVS°¢6öç7B&Vv—7FW$6öFRÒVÇ2ç&W6WD6öFRçfÇVRçG&–Ò‚“°¢VÇ2ç&W6WDW'&÷"çFW‡D6öçFVçBÒ"#°¢–b‚æÖR’&WGW&âfö–B†VÇ2ç&W6WDW'&÷"çFW‡D6öçFVçBÒ.Šû~‹é>XZ^yÉşZéîZy>YÒ"“°¢–b‚õãÆG³ÒBòçFW7B‡†öæR’’&WGW&âfö–B†VÇ2ç&W6WDW'&÷"çFW‡D6öçFVçBÒ.Šû~‹é>XZ^jÚ>zîy¨CKØŞh˜¾iË®Xûr"“°¢–b‚&öÆR’&WGW&âfö–B†VÇ2ç&W6WDW'&÷"çFW‡D6öçFVçBÒ.Šû~˜hº[)~KØÒ"“°¢6öç7BW'&÷"Ò77v÷&DW'&÷"‡77v÷&B“°¢–b†W'&÷"’&WGW&âfö–B†VÇ2ç&W6WDW'&÷"çFW‡D6öçFVçBÒW'&÷"“°¢–b‡77v÷&BÓÒ6öæf—&Ò’&WGW&âfö–B†VÇ2ç&W6WDW'&÷"çFW‡D6öçFVçBÒ.KŠNjÊ‹é>XZ^y¨NZønzKˆŞKˆˆ{B"“°¢–b‚&Vv—7FW$6öFR’&WGW&âfö–B†VÇ2ç&W6WDW'&÷"çFW‡D6öçFVçBÒ.Šû~‹é>XZ^XZÎXûk:XhÎXú>KºB"“°¢6öç7B'WGFöâÒVÇ2ç&W6WDf÷&ÒçVW'•6VÆV7F÷"‚v'WGFöå·G—SÒ'7V&Ö—B%Òr“°¢'WGFöâæF—6&ÆVBÒG'VS°¢'WGFöâçFW‡D6öçFVçBÒ.jÚ>YÊ˜xŞ{Úââââ#°¢G'’°¢6öç7BFFÒv—B6Æ÷VE&WVW7B‚'&W6WB"Â²æÖRÂ†öæRÂ&öÆRÂ77v÷&BÂ&Vv—7FW$6öFRÂ6Æ–VçD–C¢vWD6Æ–VçD–B‚’Ò“°¢–b‚FFçFö¶VâÇÂFFçW6W"’F‡&÷ræWrW'&÷"‚.Zønz˜xŞ{ÚîZK‹JR"“°¢6fTWF†VçF–6FVEW6W"†FF“°¢VÇ2ç&W6WDf÷&Òç&W6WB‚“°¢6†÷tWF‚†fÇ6R“°¢&VæFW$ÆÂ‚“°¢Ò6F6‚‡&WVW7DW'&÷"’°¢VÇ2ç&W6WDW'&÷"çFW‡D6öçFVçBÒ&WVW7DW'&÷"æÖW76vRÇÂ.Zønz˜xŞ{ÚîZK‹J^ûÈÎŠû~zˆŞYî˜xŞŠùR#°¢Òf–æÆÇ’°¢'WGFöâæF—6&ÆVBÒfÇ6S°¢'WGFöâçFW‡D6öçFVçBÒ.˜xŞ{ÚîZønz[›ny›¾[ÙR#°¢Ğ§Ğ Ğ¦gVæ7F–öâÆöv÷WB‚’°¢6ÆV$WFôæW‡EF–ÖW"‚“°¢7F÷F–ÖW"‚“°¢7FFRæW†Ôf–æ—6†VBÒG'VS°¢7FFRæW†Õ7V&Ö—GF–ærÒfÇ6S°¢6WDW†ÔÆö6¶VB†fÇ6R“°Ğ¢W6W%7F÷&Ræ7W'&VçE†öæRÒ"#°¢Æö6Å7F÷&vRç&VÖ÷fT—FVÒ‚&§¥öWF…÷Fö¶Vâ"“°¢7FFRæ7W'&VçEW6W"ÒçVÆÃ°Ğ¢Ç”FÖ–ä66W72‚“°Ğ¢7FFRçV—¢ÒµÓ°Ğ¢7FFRçV—¤–æFW‚Ò°Ğ¢7FFRç66÷&RÒ°Ğ¢VÇ2æÆöv–ä66÷VçBçfÇVRÒ"#°¢VÇ2æÆöv–å77v÷&BçfÇVRÒ"#°¢VÇ2ç&Vv—7FW$f÷&Òç&W6WB‚“°¢VÇ2ç&W6WDf÷&Òç&W6WB‚“°¢6†÷tWF‚‡G'VR“°¢&VæFW$ÆÂ‚“°Ğ§ĞĞ Ğ¦gVæ7F–öâ&–æDWfVçG2‚’°Ğ¢VÇ2ææeF'2æf÷$V6‚‚‡F"’ÓâF"æFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ7v—F6…f–Wr‡F"æFF6WBçf–Wr’’“°Ğ¢VÇ2æ&æµ6VÆV7BæFDWfVçDÆ—7FVæW"‚&6†ævR"Â‚’Óâ°¢6ÆV$WFôæW‡EF–ÖW"‚“°¢7FFRæ7W'&VçD&æ²ÒVÇ2æ&æµ6VÆV7BçfÇVS°¢7FFRæÆV&åvRÒ°Ğ¢&VæFW$ÆÂ‚“°Ğ¢Ò“°Ğ¢VÇ2ç6V&6„–çWBæFDWfVçDÆ—7FVæW"‚&–çWB"Â‚’Óâ°Ğ¢7FFRæÆV&åvRÒ°Ğ¢&VæFW$ÆÂ‚“°Ğ¢Ò“°Ğ¢VÇ2ç7F'EV—¤'FâæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â7F'EV—¢“°Ğ¢VÇ2ç&WG'”Ö—7F¶W4'FâæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â7F'DÖ—7F¶UV—¢“°Ğ¢VÇ2æW‡÷'E&V6÷&G4'FâæFDWfVçDÆ—7FVæW"‚&6Æ–6²"ÂW‡÷'E&V6÷&G2“°Ğ¢VÇ2æW‡÷'DÖ—7F¶W4'FâæFDWfVçDÆ—7FVæW"‚&6Æ–6²"ÂW‡÷'DÖ—7F¶W2“°Ğ¢Fö7VÖVçBçVW'•6VÆV7F÷$ÆÂ‚"æÖöFR×F""’æf÷$V6‚‚‡F"’Óâ°Ğ¢F"æFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°¢6ÆV$WFôæW‡EF–ÖW"‚“°¢7FFRçV—¤ÖöFRÒF"æFF6WBæÖöFS°¢Fö7VÖVçBçVW'•6VÆV7F÷$ÆÂ‚"æÖöFR×F""’æf÷$V6‚‚‡B’ÓàĞ¢Bæ6Æ74Æ—7BçFövvÆR‚&7F—fR"ÂBÓÓÒF"Ğ¢“°Ğ¢VÇ2æÖöFU&æFöÒæ6Æ74Æ—7BçFövvÆR‚&†–FFVâ"Â7FFRçV—¤ÖöFRÓÒ'&æFöÒ"“°Ğ¢VÇ2æÖöFU&öGV7Bæ6Æ74Æ—7BçFövvÆR‚&†–FFVâ"Â7FFRçV—¤ÖöFRÓÒ'&öGV7B"“°Ğ¢VÇ2æÖöFU&öÆRæ6Æ74Æ—7BçFövvÆR‚&†–FFVâ"Â7FFRçV—¤ÖöFRÓÒ'&öÆR"“°Ğ¢Ò“°Ğ¢Ò“°Ğ¢VÇ2æ6ÆV$Ö—7F¶W4'FâæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°Ğ¢–b‚v–æF÷ræ6öæf—&Ò‚.zîZé®kˆ^z›®[Ù>X˜Ş‹JnXû~y¨NXZ˜:™Iš)Y	~ûÉşjÚNi8ŞKÙÎKˆŞˆ;Şi*N™H8""’’&WGW&ã°Ğ¢7F÷&vRæÖ—7F¶W2ÒµÓ°Ğ¢&VæFW$ÆÂ‚“°Ğ¢Ò“°Ğ¢VÇ2ç&W6WD'FâæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°Ğ¢–b‚v–æF÷ræ6öæf—&Ò‚.zîZé®kˆ^z›®[Ù>X˜Ş‹JnXû~y¨NjÚ>zîxè~8™Iš)Y(ÎXZ˜:ˆ>Šù^Šë[Ù^Y	~ûÉşjÚNi8ŞKÙÎKˆŞˆ;Şi*N™H8""’’&WGW&ã°Ğ¢7F÷&vRæGFV×G2Ò°Ğ¢7F÷&vRæ6÷'&V7BÒ°Ğ¢7F÷&vRæÖ—7F¶W2ÒµÓ°Ğ¢7F÷&vRæW†Õ&V6÷&G2ÒµÓ°Ğ¢Æö6Å7F÷&vRç&VÖ÷fT—FVÒ‚&§¥÷7–æ5÷VWVR"“°Ğ¢&VæFW$ÆÂ‚“°Ğ¢Ò“°Ğ¢VÇ2ç6†÷tÆöv–åF"æFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ7v—F6„WF„ÖöFR‚&Æöv–â"’“°¢VÇ2ç6†÷u&Vv—7FW%F"æFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ7v—F6„WF„ÖöFR‚'&Vv—7FW""’“°¢VÇ2ç6†÷u&W6WDf÷&ÒæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ7v—F6„WF„ÖöFR‚'&W6WB"’“°¢VÇ2æ&6µFôÆöv–âæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ7v—F6„WF„ÖöFR‚&Æöv–â"’“°¢VÇ2æÆöv–äf÷&ÒæFDWfVçDÆ—7FVæW"‚'7V&Ö—B"ÂÆöv–äV×Æ÷–VR“°¢VÇ2ç&Vv—7FW$f÷&ÒæFDWfVçDÆ—7FVæW"‚'7V&Ö—B"Â&Vv—7FW$V×Æ÷–VR“°¢VÇ2ç&W6WDf÷&ÒæFDWfVçDÆ—7FVæW"‚'7V&Ö—B"Â&W6WE77v÷&B“°¢VÇ2ç&WG'”W†Õ7V&Ö—D'FãòæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Âf–æ—6…V—¢“°¢Fö7VÖVçBçVW'•6VÆV7F÷$ÆÂ‚"ç77v÷&B×FövvÆR"’æf÷$V6‚‚†'WGFöâ’Óâ°¢'WGFöâæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°¢6öç7B–çWBÒFö7VÖVçBævWDVÆVÖVçD'”–B†'WGFöâæFF6WBçF&vWB“°¢–b‚–çWB’&WGW&ã°¢6öç7Bf—6–&ÆRÒ–çWBçG—RÓÓÒ'FW‡B#°¢–çWBçG—RÒf—6–&ÆRò'77v÷&B"¢'FW‡B#°¢'WGFöâçFW‡D6öçFVçBÒf—6–&ÆRò.i‹îzK¢"¢.™©‰xò#°¢Ò“°¢Ò“°¢VÇ2æÆöv÷WD'FâæFDWfVçDÆ—7FVæW"‚&6Æ–6²"ÂÆöv÷WB“°Ğ¢VÇ2æÖö&–ÆU6–FV&%FövvÆSòæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°Ğ¢6öç7B÷VâÒVÇ2ç6–FV&%FööÇ2æ6Æ74Æ—7Bæ6öçF–ç2‚&Öö&–ÆRÖ÷Vâ"“°Ğ¢VÇ2ç6–FV&%FööÇ2æ6Æ74Æ—7BçFövvÆR‚&Öö&–ÆRÖ÷Vâ"Â÷Vâ“°Ğ¢VÇ2æÖö&–ÆU6–FV&%FövvÆRç6WDGG&–'WFR‚&&–ÖW‡æFVB"Â7G&–ær†÷Vâ’“°Ğ¢Ò“°Ğ¢v–æF÷ræFDWfVçDÆ—7FVæW"‚&&Vf÷&WVæÆöB"Â†WfVçB’Óâ°Ğ¢–b‚7FFRæW†Ôf–æ—6†VBbb7FFRæW†ÕG—RÓÓÒ&f÷&ÖÂ"’°Ğ¢WfVçBç&WfVçDFVfVÇB‚“°Ğ¢WfVçBç&WGW&åfÇVRÒ"#°Ğ¢ĞĞ¢Ò“°Ğ§ĞĞ Ğ¦7–æ2gVæ7F–öâ–æ—B‚’°Ğ¢G'’°Ğ¢v—BÆöEVW7F–öç2‚“°Ğ¢ÆöD7W'&VçEW6W"‚“°Ğ¢&V6öæ6–ÆU7F÷&VEVW7F–öç2‚“°Ğ¢&VæFW$&æµ6VÆV7B‚“°Ğ¢&VæFW%V—¥6WGW‚“°Ğ¢–æ—E6Æövâ‚“°Ğ¢&–æDWfVçG2‚“°Ğ¢Ç”FÖ–ä66W72‚“°Ğ¢v—BfÇW6…7–æ5VWVR‚“°Ğ¢v—BÆöD6Æ÷VE7FG2‚“°Ğ¢&VæFW$ÆÂ‚“°Ğ¢6†÷tWF‚‚7FFRæ7W'&VçEW6W"“°Ğ¢Ò6F6‚†W'&÷"’°Ğ¢Fö7VÖVçBæ&öG’æ–ææW$…DÔÂÒÆF—b6Æ73Ò&V×G’#îš)[©>Xª‹ÛŞZK‹J^ûÉ¢G¶W66T‡FÖÂ†W'&÷"æÖW76vR—ÓÂöF—cæ°Ğ¢F‡&÷rW'&÷#°Ğ¢ĞĞ§ĞĞ Ğ¦–æ—B‚“°Ğ Ğ 
+  return `${year}-${month}-${day}`;
+};
+
+const getUserRecords = (phone) =>
+  safeJsonArray(`jz_${phone}_exam_records`);
+
+const getUserMistakes = (phone) =>
+  safeJsonArray(`jz_${phone}_mistakes`);
+
+function setSyncStatus(text, type = "info") {
+  const existing = document.querySelector("#cloudSyncStatus");
+  const target = existing || document.createElement("div");
+  target.id = "cloudSyncStatus";
+  target.className = `cloud-sync-status ${type}`;
+  target.textContent = text;
+  if (!existing) document.body.appendChild(target);
+  clearTimeout(target._timer);
+  target._timer = setTimeout(() => target.remove(), type === "error" ? 8000 : 3000);
+}
+
+function showConnectionStatus() {
+  const existing = document.querySelector("#cloudSyncStatus");
+  const target = existing || document.createElement("div");
+  target.id = "cloudSyncStatus";
+  target.className = "cloud-sync-status info";
+  target.textContent = "æ­£åœ¨è¿æ¥å…¬å¸è´¦å·ç³»ç»Ÿï¼Œè¯·å‹¿å…³é—­é¡µé¢â€¦â€¦";
+  if (!existing) document.body.appendChild(target);
+  clearTimeout(target._timer);
+  target._timer = null;
+}
+
+function hideConnectionStatus() {
+  document.querySelector("#cloudSyncStatus")?.remove();
+}
+
+async function cloudRequest(action, payload) {
+  if (!CLOUD_ENABLED) return { ok: true, skipped: true };
+  const accountAction = ["login", "register", "reset"].includes(action);
+  if (accountAction) showConnectionStatus();
+  const token = localStorage.getItem("jz_auth_token") || "";
+  const body = JSON.stringify({ ...payload, token: payload.token || token, userAgent: navigator.userAgent, deviceId: payload.deviceId || getClientId(), clientId: payload.clientId || getClientId() });
+  let lastError = null;
+  for (const base of API_BASES) {
+    try {
+      const res = await fetchWithTimeout(`${base}/api/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body,
+      }, CLOUD_TIMEOUT_MS);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `äº‘ç«¯åŒæ­¥å¤±è´¥ï¼š${res.status}`);
+      if (!data.ok) throw new Error(data.error || "äº‘ç«¯åŒæ­¥å¤±è´¥");
+      if (accountAction) hideConnectionStatus();
+      return data;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (accountAction) hideConnectionStatus();
+  throw lastError || new Error("äº‘ç«¯åŒæ­¥å¤±è´¥");
+}
+
+async function syncLater(action, payload) {
+  if (!CLOUD_ENABLED) return { ok: true, skipped: true };
+  try {
+    const data = await cloudRequest(action, payload);
+    if (action === "exam" && !data.record_id) throw new Error("æœåŠ¡å™¨æœªè¿”å›è€ƒè¯•è®°å½•ID");
+    if (action === "mistakes" && payload.items?.length && (!Array.isArray(data.record_ids) || data.record_ids.length < payload.items.length)) {
+      throw new Error("æœåŠ¡å™¨æœªè¿”å›å®Œæ•´é”™é¢˜è®°å½•ID");
+    }
+    if (action === "exam") setSyncStatus("æ­£å¼è€ƒè¯•å·²åŒæ­¥åˆ°é£ä¹¦", "success");
+    if (action === "mistakes" && payload.items?.length) setSyncStatus("é”™é¢˜å·²æ‰¹é‡åŒæ­¥åˆ°é£ä¹¦", "success");
+    return data;
+  } catch (error) {
+    const queue = safeJsonArray("jz_sync_queue");
+    queue.push({ action, payload, createdAt: new Date().toISOString(), error: error.message });
+    localStorage.setItem("jz_sync_queue", JSON.stringify(queue.slice(-300)));
+    setSyncStatus(`äº‘ç«¯åŒæ­¥å¤±è´¥ï¼Œå·²æš‚å­˜æœ¬æœºï¼š${error.message}`, "error");
+    return { ok: false, error: error.message };
+  }
+}
+
+async function flushSyncQueue() {
+  if (!CLOUD_ENABLED) {
+    localStorage.removeItem("jz_sync_queue");
+    return;
+  }
+  const queue = safeJsonArray("jz_sync_queue");
+  if (!queue.length) return;
+  const remain = [];
+  for (const item of queue) {
+    if (!['mistakes'].includes(item.action)) continue;
+    try {
+      await cloudRequest(item.action, item.payload);
+    } catch (error) {
+      remain.push({ ...item, error: error.message });
+    }
+  }
+  localStorage.setItem("jz_sync_queue", JSON.stringify(remain.slice(-300)));
+}
+
+async function loadCloudStats() {
+  if (!CLOUD_ENABLED) {
+    state.cloudStats = null;
+    return;
+  }
+  try {
+    const token = localStorage.getItem("jz_auth_token") || "";
+    const res = await fetchWithTimeout(`${API_BASE}/api/stats`, token ? { headers: { Authorization: `Bearer ${token}` } } : {}, CLOUD_TIMEOUT_MS);
+    const data = await res.json();
+    if (data.ok) state.cloudStats = data;
+  } catch {
+    state.cloudStats = null;
+  }
+}
+
+async function loadQuestions() {
+  const [productRes, roleRes] = await Promise.all([fetch(productUrl), fetch(roleUrl)]);
+  if (!productRes.ok || !roleRes.ok) {
+    throw new Error(`é¢˜åº“æ–‡ä»¶è¯·æ±‚å¤±è´¥ï¼ˆäº§å“ ${productRes.status} / å²—ä½ ${roleRes.status}ï¼‰`);
+  }
+  const [productQuestions, roleQuestions] = await Promise.all([productRes.json(), roleRes.json()]);
+  state.allQuestions = [...productQuestions, ...roleQuestions].map((question) => ({
+    ...question,
+    role: question.role || question.category || "",
+    module: question.module || question.productLine || "",
+    source: question.source || "äº§å“çŸ¥è¯†åº“",
+    note: question.note || "",
+  }));
+}
+
+const questionIdentity = (question) => [
+  question.bank || "",
+  question.code || "",
+  question.knowledgePoint || "",
+  question.type || "",
+].join("|");
+
+function reconcileStoredQuestions() {
+  if (!state.currentUser) return;
+  const byId = new Map(state.allQuestions.map((question) => [question.id, question]));
+  const byIdentity = new Map(state.allQuestions.map((question) => [questionIdentity(question), question]));
+  const resolveCurrent = (question) => {
+    if (!question) return null;
+    if (String(question.id || "").startsWith("R-")) return byId.get(question.id) || null;
+    return byIdentity.get(questionIdentity(question)) || null;
+  };
+
+  const seen = new Set();
+  const migratedMistakes = storage.mistakes.flatMap((oldQuestion) => {
+    const current = resolveCurrent(oldQuestion);
+    if (!current) return [];
+    const key = questionIdentity(current);
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ ...current, selected: oldQuestion.selected || "", savedAt: oldQuestion.savedAt || new Date().toISOString() }];
+  });
+  storage.mistakes = migratedMistakes.slice(0, 300);
+
+  storage.examRecords = storage.examRecords.slice(0, 100).map((record) => ({
+    ...record,
+    buildVersion: record.buildVersion || "legacy",
+    wrongDetails: (record.wrongDetails || []).flatMap((oldQuestion) => {
+      const current = resolveCurrent(oldQuestion);
+      return current ? [{ ...current, selected: oldQuestion.selected || "", savedAt: oldQuestion.savedAt || "" }] : [];
+    }),
+  }));
+}
+
+function banks() {
+  return ["å…¨éƒ¨é¢˜åº“", ...new Set(state.allQuestions.map((question) => question.bank))];
+}
+
+function bankQuestions() {
+  const keyword = normalize(els.searchInput.value);
+  return state.allQuestions.filter((question) => {
+    const bankMatch = state.currentBank === "å…¨éƒ¨é¢˜åº“" || question.bank === state.currentBank;
+    if (!bankMatch) return false;
+    if (!keyword) return true;
+    return [
+      question.id,
+      question.bank,
+      question.role,
+      question.module,
+      question.code,
+      question.productName,
+      question.knowledgePoint,
+      question.question,
+      question.answerText,
+    ]
+      .map(normalize)
+      .some((text) => text.includes(keyword));
+  });
+}
+
+function renderBankSelect() {
+  els.bankSelect.innerHTML = banks()
+    .map((bank) => `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}</option>`)
+    .join("");
+  els.bankSelect.value = state.currentBank;
+}
+
+function renderStats() {
+  state.filtered = bankQuestions();
+  els.bankCount.textContent = state.filtered.length;
+  els.mistakeCount.textContent = storage.mistakes.length;
+  const accuracy = storage.attempts ? Math.round((storage.correct / storage.attempts) * 100) : 0;
+  els.accuracyText.textContent = `${accuracy}%`;
+  renderUser();
+}
+
+function renderDashboard() {
+  const records = storage.examRecords;
+  const mistakes = storage.mistakes;
+  const todayRecords = records.filter((record) => record.finishedAt && todayKey(record.finishedAt) === todayKey());
+  const best = records.reduce((acc, record) => Math.max(acc, Number(record.percent) || 0), 0);
+  const last = records[0];
+
+  els.taskPanel.innerHTML = `
+    <div class="task-card ${todayRecords.length ? "done" : ""}">
+      <span>${todayRecords.length ? "âœ“" : "1"}</span>
+      <div><strong>å®Œæˆä»Šæ—¥è€ƒæ ¸</strong><small>${todayRecords.length ? `ä»Šæ—¥å·²å®Œæˆ ${todayRecords.length} æ¬¡` : "å»ºè®®å…ˆåš 30-50 é¢˜æ­£å¼è€ƒæ ¸"}</small></div>
+    </div>
+    <div class="task-card ${mistakes.length === 0 ? "done" : ""}">
+      <span>${mistakes.length === 0 ? "âœ“" : "2"}</span>
+      <div><strong>å¤ä¹ é”™é¢˜</strong><small>${mistakes.length ? `è¿˜æœ‰ ${mistakes.length} é“é”™é¢˜å¾…é‡ç»ƒ` : "å½“å‰æ²¡æœ‰å¾…å¤ä¹ é”™é¢˜"}</small></div>
+    </div>
+    <div class="task-card ${best >= 90 ? "done" : ""}">
+      <span>${best >= 90 ? "âœ“" : "3"}</span>
+      <div><strong>å†²åˆºä¼˜ç§€</strong><small>${best >= 90 ? `æœ€ä½³æˆç»© ${best} åˆ†` : `è·ç¦»ä¼˜ç§€è¿˜å·® ${Math.max(0, 90 - best)} åˆ†`}</small></div>
+    </div>
+  `;
+
+  const total = state.allQuestions.length;
+  const productTotal = state.allQuestions.filter((q) => PRODUCT_BANKS.includes(q.bank)).length;
+  const roleTotal = total - productTotal;
+  els.summaryCards.innerHTML = `
+    <div class="summary-card"><span>é¢˜åº“æ€»é‡</span><strong>${total}</strong><small>è¦†ç›–äº§å“ä¸å²—ä½</small></div>
+    <div class="summary-card"><span>äº§å“èµ„æ–™é¢˜</span><strong>${productTotal}</strong><small>äº§å“ / åœºæ™¯ / å“ç‰Œ / å•†å®¶ç¼–ç </small></div>
+    <div class="summary-card"><span>å²—ä½é¢˜</span><strong>${roleTotal}</strong><small>è¿è¥ / å®¢æœ / ç¾å·¥ç­‰</small></div>
+    <div class="summary-card"><span>æœ€è¿‘æˆç»©</span><strong>${last ? `${last.percent}åˆ†` : "--"}</strong><small>${last ? examTimeLabel(last.finishedAt) : "æš‚æ— è€ƒè¯•è®°å½•"}</small></div>
+  `;
+
+  const grouped = banks()
+    .filter((bank) => bank !== "å…¨éƒ¨é¢˜åº“")
+    .map((bank) => ({
+      bank,
+      count: state.allQuestions.filter((question) => question.bank === bank).length,
+      imageCount: state.allQuestions.filter((question) => question.bank === bank && (question.questionImage || question.optionAImage)).length,
+    }));
+
+  els.bankCards.innerHTML = grouped
+    .map(
+      (item) => `
+        <button class="bank-card" data-bank="${escapeHtml(item.bank)}">
+          <h4>${escapeHtml(item.bank)}</h4>
+          <p>${item.imageCount ? `${item.imageCount} é“å›¾ç‰‡é¢˜` : "å²—ä½ä¸çŸ¥è¯†ç‚¹ç»ƒä¹ "}</p>
+          <strong>${item.count}</strong>
+        </button>
+      `
+    )
+    .join("");
+
+  els.bankCards.querySelectorAll(".bank-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      clearAutoNextTimer();
+      state.currentBank = card.dataset.bank;
+      state.learnPage = 1;
+      els.bankSelect.value = state.currentBank;
+      switchView("learn");
+      renderAll();
+    });
+  });
+}
+
+function examTimeLabel(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function renderQuestionImages(question) {
+  if (!question.questionImage) return "";
+  return `<img class="thumb" src="${imagePath(question.questionImage)}" alt="é¢˜ç›®å›¾ç‰‡" loading="lazy" />`;
+}
+
+function renderOptionImages(question) {
+  const imageOptions = optionEntries(question).filter(([, , image]) => image);
+  if (!imageOptions.length) return "";
+  return `
+    <div class="learn-option-images">
+      ${imageOptions
+        .map(
+          ([letter, text, img, imageWidth]) => `
+            <figure>
+              <img src="${imagePath(img)}" alt="é€‰é¡¹${letter}å›¾ç‰‡" loading="lazy" ${imageWidth ? `style="max-width:${imageWidth}px"` : ""} />
+              <figcaption>${letter} ${escapeHtml(text)}</figcaption>
+            </figure>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderLearnFilter() {
+  const allBanks = banks().filter((b) => b !== "å…¨éƒ¨é¢˜åº“");
+  const productBankSet = new Set(PRODUCT_BANKS);
+  const productGroup = allBanks.filter((b) => productBankSet.has(b));
+  const roleGroup = allBanks.filter((b) => !productBankSet.has(b));
+
+  const makeBtn = (label, value) => {
+    const active = state.currentBank === value;
+    return `<button class="learn-filter-btn${active ? " active" : ""}" data-bank="${escapeHtml(value)}">${escapeHtml(label)}</button>`;
+  };
+
+  els.learnFilter.innerHTML = `
+    ${makeBtn("å…¨éƒ¨", "å…¨éƒ¨é¢˜åº“")}
+    <span class="filter-sep"></span>
+    ${productGroup.map((b) => makeBtn(b, b)).join("")}
+    <span class="filter-sep"></span>
+    ${roleGroup.map((b) => makeBtn(b, b)).join("")}
+  `;
+
+  els.learnFilter.querySelectorAll(".learn-filter-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      clearAutoNextTimer();
+      state.currentBank = btn.dataset.bank;
+      state.learnPage = 1;
+      els.bankSelect.value = state.currentBank;
+      renderAll();
+    });
+  });
+}
+
+function renderLearnList() {
+  const totalPages = Math.max(1, Math.ceil(state.filtered.length / state.learnPageSize));
+  state.learnPage = Math.min(state.learnPage, totalPages);
+  const start = (state.learnPage - 1) * state.learnPageSize;
+  const items = state.filtered.slice(start, start + state.learnPageSize);
+  els.learnCount.textContent = `${state.filtered.length} é“é¢˜`;
+  if (!items.length) {
+    els.learnList.innerHTML = `<div class="empty">æ²¡æœ‰æ‰¾åˆ°åŒ¹é…çš„é¢˜ç›®ã€‚</div>`;
+    els.learnPagination.innerHTML = "";
+    return;
+  }
+  els.learnList.innerHTML = items
+    .map(
+      (question) => `
+        <article class="learn-item">
+          <div>
+            <div class="meta">
+              <span>${escapeHtml(question.bank)}</span>
+              <span>${escapeHtml(question.type)}</span>
+              <span>${escapeHtml(question.difficulty)}</span>
+              <span>${escapeHtml(question.knowledgePoint)}</span>
+            </div>
+            <h4>${escapeHtml(question.question)}</h4>
+            <p class="answer-line">ç­”æ¡ˆï¼š${escapeHtml(question.answer)}ï½œ${escapeHtml(displayAnswerText(question))}</p>
+            <p class="explain">${escapeHtml(displayExplanation(question))}</p>
+            ${renderOptionImages(question)}
+          </div>
+          ${renderQuestionImages(question)}
+        </article>
+      `
+    )
+    .join("");
+  els.learnPagination.innerHTML = `
+    <button class="secondary-btn" data-page="prev" ${state.learnPage <= 1 ? "disabled" : ""}>ä¸Šä¸€é¡µ</button>
+    <span>ç¬¬ ${state.learnPage} / ${totalPages} é¡µ</span>
+    <button class="secondary-btn" data-page="next" ${state.learnPage >= totalPages ? "disabled" : ""}>ä¸‹ä¸€é¡µ</button>
+  `;
+  els.learnPagination.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.learnPage += button.dataset.page === "next" ? 1 : -1;
+      renderLearnList();
+      document.querySelector("#learnView")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+}
+
+const PRODUCT_BANKS = ["æœˆé¥¼é¢˜åº“", "æ—¥å¸¸å¹´è´§é¢˜åº“", "ä¸šåŠ¡åœºæ™¯é¢˜åº“", "å“ç‰ŒçŸ¥è¯†é¢˜åº“", "å•†å®¶ç¼–ç é¢˜åº“"];
+const CORE_EXAM_BANKS = ["æœˆé¥¼é¢˜åº“", "æ—¥å¸¸å¹´è´§é¢˜åº“", "ä¸šåŠ¡åœºæ™¯é¢˜åº“"];
+
+let timerInterval = null;
+let timerSeconds = 0;
+let timerLimitSeconds = 0;
+let timerExpired = false;
+
+function formatTime(s) {
+  const m = Math.floor(s / 60).toString().padStart(2, "0");
+  const sec = (s % 60).toString().padStart(2, "0");
+  return `${m}:${sec}`;
+}
+
+function quizTimeLimit(size) {
+  // 50é¢˜=20åˆ†é’Ÿï¼ŒæŒ‰æ¯”ä¾‹ç»™æ—¶é—´ï¼šæ¯é¢˜24ç§’ï¼›10é¢˜=4åˆ†é’Ÿã€‚
+  return Math.max(60, Math.round(size * 24));
+}
+
+function updateTimerText() {
+  const remaining = Math.max(0, timerLimitSeconds - timerSeconds);
+  els.quizTimer.textContent = `â³ å‰©ä½™ ${formatTime(remaining)}`;
+}
+
+function startTimer(limitSeconds) {
+  clearInterval(timerInterval);
+  timerSeconds = 0;
+  timerExpired = false;
+  timerLimitSeconds = limitSeconds || quizTimeLimit(state.quiz.length || EXAM_SIZE);
+  updateTimerText();
+  timerInterval = setInterval(() => {
+    timerSeconds += 1;
+    updateTimerText();
+    if (timerSeconds >= timerLimitSeconds) {
+      timerExpired = true;
+      finishQuiz();
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+function updateWrongCount() {
+  if (state.examType === "formal" && !state.examFinished) {
+    els.quizWrongCount.textContent = "æ­£å¼æ¨¡å¼ä¸æ˜¾ç¤ºå¯¹é”™";
+    els.quizWrongCount.classList.remove("has-wrong");
+    return;
+  }
+  els.quizWrongCount.textContent = `âœ— é”™è¯¯ ${state.quizWrong} é¢˜`;
+  els.quizWrongCount.classList.toggle("has-wrong", state.quizWrong > 0);
+}
+const EXAM_SIZE = 50;
+
+function setExamLocked(locked) {
+  document.body.classList.toggle("exam-locked", locked);
+  els.navTabs.forEach((tab) => { tab.disabled = locked; });
+  [els.bankSelect, els.searchInput, els.resetBtn, els.logoutBtn].forEach((control) => {
+    if (control) control.disabled = locked;
+  });
+}
+
+function renderQuizSetup() {
+  const productBanks = PRODUCT_BANKS.filter((bank) =>
+    state.allQuestions.some((q) => q.bank === bank)
+  );
+  const roleBanks = banks().filter(
+    (bank) => bank !== "å…¨éƒ¨é¢˜åº“" && !PRODUCT_BANKS.includes(bank)
+  );
+
+  els.productBankSelect.innerHTML = productBanks
+    .map((bank) => {
+      const count = state.allQuestions.filter((q) => q.bank === bank).length;
+      return `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}ï¼ˆ${count} é¢˜ï¼‰</option>`;
+    })
+    .join("");
+
+  els.roleBankSelect.innerHTML = roleBanks
+    .map((bank) => {
+      const count = state.allQuestions.filter((q) => q.bank === bank).length;
+      return `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}ï¼ˆ${count} é¢˜ï¼‰</option>`;
+    })
+    .join("");
+}
+
+async function startQuiz() {
+  clearAutoNextTimer();
+  const size = Number(els.quizSize.value) || EXAM_SIZE;
+  state.examType = els.examType?.value || "practice";
+  state.examLabelOverride = "";
+  state.examId = "";
+  state.examSessionToken = "";
+  state.submissionId = "";
+  state.serverRecordId = "";
+  state.serverDuration = null;
+  state.examSubmitting = false;
+  state.answers = new Map();
+  let pool = [];
+  if (state.examType === "formal") {
+    const allowedModes = ["random", "product", "role"];
+    const mode = allowedModes.includes(state.quizMode) ? state.quizMode : "random";
+    let bank = "";
+    if (mode === "product") bank = els.productBankSelect.value;
+    if (mode === "role") bank = els.roleBankSelect.value;
+    try {
+      const data = await cloudRequest("exam-start", { mode, bank, size });
+      if (!data.sessionToken || !data.examId || !Array.isArray(data.questions) || !data.questions.length) {
+        throw new Error("æœåŠ¡å™¨æœªè¿”å›æœ‰æ•ˆè€ƒè¯•é¢˜ç›®");
+      }
+      state.examId = data.examId;
+      state.examSessionToken = data.sessionToken;
+      state.submissionId = crypto.randomUUID();
+      state.quiz = data.questions;
+      state.examLabelOverride = data.bank || bank || "ç»¼åˆäº§å“é¢˜åº“";
+    } catch (error) {
+      els.quizSetupStatus.textContent = `æ­£å¼è€ƒè¯•å¯åŠ¨å¤±è´¥ï¼š${error.message}`;
+      return;
+    }
+  } else {
+    // ç»ƒä¹ æ¨¡å¼ä¹Ÿåªä»è€ƒè¯•æ§ä»¶é€‰æ‹©çš„é¢˜åº“å–é¢˜ï¼Œä¸å—æœç´¢æ¡†å’Œå·¦ä¾§å­¦ä¹ ç­›é€‰å½±å“ã€‚
+    if (state.quizMode === "product") {
+      const bank = els.productBankSelect.value;
+      pool = state.allQuestions.filter((q) => q.bank === bank);
+      state.examLabelOverride = bank;
+    } else if (state.quizMode === "role") {
+      const bank = els.roleBankSelect.value;
+      pool = state.allQuestions.filter((q) => q.bank === bank && (q.role === state.currentUser?.role || q.role === "å…¨å‘˜"));
+      state.examLabelOverride = bank;
+    } else {
+      pool = state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank));
+      state.examLabelOverride = "ç»¼åˆäº§å“é¢˜åº“";
+    }
+    state.quiz = shuffle(pool).slice(0, Math.min(size, pool.length));
+  }
+  if (!state.quiz.length) {
+    els.quizSetupStatus.textContent = "å½“å‰ç­›é€‰æ²¡æœ‰å¯ç”¨äºè€ƒæ ¸çš„é¢˜ç›®ï¼Œè¯·è°ƒæ•´æœç´¢æˆ–é¢˜åº“ç­›é€‰ã€‚";
+    return;
+  }
+  els.quizSetupStatus.textContent = state.quiz.length < size
+    ? `å½“å‰é¢˜åº“åªæœ‰ ${state.quiz.length} é¢˜ï¼Œæœ¬æ¬¡å°†å…¨éƒ¨ä½¿ç”¨ã€‚`
+    : "";
+  state.quizIndex = 0;
+  state.score = 0;
+  state.answered = false;
+  state.answeredCount = 0;
+  state.answeredQuestionIds = new Set();
+  state.quizWrong = 0;
+  state.wrongDetails = [];
+  state.examFinished = false;
+  if (els.examSubmitStatus) els.examSubmitStatus.textContent = "";
+  if (els.retryExamSubmitBtn) els.retryExamSubmitBtn.classList.add("hidden");
+  setExamLocked(state.examType === "formal");
+  startTimer(quizTimeLimit(state.quiz.length));
+  updateWrongCount();
+  els.quizSetup.classList.add("hidden");
+  els.quizResult.classList.add("hidden");
+  els.quizRunner.classList.remove("hidden");
+  renderQuizCard();
+}
+
+function goToNextQuestion() {
+  clearAutoNextTimer();
+  if (state.quizIndex + 1 >= state.quiz.length) {
+    finishQuiz();
+    return;
+  }
+  state.quizIndex += 1;
+  state.answered = false;
+  renderQuizCard();
+  renderStats();
+  requestAnimationFrame(() => {
+    els.quizCard?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  });
+}
+
+function scheduleAutoNext() {
+  clearAutoNextTimer();
+  const delay = state.examType === "formal" ? FORMAL_AUTO_NEXT_DELAY_MS : PRACTICE_AUTO_NEXT_DELAY_MS;
+  autoNextTimer = setTimeout(goToNextQuestion, delay);
+}
+
+function renderQuizCard() {
+  const question = state.quiz[state.quizIndex];
+  if (!question) {
+    finishQuiz();
+    return;
+  }
+  const progress = ((state.quizIndex + 1) / state.quiz.length) * 100;
+  els.quizStep.textContent = `ç¬¬ ${state.quizIndex + 1} é¢˜`;
+  els.quizScore.textContent = state.examType === "formal"
+    ? `å·²ç­” ${state.answeredCount} é¢˜`
+    : `ç­”å¯¹ ${state.score} é¢˜`;
+  els.progressBar.style.width = `${progress}%`;
+  const options = optionEntries(question);
+  els.quizCard.innerHTML = `
+    <div class="meta">
+      <span>${escapeHtml(question.bank)}</span>
+      <span>${escapeHtml(question.type)}</span>
+      <span>${escapeHtml(question.knowledgePoint)}</span>
+    </div>
+    <h3>${escapeHtml(question.question)}</h3>
+    ${question.questionImage ? (() => {
+      const sourceWidth = Math.max(120, Number(question.questionImageWidth) || 520);
+      return `<div class="quiz-img-wrap" style="width:min(${sourceWidth}px, 100%)">
+        <img src="${imagePath(question.questionImage)}" alt="é¢˜ç›®å›¾ç‰‡" />
+      </div>`;
+    })() : ""}
+    <div class="options">
+      ${options
+        .map(
+          ([letter, text, img, imageWidth]) => `
+            <button class="option-btn" data-letter="${letter}">
+              <strong>${letter}</strong>${escapeHtml(stripCodeFromOption(text, question))}
+              ${img ? (() => {
+                return `<div class="quiz-opt-img" ${imageWidth ? `style="max-width:${Math.max(120, imageWidth)}px"` : ""}>
+                  <img src="${imagePath(img)}" alt="é€‰é¡¹${letter}å›¾ç‰‡" />
+                </div>`;
+              })() : ""}
+            </button>
+          `
+        )
+        .join("")}
+    </div>
+    <div id="feedback" class="feedback hidden"></div>
+  `;
+  els.quizCard.querySelectorAll(".option-btn").forEach((button) => {
+    button.addEventListener("click", () => chooseAnswer(button.dataset.letter));
+  });
+}
+
+function chooseAnswer(letter) {
+  if (state.answered) return;
+  state.answered = true;
+  const question = state.quiz[state.quizIndex];
+  state.answeredCount += 1;
+  state.answeredQuestionIds.add(question.id);
+  const correct = state.examType === "formal" ? null : isEquivalentAnswer(question, letter);
+  if (state.examType === "formal") state.answers.set(question.id, letter);
+  storage.attempts += 1;
+  if (correct === true) {
+    storage.correct += 1;
+    state.score += 1;
+  } else if (correct === false) {
+    state.quizWrong += 1;
+    state.wrongDetails.push({ ...question, selected: letter, savedAt: new Date().toISOString() });
+    if (state.examType === "practice") updateWrongCount();
+  }
+  els.quizScore.textContent = state.examType === "formal"
+    ? `å·²ç­” ${state.answeredCount} é¢˜`
+    : `ç­”å¯¹ ${state.score} é¢˜`;
+  els.quizCard.querySelectorAll(".option-btn").forEach((button) => {
+    button.disabled = true;
+    if (state.examType === "practice" && button.dataset.letter === question.answer) button.classList.add("correct");
+    if (state.examType === "practice" && button.dataset.letter === letter && !correct) button.classList.add("wrong");
+    if (state.examType === "formal" && button.dataset.letter === letter) button.classList.add("selected");
+  });
+  const feedback = document.querySelector("#feedback");
+  feedback.classList.remove("hidden");
+  const isLast = state.quizIndex + 1 >= state.quiz.length;
+  feedback.innerHTML = state.examType === "formal" ? `
+    <strong>å·²ä½œç­”</strong>
+    <p class="explain">${isLast ? "æ­£åœ¨æäº¤è¯•å·â€¦" : "å³å°†è¿›å…¥ä¸‹ä¸€é¢˜â€¦"}</p>
+  ` : `
+    <strong>${correct ? "å›ç­”æ­£ç¡®" : "å›ç­”é”™è¯¯"}</strong>
+    <p class="explain">æ­£ç¡®ç­”æ¡ˆï¼š${escapeHtml(question.answer)}ï½œ${escapeHtml(displayAnswerText(question))}</p>
+    <p class="explain">${escapeHtml(displayExplanation(question))}</p>
+    <p class="auto-next-hint">${isLast ? "å³å°†æ˜¾ç¤ºæˆç»©â€¦" : "å³å°†è¿›å…¥ä¸‹ä¸€é¢˜â€¦"}</p>
+  `;
+  scheduleAutoNext();
+}
+
+function saveMistake(question, selected) {
+  const key = questionIdentity(question);
+  const mistakes = storage.mistakes.filter((item) => questionIdentity(item) !== key);
+  const item = { ...question, selected, savedAt: new Date().toISOString() };
+  mistakes.unshift(item);
+  storage.mistakes = mistakes.slice(0, 300);
+}
+
+async function submitFormalExam() {
+  const data = await cloudRequest("exam-submit", {
+    sessionToken: state.examSessionToken,
+    submissionId: state.submissionId,
+    answers: [...state.answers.entries()].map(([id, answer]) => ({ id, answer })),
+  });
+  if (!data.record_id) throw new Error("æœåŠ¡å™¨æœªè¿”å›æ­£å¼è€ƒè¯•è®°å½•ID");
+  state.score = Number(data.correct || 0);
+  state.quizWrong = Number(data.wrong || 0);
+  state.serverRecordId = data.record_id;
+  state.serverDuration = Number.isFinite(Number(data.duration)) ? Number(data.duration) : null;
+  state.wrongDetails = Array.isArray(data.wrong_details) ? data.wrong_details : [];
+  state.wrongDetails.forEach((item) => saveMistake(item, item.selected || "æœªä½œç­”"));
+  return data;
+}
+
+async function finishQuiz() {
+  if (state.examFinished || !state.quiz.length) return;
+  if (state.examType === "formal" && state.examSubmitting) return;
+  clearAutoNextTimer();
+  stopTimer();
+  if (state.examType === "formal") {
+    state.examSubmitting = true;
+    document.body.classList.add("exam-submitting");
+    try {
+      await submitFormalExam();
+    } catch (error) {
+      state.examFinished = false;
+      setExamLocked(true);
+      if (els.examSubmitStatus) {
+        els.examSubmitStatus.textContent = `æˆç»©æäº¤å¤±è´¥ï¼š${error.message}`;
+        els.retryExamSubmitBtn.classList.remove("hidden");
+      }
+      return;
+    } finally {
+      state.examSubmitting = false;
+      document.body.classList.remove("exam-submitting");
+    }
+  } else {
+    const unansweredQuestions = state.quiz.filter((question) => !state.answeredQuestionIds.has(question.id));
+    if (unansweredQuestions.length) {
+      storage.attempts += unansweredQuestions.length;
+      unansweredQuestions.forEach((question) => {
+        state.wrongDetails.push({ ...question, selected: "æœªä½œç­”", savedAt: new Date().toISOString() });
+        saveMistake(question, "æœªä½œç­”");
+      });
+      state.quizWrong += unansweredQuestions.length;
+    }
+    if (state.wrongDetails.length) {
+      await syncLater("mistakes", { user: state.currentUser, items: state.wrongDetails, submissionId: crypto.randomUUID() });
+    }
+  }
+  state.examFinished = true;
+  setExamLocked(false);
+  if (els.examSubmitStatus) els.examSubmitStatus.textContent = "";
+  if (els.retryExamSubmitBtn) els.retryExamSubmitBtn.classList.add("hidden");
+  updateWrongCount();
+  const percent = state.quiz.length ? Math.round((state.score / state.quiz.length) * 100) : 0;
+  const timeStr = formatTime(state.serverDuration ?? timerSeconds);
+  saveExamRecord(percent);
+  els.quizRunner.classList.add("hidden");
+  els.quizResult.classList.remove("hidden");
+  const wrongReview = state.wrongDetails.length ? `
+    <div class="wrong-review">
+      <h4>æœ¬æ¬¡é”™é¢˜è§£æ</h4>
+      ${state.wrongDetails.slice(0, 8).map((q, i) => `
+        <div class="wrong-review-item">
+          <strong>${i + 1}. ${escapeHtml(q.question)}</strong>
+          <p>é”™é€‰ï¼š${escapeHtml(q.selected)}ï½œæ­£ç¡®ï¼š${escapeHtml(q.answer)} ${escapeHtml(displayAnswerText(q))}</p>
+          <small>${escapeHtml(displayExplanation(q))}</small>
+        </div>
+      `).join("")}
+      ${state.wrongDetails.length > 8 ? `<p class="explain">æ›´å¤šé”™é¢˜å·²è¿›å…¥é”™é¢˜æœ¬ã€‚</p>` : ""}
+    </div>
+  ` : "";
+  els.quizResult.innerHTML = `
+    <p class="eyebrow">Result Â· ${escapeHtml(examLabel())} Â· ${state.examType === "formal" ? "æ­£å¼è€ƒè¯•" : "ç»ƒä¹ æ¨¡å¼"}</p>
+    <h3>${percent} åˆ†</h3>
+    ${timerExpired ? `<p class="explain result-wrong">æ—¶é—´åˆ°ï¼Œå·²è‡ªåŠ¨äº¤å·ã€‚</p>` : ""}
+    <div class="result-meta">
+      <span>âœ“ ç­”å¯¹ ${state.score} é¢˜</span>
+      <span class="${state.quizWrong > 0 ? "result-wrong" : ""}">âœ— ç­”é”™ ${state.quizWrong} é¢˜</span>
+      <span>â± ç”¨æ—¶ ${timeStr}</span>
+      <span>${percent >= 80 ? "å·²é€šè¿‡" : "æœªé€šè¿‡"}</span>
+    </div>
+    <p class="explain">${percent >= 90 ? "è¡¨ç°å¾ˆç¨³ï¼Œå¯ä»¥è¿›å…¥ä¸‹ä¸€ç»„é¢˜åº“ã€‚" : percent >= 80 ? "å·²è¾¾åˆ°åˆæ ¼çº¿ï¼Œå»ºè®®ç»§ç»­é‡ç»ƒé”™é¢˜å†²åˆºä¼˜ç§€ã€‚" : "å»ºè®®å…ˆå¤ä¹ é”™é¢˜ï¼Œå†é‡æ–°è€ƒä¸€æ¬¡ã€‚"}</p>
+    ${wrongReview}
+    <div class="result-actions">
+      <button class="primary-btn" id="retryQuizBtn">é‡æ–°è€ƒæ ¸</button>
+      <button class="secondary-btn" id="reviewMistakesBtn">æŸ¥çœ‹é”™é¢˜</button>
+    </div>
+  `;
+  document.querySelector("#retryQuizBtn").addEventListener("click", startQuiz);
+  document.querySelector("#reviewMistakesBtn").addEventListener("click", () => switchView("mistakes"));
+  renderStats();
+}
+
+function examLabel() {
+  if (state.examLabelOverride) return state.examLabelOverride;
+  if (state.quizMode === "product") return els.productBankSelect.value;
+  if (state.quizMode === "role") return els.roleBankSelect.value;
+  return "ç»¼åˆäº§å“é¢˜åº“";
+}
+
+function saveExamRecord(percent) {
+  const records = storage.examRecords;
+  records.unshift({
+    user: state.currentUser,
+    bank: examLabel(),
+    type: state.examType === "formal" ? "æ­£å¼è€ƒè¯•" : "ç»ƒä¹ æ¨¡å¼",
+    score: state.score,
+    total: state.quiz.length,
+    wrong: state.quizWrong,
+    percent,
+    passed: percent >= 80,
+    duration: timerSeconds,
+    finishedAt: new Date().toISOString(),
+    buildVersion: BUILD_VERSION,
+    serverRecordId: state.serverRecordId || "",
+    wrongDetails: state.wrongDetails.slice(0, 30),
+  });
+  storage.examRecords = records.slice(0, 100);
+}
+
+function renderMistakes() {
+  const mistakes = storage.mistakes;
+  els.retryMistakesBtn.disabled = !mistakes.length;
+  if (!mistakes.length) {
+    els.mistakeList.innerHTML = `<div class="empty">ç°åœ¨è¿˜æ²¡æœ‰é”™é¢˜è®°å½•ã€‚</div>`;
+    return;
+  }
+  const grouped = mistakes.reduce((acc, q) => {
+    const key = q.knowledgePoint || "å…¶ä»–";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const topTags = Object.entries(grouped).sort((a, b) => b[1] - a[1]).slice(0, 6)
+    .map(([name, count]) => `<span class="pill">${escapeHtml(name)} ${count}</span>`).join("");
+  els.mistakeList.innerHTML = `
+    <div class="mistake-summary">
+      <strong>å¾…å¤ä¹  ${mistakes.length} é“</strong>
+      <div>${topTags}</div>
+    </div>
+    ${mistakes
+      .map(
+        (question) => `
+          <article class="learn-item">
+            <div>
+              <div class="meta">
+                <span>${escapeHtml(question.bank)}</span>
+                <span>${escapeHtml(question.knowledgePoint)}</span>
+                <span>é”™é€‰ï¼š${escapeHtml(question.selected)}</span>
+              </div>
+              <h4>${escapeHtml(question.question)}</h4>
+              <p class="answer-line">æ­£ç¡®ç­”æ¡ˆï¼š${escapeHtml(question.answer)}ï½œ${escapeHtml(displayAnswerText(question))}</p>
+              <p class="explain">${escapeHtml(displayExplanation(question))}</p>
+              ${renderOptionImages(question)}
+            </div>
+            ${renderQuestionImages(question)}
+          </article>
+        `
+      )
+      .join("")}
+  `;
+}
+
+function startMistakeQuiz() {
+  clearAutoNextTimer();
+  const mistakes = storage.mistakes;
+  if (!mistakes.length) return;
+  state.quiz = shuffle(mistakes).slice(0, Math.min(30, mistakes.length));
+  state.quizIndex = 0;
+  state.score = 0;
+  state.answered = false;
+  state.answeredCount = 0;
+  state.answeredQuestionIds = new Set();
+  state.quizWrong = 0;
+  state.wrongDetails = [];
+  state.examType = "practice";
+  state.examFinished = false;
+  state.examSubmitting = false;
+  state.examLabelOverride = "é”™é¢˜é‡ç»ƒ";
+  startTimer(quizTimeLimit(state.quiz.length));
+  updateWrongCount();
+  switchView("quiz");
+  els.quizSetup.classList.add("hidden");
+  els.quizResult.classList.add("hidden");
+  els.quizRunner.classList.remove("hidden");
+  renderQuizCard();
+}
+
+let rankSortMode = "score";
+
+function renderRanking() {
+  const listEl = document.querySelector("#rankingList");
+  if (!listEl) return;
+
+  const allUsers = userStore.users;
+  const rows = Object.values(allUsers).map((user) => {
+    const records = JSON.parse(
+      localStorage.getItem(`jz_${user.phone}_exam_records`) || "[]"
+    );
+    if (!records.length) return null;
+    const best = records.reduce((a, b) => {
+      if (b.percent > a.percent) return b;
+      if (b.percent === a.percent && (b.duration ?? 99999) < (a.duration ?? 99999)) return b;
+      return a;
+    });
+    return { user, best, totalExams: records.length };
+  }).filter(Boolean);
+
+  if (rankSortMode === "time") {
+    rows.sort((a, b) => {
+      const ta = a.best.duration ?? 99999;
+      const tb = b.best.duration ?? 99999;
+      if (ta !== tb) return ta - tb;
+      return b.best.percent - a.best.percent;
+    });
+  } else {
+    rows.sort((a, b) => {
+      if (b.best.percent !== a.best.percent) return b.best.percent - a.best.percent;
+      return (a.best.duration ?? 99999) - (b.best.duration ?? 99999);
+    });
+  }
+
+  if (!rows.length) {
+    listEl.innerHTML = `<div class="empty">è¿˜æ²¡æœ‰è€ƒæ ¸è®°å½•ï¼Œå®Œæˆä¸€æ¬¡è€ƒæ ¸åå³å¯ä¸Šæ¦œã€‚</div>`;
+    return;
+  }
+
+  const medalClass = (i) => (i === 0 ? " rank-gold" : i === 1 ? " rank-silver" : i === 2 ? " rank-bronze" : "");
+  const medalLabel = (i) => (i === 0 ? "ğŸ¥‡" : i === 1 ? "ğŸ¥ˆ" : i === 2 ? "ğŸ¥‰" : String(i + 1));
+
+  listEl.innerHTML = rows.map(({ user, best, totalExams }, i) => `
+    <div class="rank-row${i < 3 ? " rank-top" : ""}">
+      <div class="rank-num${medalClass(i)}">${medalLabel(i)}</div>
+      <div class="rank-info">
+        <strong>${escapeHtml(user.name)}</strong>
+        <span>${escapeHtml(user.role)} Â· è€ƒæ ¸ ${totalExams} æ¬¡</span>
+      </div>
+      <div class="rank-mid">
+        <span class="rank-bank">${escapeHtml(best.bank || "")}</span>
+        <span class="rank-detail-time">${best.duration != null ? "â± " + formatTime(best.duration) : ""}</span>
+      </div>
+      <div class="rank-score${best.percent >= 90 ? " rank-score-high" : ""}">${best.percent}<small>åˆ†</small></div>
+    </div>
+  `).join("");
+
+  document.querySelectorAll(".rank-sort-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.sort === rankSortMode);
+    btn.onclick = () => {
+      rankSortMode = btn.dataset.sort;
+      renderRanking();
+    };
+  });
+}
+
+function renderAdmin() {
+  if (!isAdminUser()) {
+    els.adminDataWarning?.classList.add("hidden");
+    els.adminMetrics.innerHTML = `<div class="empty">æ— æƒé™è®¿é—®ç®¡ç†çœ‹æ¿ã€‚</div>`;
+    els.adminUserTable.innerHTML = "";
+    els.adminWeakList.innerHTML = "";
+    return;
+  }
+  const cloud = state.cloudStats;
+  const errors = Array.isArray(cloud?.errors) ? cloud.errors : [];
+  if (els.adminDataWarning) {
+    els.adminDataWarning.classList.toggle("hidden", !errors.length);
+    els.adminDataWarning.textContent = errors.length
+      ? "éƒ¨åˆ†é£ä¹¦æ•°æ®è¯»å–å¤±è´¥ï¼Œæœ¬é¡µç»Ÿè®¡å¯èƒ½ä¸å®Œæ•´ï¼Œè¯·å‹¿ç›´æ¥ç”¨äºè€ƒæ ¸ç»“è®ºã€‚"
+      : "";
+  }
+  const users = cloud?.employees?.length
+    ? cloud.employees.map((u) => ({ name: u["å§“å"], phone: u["æ‰‹æœºå·"], role: u["å²—ä½"] }))
+    : Object.values(userStore.users);
+  const rows = users.map((user) => {
+    const records = cloud?.exams?.length
+      ? cloud.exams.filter((r) => String(r["æ‰‹æœºå·"]) === String(user.phone) && String(r["è€ƒæ ¸ç±»å‹"] || "") === "æ­£å¼è€ƒè¯•").map((r) => ({
+          percent: Number(r["åˆ†æ•°"] || 0), score: Number(r["ç­”å¯¹æ•°"] || 0), total: Number(r["æ€»é¢˜æ•°"] || 0),
+          wrong: Number(r["ç­”é”™æ•°"] || 0), duration: Number(r["ç”¨æ—¶ç§’æ•°"] || 0), bank: r["é¢˜åº“"], type: r["è€ƒæ ¸ç±»å‹"], finishedAt: r["æäº¤æ—¶é—´"],
+        })).sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime())
+      : getUserRecords(user.phone).filter((r) => r.type === "æ­£å¼è€ƒè¯•");
+    records.sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime());
+    const mistakes = cloud?.mistakes?.length
+      ? cloud.mistakes.filter((r) => String(r["æ‰‹æœºå·"]) === String(user.phone)).map((r) => ({ knowledgePoint: r["çŸ¥è¯†ç‚¹"], bank: r["é¢˜åº“"] }))
+      : getUserMistakes(user.phone);
+    const best = records.reduce((acc, record) => (Number(record.percent) > Number(acc?.percent || -1) ? record : acc), null);
+    const latest = records[0];
+    return { user, records, mistakes, best, latest };
+  });
+  const allRecords = rows.flatMap((row) => row.records.map((record) => ({ ...record, user: row.user })));
+  const practiceCount = cloud?.exams?.length
+    ? cloud.exams.filter((r) => String(r["è€ƒæ ¸ç±»å‹"] || "") === "ç»ƒä¹ æ¨¡å¼").length
+    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone)).filter((r) => r.type === "ç»ƒä¹ æ¨¡å¼").length;
+  const avg = allRecords.length ? Math.round(allRecords.reduce((sum, r) => sum + Number(r.percent || 0), 0) / allRecords.length) : 0;
+  const passed = allRecords.filter((r) => Number(r.percent) >= 80).length;
+  const passRate = allRecords.length ? Math.round((passed / allRecords.length) * 100) : 0;
+  const notExam = rows.filter((row) => !row.records.length).length;
+
+  els.adminMetrics.innerHTML = `
+    <div class="summary-card"><span>å‘˜å·¥æ•°</span><strong>${users.length}</strong><small>${cloud?.employees?.length ? "é£ä¹¦äº‘ç«¯æ•°æ®" : "æœ¬æœºå·²ç™»å½•è´¦å·"}</small></div>
+    <div class="summary-card"><span>æ­£å¼è€ƒè¯•æ¬¡æ•°</span><strong>${allRecords.length}</strong><small>ä»…ç”¨äºå‘˜å·¥è€ƒæ ¸</small></div>
+    <div class="summary-card"><span>æ­£å¼è€ƒè¯•å¹³å‡åˆ†</span><strong>${avg}</strong><small>ç»ƒä¹ æ•°æ®ä¸è®¡å…¥</small></div>
+    <div class="summary-card"><span>æ­£å¼è€ƒè¯•é€šè¿‡ç‡</span><strong>${passRate}%</strong><small>ç»ƒä¹ æ¬¡æ•° ${practiceCount}ï¼Œæœªè€ƒ ${notExam} äºº</small></div>
+  `;
+
+  els.adminUserTable.innerHTML = rows.length ? `
+    <table>
+      <thead><tr><th>å§“å</th><th>å²—ä½</th><th>æ¬¡æ•°</th><th>æœ€ä½³</th><th>æœ€è¿‘</th><th>é”™é¢˜</th></tr></thead>
+      <tbody>
+        ${rows.map(({ user, records, mistakes, best, latest }) => `
+          <tr>
+            <td>${escapeHtml(user.name)}</td>
+            <td>${escapeHtml(user.role)}</td>
+            <td>${records.length}</td>
+            <td>${best ? `${best.percent}åˆ†` : "æœªè€ƒ"}</td>
+            <td>${latest ? `${latest.percent}åˆ† Â· ${examTimeLabel(latest.finishedAt)}` : "--"}</td>
+            <td>${mistakes.length}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  ` : `<div class="empty">æš‚æ— å‘˜å·¥è®°å½•ã€‚</div>`;
+
+  const allMistakes = rows.flatMap((row) => row.mistakes);
+  const weak = allMistakes.reduce((acc, q) => {
+    const key = q.knowledgePoint || q.bank || "å…¶ä»–";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const weakRows = Object.entries(weak).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  els.adminWeakList.innerHTML = weakRows.length ? `
+    <table><thead><tr><th>çŸ¥è¯†ç‚¹</th><th>é”™é¢˜æ•°</th></tr></thead><tbody>
+      ${weakRows.map(([name, count]) => `<tr><td>${escapeHtml(name)}</td><td>${count}</td></tr>`).join("")}
+    </tbody></table>
+  ` : `<div class="empty">æš‚æ— é”™é¢˜ç»Ÿè®¡ã€‚</div>`;
+}
+
+function exportRecords() {
+  const rows = state.cloudStats?.exams?.length
+    ? state.cloudStats.exams.map((r) => ({
+        å§“å: r["å§“å"], æ‰‹æœºå·: r["æ‰‹æœºå·"], å²—ä½: r["å²—ä½"], è€ƒè¯•åç§°: r["è€ƒè¯•åç§°"], è€ƒæ ¸ç±»å‹: r["è€ƒæ ¸ç±»å‹"], é¢˜åº“: r["é¢˜åº“"], åˆ†æ•°: r["åˆ†æ•°"], ç­”å¯¹æ•°: r["ç­”å¯¹æ•°"], æ€»é¢˜æ•°: r["æ€»é¢˜æ•°"], ç­”é”™æ•°: r["ç­”é”™æ•°"], æ˜¯å¦é€šè¿‡: r["æ˜¯å¦é€šè¿‡"], ç”¨æ—¶ç§’æ•°: r["ç”¨æ—¶ç§’æ•°"], æäº¤æ—¶é—´: r["æäº¤æ—¶é—´"], è€ƒè¯•ä¼šè¯ID: r["è€ƒè¯•ä¼šè¯ID"],
+      }))
+    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).map((record) => ({
+        å§“å: user.name,
+        æ‰‹æœºå·: user.phone,
+        å²—ä½: user.role,
+        è€ƒæ ¸ç±»å‹: record.type || "ç»ƒä¹ æ¨¡å¼",
+        é¢˜åº“: record.bank,
+        åˆ†æ•°: record.percent,
+        è€ƒè¯•åç§°: "é‡‘å°Šäº§å“çŸ¥è¯†åº“å­¦ä¹ è€ƒæ ¸",
+        ç­”å¯¹æ•°: record.score,
+        æ€»é¢˜æ•°: record.total,
+        ç­”é”™æ•°: record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
+        æ˜¯å¦é€šè¿‡: Number(record.percent) >= 80 ? "æ˜¯" : "å¦",
+        ç”¨æ—¶ç§’æ•°: record.duration,
+        æäº¤æ—¶é—´: record.finishedAt,
+      })));
+  downloadText(`é‡‘å°Šè€ƒè¯•è®°å½•_${todayKey()}.csv`, toCsv(["å§“å", "æ‰‹æœºå·", "å²—ä½", "è€ƒè¯•åç§°", "è€ƒæ ¸ç±»å‹", "é¢˜åº“", "åˆ†æ•°", "ç­”å¯¹æ•°", "æ€»é¢˜æ•°", "ç­”é”™æ•°", "æ˜¯å¦é€šè¿‡", "ç”¨æ—¶ç§’æ•°", "æäº¤æ—¶é—´", "è€ƒè¯•ä¼šè¯ID"], rows));
+}
+
+function exportMistakes() {
+  const rows = state.cloudStats?.mistakes?.length
+    ? state.cloudStats.mistakes.map((q) => ({
+        å§“å: q["å§“å"], æ‰‹æœºå·: q["æ‰‹æœºå·"], å²—ä½: q["å²—ä½"], é¢˜åº“: q["é¢˜åº“"], çŸ¥è¯†ç‚¹: q["çŸ¥è¯†ç‚¹"], é¢˜ç›®: q["é¢˜ç›®"], é”™é€‰: q["é”™é€‰"], æ­£ç¡®ç­”æ¡ˆ: q["æ­£ç¡®ç­”æ¡ˆ"], è§£æ: q["è§£æ"], è®°å½•æ—¶é—´: q["è®°å½•æ—¶é—´"],
+      }))
+    : Object.values(userStore.users).flatMap((user) => getUserMistakes(user.phone).map((q) => ({
+        å§“å: user.name,
+        æ‰‹æœºå·: user.phone,
+        å²—ä½: user.role,
+        é¢˜åº“: q.bank,
+        çŸ¥è¯†ç‚¹: q.knowledgePoint,
+        é¢˜ç›®: q.question,
+        é”™é€‰: q.selected,
+        æ­£ç¡®ç­”æ¡ˆ: `${q.answer} ${displayAnswerText(q)}`,
+        è§£æ: displayExplanation(q),
+        è®°å½•æ—¶é—´: q.savedAt,
+      })));
+  downloadText(`é‡‘å°Šé”™é¢˜è®°å½•_${todayKey()}.csv`, toCsv(["å§“å", "æ‰‹æœºå·", "å²—ä½", "é¢˜åº“", "çŸ¥è¯†ç‚¹", "é¢˜ç›®", "é”™é€‰", "æ­£ç¡®ç­”æ¡ˆ", "è§£æ", "è®°å½•æ—¶é—´"], rows));
+}
+
+function switchView(view) {
+  if (view !== "quiz") clearAutoNextTimer();
+  if (!state.examFinished && state.examType === "formal" && view !== "quiz") return;
+  if (view === "admin" && !isAdminUser()) {
+    view = "dashboard";
+  }
+  state.currentView = view;
+  els.navTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.view === view));
+  Object.entries(els.views).forEach(([name, element]) => element.classList.toggle("active", name === view));
+  els.pageTitle.textContent = pageTitles[view];
+  if (view === "quiz" && !state.quiz.length) {
+    els.quizSetup.classList.remove("hidden");
+    els.quizRunner.classList.add("hidden");
+    els.quizResult.classList.add("hidden");
+  }
+  if (view === "ranking") renderRanking();
+  if (view === "mistakes") renderMistakes();
+  if (view === "admin") {
+    loadCloudStats().then(renderAdmin);
+    renderAdmin();
+  }
+}
+
+function renderAll() {
+  renderStats();
+  renderDashboard();
+  renderLearnFilter();
+  renderLearnList();
+  renderMistakes();
+  renderAdmin();
+}
+
+function renderUser() {
+  applyAdminAccess();
+  if (!state.currentUser) {
+    els.userName.textContent = "æœªç™»å½•";
+    els.userMeta.textContent = "-";
+    return;
+  }
+  els.userName.textContent = state.currentUser.name;
+  els.userMeta.textContent = `${state.currentUser.role} Â· ${state.currentUser.phone}`;
+}
+
+function normalizePhone(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function loadCurrentUser() {
+  if (!localStorage.getItem("jz_auth_token")) {
+    state.currentUser = null;
+    return;
+  }
+  const phone = userStore.currentPhone;
+  const users = userStore.users;
+  state.currentUser = phone && users[phone] ? users[phone] : null;
+}
+
+function showAuth(visible) {
+  els.authView.classList.toggle("hidden", !visible);
+  document.body.classList.toggle("auth-locked", visible);
+}
+
+function switchAuthMode(mode) {
+  const isLogin = mode === "login";
+  const isRegister = mode === "register";
+  els.loginForm.classList.toggle("hidden", !isLogin);
+  els.registerForm.classList.toggle("hidden", !isRegister);
+  els.resetForm.classList.toggle("hidden", mode !== "reset");
+  els.showLoginTab.classList.toggle("active", isLogin);
+  els.showRegisterTab.classList.toggle("active", isRegister);
+  els.loginError.textContent = "";
+  els.registerError.textContent = "";
+  els.resetError.textContent = "";
+}
+
+function saveAuthenticatedUser(data) {
+  localStorage.setItem("jz_auth_token", data.token);
+  const user = {
+    id: data.user.id,
+    name: data.user.name,
+    phone: data.user.phone,
+    role: data.user.role,
+    isAdmin: data.user.isAdmin === true,
+    updatedAt: new Date().toISOString(),
+  };
+  const users = userStore.users;
+  users[user.phone] = user;
+  userStore.users = users;
+  userStore.currentPhone = user.phone;
+  state.currentUser = user;
+  reconcileStoredQuestions();
+  applyAdminAccess();
+}
+
+const passwordError = (password) => {
+  if (password.length < 8) return "å¯†ç ä¸èƒ½å°‘äº8ä½";
+  if (!/[A-Za-z]/.test(password)) return "å¯†ç å¿…é¡»åŒ…å«å­—æ¯";
+  if (!/\d/.test(password)) return "å¯†ç å¿…é¡»åŒ…å«æ•°å­—";
+  return "";
+};
+
+async function loginEmployee(event) {
+  event.preventDefault();
+  const account = els.loginAccount.value.trim();
+  const password = els.loginPassword.value;
+  els.loginError.textContent = "";
+  if (!account || !password) {
+    els.loginError.textContent = "è¯·è¾“å…¥å§“åæˆ–æ‰‹æœºå·å’Œå¯†ç ";
+    return;
+  }
+  const button = els.loginForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = "æ­£åœ¨ç™»å½•...";
+  try {
+    const data = await cloudRequest("login", { account, password, clientId: getClientId() });
+    if (!data.token || !data.user) throw new Error("è´¦å·æˆ–å¯†ç é”™è¯¯");
+    saveAuthenticatedUser(data);
+    els.loginPassword.value = "";
+    showAuth(false);
+    renderAll();
+  } catch (error) {
+    els.loginError.textContent = error.message || "è´¦å·æˆ–å¯†ç é”™è¯¯";
+  } finally {
+    button.disabled = false;
+    button.textContent = "ç™»å½•";
+  }
+}
+
+async function registerEmployee(event) {
+  event.preventDefault();
+  const name = els.registerName.value.trim();
+  const phone = normalizePhone(els.registerPhone.value);
+  const role = els.registerRole.value;
+  const password = els.registerPassword.value;
+  const confirm = els.registerPasswordConfirm.value;
+  const registerCode = els.registerCode.value.trim();
+  els.registerError.textContent = "";
+  if (!name) return void (els.registerError.textContent = "è¯·å¡«å†™çœŸå®å§“å");
+  if (!/^1\d{10}$/.test(phone)) return void (els.registerError.textContent = "è¯·è¾“å…¥æ­£ç¡®çš„11ä½æ‰‹æœºå·");
+  if (!role) return void (els.registerError.textContent = "è¯·é€‰æ‹©å²—ä½");
+  const error = passwordError(password);
+  if (error) return void (els.registerError.textContent = error);
+  if (password !== confirm) return void (els.registerError.textContent = "ä¸¤æ¬¡è¾“å…¥çš„å¯†ç ä¸ä¸€è‡´");
+  if (!registerCode) return void (els.registerError.textContent = "è¯·è¾“å…¥å…¬å¸æ³¨å†Œå£ä»¤");
+  const button = els.registerForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = "æ­£åœ¨æ³¨å†Œ...";
+  try {
+    const data = await cloudRequest("register", { name, phone, role, password, registerCode, clientId: getClientId() });
+    if (!data.token || !data.user) throw new Error("æ³¨å†Œå¤±è´¥");
+    saveAuthenticatedUser(data);
+    els.registerForm.reset();
+    showAuth(false);
+    renderAll();
+  } catch (requestError) {
+    const message = requestError.message || "æ³¨å†Œå¤±è´¥ï¼Œè¯·ç¨åé‡è¯•";
+    els.registerError.textContent = message.includes("å·²ç»æ³¨å†Œ")
+      ? `${message}ï¼Œè¯·åˆ‡æ¢åˆ°â€œå‘˜å·¥ç™»å½•â€`
+      : message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "æ³¨å†Œå¹¶è¿›å…¥å­¦ä¹ ";
+  }
+}
+
+async function resetPassword(event) {
+  event.preventDefault();
+  const name = els.resetName.value.trim();
+  const phone = normalizePhone(els.resetPhone.value);
+  const role = els.resetRole.value;
+  const password = els.resetPassword.value;
+  const confirm = els.resetPasswordConfirm.value;
+  const registerCode = els.resetCode.value.trim();
+  els.resetError.textContent = "";
+  if (!name) return void (els.resetError.textContent = "è¯·è¾“å…¥çœŸå®å§“å");
+  if (!/^1\d{10}$/.test(phone)) return void (els.resetError.textContent = "è¯·è¾“å…¥æ­£ç¡®çš„11ä½æ‰‹æœºå·");
+  if (!role) return void (els.resetError.textContent = "è¯·é€‰æ‹©å²—ä½");
+  const error = passwordError(password);
+  if (error) return void (els.resetError.textContent = error);
+  if (password !== confirm) return void (els.resetError.textContent = "ä¸¤æ¬¡è¾“å…¥çš„å¯†ç ä¸ä¸€è‡´");
+  if (!registerCode) return void (els.resetError.textContent = "è¯·è¾“å…¥å…¬å¸æ³¨å†Œå£ä»¤");
+  const button = els.resetForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = "æ­£åœ¨é‡ç½®...";
+  try {
+    const data = await cloudRequest("reset", { name, phone, role, password, registerCode, clientId: getClientId() });
+    if (!data.token || !data.user) throw new Error("å¯†ç é‡ç½®å¤±è´¥");
+    saveAuthenticatedUser(data);
+    els.resetForm.reset();
+    showAuth(false);
+    renderAll();
+  } catch (requestError) {
+    els.resetError.textContent = requestError.message || "å¯†ç é‡ç½®å¤±è´¥ï¼Œè¯·ç¨åé‡è¯•";
+  } finally {
+    button.disabled = false;
+    button.textContent = "é‡ç½®å¯†ç å¹¶ç™»å½•";
+  }
+}
+
+function logout() {
+  clearAutoNextTimer();
+  stopTimer();
+  state.examFinished = true;
+  state.examSubmitting = false;
+  setExamLocked(false);
+  userStore.currentPhone = "";
+  localStorage.removeItem("jz_auth_token");
+  state.currentUser = null;
+  applyAdminAccess();
+  state.quiz = [];
+  state.quizIndex = 0;
+  state.score = 0;
+  els.loginAccount.value = "";
+  els.loginPassword.value = "";
+  els.registerForm.reset();
+  els.resetForm.reset();
+  showAuth(true);
+  renderAll();
+}
+
+function bindEvents() {
+  els.navTabs.forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
+  els.bankSelect.addEventListener("change", () => {
+    clearAutoNextTimer();
+    state.currentBank = els.bankSelect.value;
+    state.learnPage = 1;
+    renderAll();
+  });
+  els.searchInput.addEventListener("input", () => {
+    state.learnPage = 1;
+    renderAll();
+  });
+  els.startQuizBtn.addEventListener("click", startQuiz);
+  els.retryMistakesBtn.addEventListener("click", startMistakeQuiz);
+  els.exportRecordsBtn.addEventListener("click", exportRecords);
+  els.exportMistakesBtn.addEventListener("click", exportMistakes);
+  document.querySelectorAll(".mode-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      clearAutoNextTimer();
+      state.quizMode = tab.dataset.mode;
+      document.querySelectorAll(".mode-tab").forEach((t) =>
+        t.classList.toggle("active", t === tab)
+      );
+      els.modeRandom.classList.toggle("hidden", state.quizMode !== "random");
+      els.modeProduct.classList.toggle("hidden", state.quizMode !== "product");
+      els.modeRole.classList.toggle("hidden", state.quizMode !== "role");
+    });
+  });
+  els.clearMistakesBtn.addEventListener("click", () => {
+    if (!window.confirm("ç¡®å®šæ¸…ç©ºå½“å‰è´¦å·çš„å…¨éƒ¨é”™é¢˜å—ï¼Ÿæ­¤æ“ä½œä¸èƒ½æ’¤é”€ã€‚")) return;
+    storage.mistakes = [];
+    renderAll();
+  });
+  els.resetBtn.addEventListener("click", () => {
+    if (!window.confirm("ç¡®å®šæ¸…ç©ºå½“å‰è´¦å·çš„æ­£ç¡®ç‡ã€é”™é¢˜å’Œå…¨éƒ¨è€ƒè¯•è®°å½•å—ï¼Ÿæ­¤æ“ä½œä¸èƒ½æ’¤é”€ã€‚")) return;
+    storage.attempts = 0;
+    storage.correct = 0;
+    storage.mistakes = [];
+    storage.examRecords = [];
+    localStorage.removeItem("jz_sync_queue");
+    renderAll();
+  });
+  els.showLoginTab.addEventListener("click", () => switchAuthMode("login"));
+  els.showRegisterTab.addEventListener("click", () => switchAuthMode("register"));
+  els.showResetForm.addEventListener("click", () => switchAuthMode("reset"));
+  els.backToLogin.addEventListener("click", () => switchAuthMode("login"));
+  els.loginForm.addEventListener("submit", loginEmployee);
+  els.registerForm.addEventListener("submit", registerEmployee);
+  els.resetForm.addEventListener("submit", resetPassword);
+  els.retryExamSubmitBtn?.addEventListener("click", finishQuiz);
+  document.querySelectorAll(".password-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const input = document.getElementById(button.dataset.target);
+      if (!input) return;
+      const visible = input.type === "text";
+      input.type = visible ? "password" : "text";
+      button.textContent = visible ? "æ˜¾ç¤º" : "éšè—";
+    });
+  });
+  els.logoutBtn.addEventListener("click", logout);
+  els.mobileSidebarToggle?.addEventListener("click", () => {
+    const open = !els.sidebarTools.classList.contains("mobile-open");
+    els.sidebarTools.classList.toggle("mobile-open", open);
+    els.mobileSidebarToggle.setAttribute("aria-expanded", String(open));
+  });
+  window.addEventListener("beforeunload", (event) => {
+    if (!state.examFinished && state.examType === "formal") {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+  });
+}
+
+async function init() {
+  try {
+    await loadQuestions();
+    loadCurrentUser();
+    reconcileStoredQuestions();
+    renderBankSelect();
+    renderQuizSetup();
+    initSlogan();
+    bindEvents();
+    applyAdminAccess();
+    await flushSyncQueue();
+    await loadCloudStats();
+    renderAll();
+    showAuth(!state.currentUser);
+  } catch (error) {
+    document.body.innerHTML = `<div class="empty">é¢˜åº“åŠ è½½å¤±è´¥ï¼š${escapeHtml(error.message)}</div>`;
+    throw error;
+  }
+}
+
+init();
+
