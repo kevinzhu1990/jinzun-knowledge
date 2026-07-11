@@ -545,6 +545,12 @@ async function listRecords(tableId) {
   return items.map((item) => ({ record_id: item.record_id, ...item.fields }));
 }
 
+async function searchRecordsReliable(tableId, fieldName, fieldValue) {
+  const records = await searchRecords(tableId, fieldName, fieldValue);
+  if (records.length) return records;
+  return (await listRecords(tableId)).filter((record) => String(record[fieldName] || '') === String(fieldValue));
+}
+
 function examPool(questions, payload, user) {
   const mode = payload.mode === 'role' ? 'role' : 'product';
   const bank = String(payload.bank || '').trim();
@@ -578,7 +584,7 @@ async function writeMistakeRecords(user, items, submissionId = '') {
   const normalized = Array.isArray(items) ? items.slice(0, 100) : [];
   if (!normalized.length) return [];
   const tableId = await mistakeTableReady();
-  const existing = submissionId ? await searchRecords(tableId, '考试提交编号', submissionId) : [];
+  const existing = submissionId ? await searchRecordsReliable(tableId, '考试提交编号', submissionId) : [];
   const existingByKey = new Map(existing.map((record) => [`${record['错题编号'] || ''}:${record['错选'] || ''}`, record.record_id]));
   const recordIds = [];
   for (const item of normalized) {
@@ -624,7 +630,7 @@ async function handleExamSubmit(payload, user) {
     .map((question) => ({ ...questionMap.get(String(question.id)), selected: answers.get(String(question.id)) || '未作答', savedAt: new Date().toISOString() }));
   const mistakeIds = await writeMistakeRecords(user, wrongItems, submissionId);
   const examTable = await examTableReady();
-  const existing = await searchRecords(examTable, '考试提交编号', submissionId);
+  const existing = await searchRecordsReliable(examTable, '考试提交编号', submissionId);
   if (existing[0]?.record_id) return { ok: true, record_id: existing[0].record_id, mistake_record_ids: mistakeIds, duplicate: true, score: percent, correct, wrong, total };
   const fields = {
     '提交时间': dt(new Date()), '姓名': user.name, '手机号': cleanPhone(user.phone), '岗位': user.role || '',
