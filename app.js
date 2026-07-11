@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260710-account-auth";
+const BUILD_VERSION = "20260711-round2";
 const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
 const API_BASE = "https://jinzun-knowledge.vercel.app";
@@ -26,6 +26,11 @@ const state = {
   answeredQuestionIds: new Set(),
   examFinished: true,
   examLabelOverride: "",
+  examId: "",
+  examSessionToken: "",
+  submissionId: "",
+  serverRecordId: "",
+  answers: new Map(),
 };
 
 const els = {
@@ -381,7 +386,6 @@ async function cloudRequest(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   const token = localStorage.getItem("jz_auth_token") || "";
   const body = JSON.stringify({ ...payload, token: payload.token || token, userAgent: navigator.userAgent, deviceId: navigator.userAgent });
-  const strictAction = action === "login" || action === "register" || action === "reset";
   let lastError = null;
   for (const base of API_BASES) {
     try {
@@ -398,29 +402,6 @@ async function cloudRequest(action, payload) {
       lastError = error;
     }
   }
-  // Authentication errors must reach the form. Sending them through the
-  // fire-and-forget sync fallback turns a real 4xx response into "注册失败".
-  if (strictAction) throw lastError || new Error("账号服务暂时不可用");
-  for (const base of API_BASES) {
-    try {
-      if (navigator.sendBeacon) {
-        const blob = new Blob([body], { type: "text/plain;charset=UTF-8" });
-        if (navigator.sendBeacon(`${base}/api/${action}`, blob)) return { ok: true, fallback: true };
-      }
-    } catch {}
-    try {
-      await fetch(`${base}/api/${action}`, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=UTF-8" },
-        body,
-        keepalive: body.length < 60000,
-      });
-      return { ok: true, fallback: true };
-    } catch (error) {
-      lastError = error;
-    }
-  }
   throw lastError || new Error("云端同步失败");
 }
 
@@ -428,8 +409,12 @@ async function syncLater(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   try {
     const data = await cloudRequest(action, payload);
-    if (action === "exam") setSyncStatus(data.fallback ? "考试成绩已提交，正在后台同步飞书" : "考试成绩已同步到飞书", "success");
-    if (action === "login") setSyncStatus(data.fallback ? "登录记录已提交，正在后台同步飞书" : (data.warning || "登录联系记录已同步"), data.warning ? "warn" : "success");
+    if (action === "exam" && !data.record_id) throw new Error("服务器未返回考试记录ID");
+    if (action === "mistakes" && payload.items?.length && (!Array.isArray(data.record_ids) || data.record_ids.length < payload.items.length)) {
+      throw new Error("服务器未返回完整错题记录ID");
+    }
+    if (action === "exam") setSyncStatus("正式考试已同步到飞书", "success");
+    if (action === "mistakes" && payload.items?.length) setSyncStatus("错题已批量同步到飞书", "success");
     return data;
   } catch (error) {
     const queue = safeJsonArray("jz_sync_queue");
@@ -449,6 +434,7 @@ async function flushSyncQueue() {
   if (!queue.length) return;
   const remain = [];
   for (const item of queue) {
+    if (!['mistakes'].includes(item.action)) continue;
     try {
       await cloudRequest(item.action, item.payload);
     } catch (error) {
@@ -824,27 +810,49 @@ function renderQuizSetup() {
     .join("");
 }
 
-function startQuiz() {
+async function startQuiz() {
   const size = Number(els.quizSize.value) || EXAM_SIZE;
-  let pool;
-  const keyword = normalize(els.searchInput.value);
-  const hasCurrentFilter = Boolean(keyword) || state.currentBank !== "全部题库";
+  state.examType = els.examType?.value || "practice";
   state.examLabelOverride = "";
-  if (hasCurrentFilter) {
-    pool = bankQuestions();
-    state.examLabelOverride = keyword
-      ? `当前搜索：${els.searchInput.value.trim()}`
-      : state.currentBank;
-  } else if (state.quizMode === "product") {
-    const bank = els.productBankSelect.value;
-    pool = state.allQuestions.filter((q) => q.bank === bank);
-  } else if (state.quizMode === "role") {
-    const bank = els.roleBankSelect.value;
-    pool = state.allQuestions.filter((q) => q.bank === bank);
+  state.examId = "";
+  state.examSessionToken = "";
+  state.submissionId = "";
+  state.serverRecordId = "";
+  state.answers = new Map();
+  let pool = [];
+  if (state.examType === "formal") {
+    const mode = state.quizMode === "role" ? "role" : "product";
+    const bank = mode === "role" ? els.roleBankSelect.value : els.productBankSelect.value;
+    try {
+      const data = await cloudRequest("exam-start", { mode, bank, size });
+      if (!data.sessionToken || !data.examId || !Array.isArray(data.questions) || !data.questions.length) {
+        throw new Error("服务器未返回有效考试题目");
+      }
+      state.examId = data.examId;
+      state.examSessionToken = data.sessionToken;
+      state.submissionId = crypto.randomUUID();
+      state.quiz = data.questions;
+      state.examLabelOverride = data.bank || bank;
+    } catch (error) {
+      els.quizSetupStatus.textContent = `正式考试启动失败：${error.message}`;
+      return;
+    }
   } else {
-    pool = state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank));
+    // 练习模式也只从考试控件选择的题库取题，不受搜索框和左侧学习筛选影响。
+    if (state.quizMode === "product") {
+      const bank = els.productBankSelect.value;
+      pool = state.allQuestions.filter((q) => q.bank === bank);
+      state.examLabelOverride = bank;
+    } else if (state.quizMode === "role") {
+      const bank = els.roleBankSelect.value;
+      pool = state.allQuestions.filter((q) => q.bank === bank && (q.role === state.currentUser?.role || q.role === "全员"));
+      state.examLabelOverride = bank;
+    } else {
+      pool = state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank));
+      state.examLabelOverride = "综合产品题库";
+    }
+    state.quiz = shuffle(pool).slice(0, Math.min(size, pool.length));
   }
-  state.quiz = shuffle(pool).slice(0, Math.min(size, pool.length));
   if (!state.quiz.length) {
     els.quizSetupStatus.textContent = "当前筛选没有可用于考核的题目，请调整搜索或题库筛选。";
     return;
@@ -859,7 +867,6 @@ function startQuiz() {
   state.answeredQuestionIds = new Set();
   state.quizWrong = 0;
   state.wrongDetails = [];
-  state.examType = els.examType?.value || "practice";
   state.examFinished = false;
   setExamLocked(state.examType === "formal");
   startTimer(quizTimeLimit(state.quiz.length));
@@ -925,16 +932,16 @@ function chooseAnswer(letter) {
   const question = state.quiz[state.quizIndex];
   state.answeredCount += 1;
   state.answeredQuestionIds.add(question.id);
-  const correct = isEquivalentAnswer(question, letter);
+  const correct = state.examType === "formal" ? null : isEquivalentAnswer(question, letter);
+  if (state.examType === "formal") state.answers.set(question.id, letter);
   storage.attempts += 1;
-  if (correct) {
+  if (correct === true) {
     storage.correct += 1;
     state.score += 1;
-  } else {
+  } else if (correct === false) {
     state.quizWrong += 1;
     state.wrongDetails.push({ ...question, selected: letter, savedAt: new Date().toISOString() });
     if (state.examType === "practice") updateWrongCount();
-    saveMistake(question, letter);
   }
   els.quizScore.textContent = state.examType === "formal"
     ? `已答 ${state.answeredCount} 题`
@@ -972,20 +979,49 @@ function saveMistake(question, selected) {
   const item = { ...question, selected, savedAt: new Date().toISOString() };
   mistakes.unshift(item);
   storage.mistakes = mistakes.slice(0, 300);
-  syncLater("mistakes", { user: state.currentUser, items: [item] });
 }
 
-function finishQuiz() {
+async function submitFormalExam() {
+  const data = await cloudRequest("exam-submit", {
+    sessionToken: state.examSessionToken,
+    submissionId: state.submissionId,
+    answers: [...state.answers.entries()].map(([id, answer]) => ({ id, answer })),
+    duration: timerSeconds,
+  });
+  if (!data.record_id) throw new Error("服务器未返回正式考试记录ID");
+  state.score = Number(data.correct || 0);
+  state.quizWrong = Number(data.wrong || 0);
+  state.serverRecordId = data.record_id;
+  state.wrongDetails = Array.isArray(data.wrong_details) ? data.wrong_details : [];
+  state.wrongDetails.forEach((item) => saveMistake(item, item.selected || "未作答"));
+  return data;
+}
+
+async function finishQuiz() {
   if (state.examFinished || !state.quiz.length) return;
   stopTimer();
-  const unansweredQuestions = state.quiz.filter((question) => !state.answeredQuestionIds.has(question.id));
-  if (unansweredQuestions.length) {
-    storage.attempts += unansweredQuestions.length;
-    unansweredQuestions.forEach((question) => {
-      state.wrongDetails.push({ ...question, selected: "未作答", savedAt: new Date().toISOString() });
-      saveMistake(question, "未作答");
-    });
-    state.quizWrong += unansweredQuestions.length;
+  if (state.examType === "formal") {
+    try {
+      await submitFormalExam();
+    } catch (error) {
+      state.examFinished = false;
+      setExamLocked(true);
+      els.quizSetupStatus.textContent = `正式考试尚未提交：${error.message}，请保持网络后再次点击交卷。`;
+      return;
+    }
+  } else {
+    const unansweredQuestions = state.quiz.filter((question) => !state.answeredQuestionIds.has(question.id));
+    if (unansweredQuestions.length) {
+      storage.attempts += unansweredQuestions.length;
+      unansweredQuestions.forEach((question) => {
+        state.wrongDetails.push({ ...question, selected: "未作答", savedAt: new Date().toISOString() });
+        saveMistake(question, "未作答");
+      });
+      state.quizWrong += unansweredQuestions.length;
+    }
+    if (state.wrongDetails.length) {
+      await syncLater("mistakes", { user: state.currentUser, items: state.wrongDetails, submissionId: crypto.randomUUID() });
+    }
   }
   state.examFinished = true;
   setExamLocked(false);
@@ -1051,10 +1087,10 @@ function saveExamRecord(percent) {
     duration: timerSeconds,
     finishedAt: new Date().toISOString(),
     buildVersion: BUILD_VERSION,
+    serverRecordId: state.serverRecordId || "",
     wrongDetails: state.wrongDetails.slice(0, 30),
   });
   storage.examRecords = records.slice(0, 100);
-  syncLater("exam", { user: state.currentUser, record: records[0] });
 }
 
 function renderMistakes() {
@@ -1201,11 +1237,11 @@ function renderAdmin() {
     : Object.values(userStore.users);
   const rows = users.map((user) => {
     const records = cloud?.exams?.length
-      ? cloud.exams.filter((r) => String(r["手机号"]) === String(user.phone)).map((r) => ({
-          percent: Number(r["分数"] || 0), score: Number(r["答对题数"] || 0), total: Number(r["总题数"] || 0),
-          wrong: Number(r["错题数"] || 0), duration: Number(r["用时秒"] || 0), bank: r["题库"], type: r["考核类型"], finishedAt: r["完成时间"],
+      ? cloud.exams.filter((r) => String(r["手机号"]) === String(user.phone) && String(r["考核类型"] || "") === "正式考试").map((r) => ({
+          percent: Number(r["分数"] || 0), score: Number(r["答对数"] || 0), total: Number(r["总题数"] || 0),
+          wrong: Number(r["答错数"] || 0), duration: Number(r["用时秒数"] || 0), bank: r["题库"], type: r["考核类型"], finishedAt: r["提交时间"],
         }))
-      : getUserRecords(user.phone);
+      : getUserRecords(user.phone).filter((r) => r.type === "正式考试");
     const mistakes = cloud?.mistakes?.length
       ? cloud.mistakes.filter((r) => String(r["手机号"]) === String(user.phone)).map((r) => ({ knowledgePoint: r["知识点"], bank: r["题库"] }))
       : getUserMistakes(user.phone);
@@ -1214,6 +1250,9 @@ function renderAdmin() {
     return { user, records, mistakes, best, latest };
   });
   const allRecords = rows.flatMap((row) => row.records.map((record) => ({ ...record, user: row.user })));
+  const practiceCount = cloud?.exams?.length
+    ? cloud.exams.filter((r) => String(r["考核类型"] || "") === "练习模式").length
+    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone)).filter((r) => r.type === "练习模式").length;
   const avg = allRecords.length ? Math.round(allRecords.reduce((sum, r) => sum + Number(r.percent || 0), 0) / allRecords.length) : 0;
   const passed = allRecords.filter((r) => Number(r.percent) >= 80).length;
   const passRate = allRecords.length ? Math.round((passed / allRecords.length) * 100) : 0;
@@ -1221,9 +1260,9 @@ function renderAdmin() {
 
   els.adminMetrics.innerHTML = `
     <div class="summary-card"><span>员工数</span><strong>${users.length}</strong><small>${cloud?.employees?.length ? "飞书云端数据" : "本机已登录账号"}</small></div>
-    <div class="summary-card"><span>考试次数</span><strong>${allRecords.length}</strong><small>正式+练习记录</small></div>
-    <div class="summary-card"><span>平均分</span><strong>${avg}</strong><small>全部考试记录</small></div>
-    <div class="summary-card"><span>通过率</span><strong>${passRate}%</strong><small>80 分以上通过，未考 ${notExam} 人</small></div>
+    <div class="summary-card"><span>正式考试次数</span><strong>${allRecords.length}</strong><small>仅用于员工考核</small></div>
+    <div class="summary-card"><span>正式考试平均分</span><strong>${avg}</strong><small>练习数据不计入</small></div>
+    <div class="summary-card"><span>正式考试通过率</span><strong>${passRate}%</strong><small>练习次数 ${practiceCount}，未考 ${notExam} 人</small></div>
   `;
 
   els.adminUserTable.innerHTML = rows.length ? `
@@ -1261,7 +1300,7 @@ function renderAdmin() {
 function exportRecords() {
   const rows = state.cloudStats?.exams?.length
     ? state.cloudStats.exams.map((r) => ({
-        姓名: r["姓名"], 手机号: r["手机号"], 岗位: r["岗位"], 考核类型: r["考核类型"], 题库: r["题库"], 分数: r["分数"], 答对: r["答对题数"], 总题数: r["总题数"], 错题数: r["错题数"], 是否通过: r["是否通过"], 用时秒: r["用时秒"], 完成时间: r["完成时间"],
+        姓名: r["姓名"], 手机号: r["手机号"], 岗位: r["岗位"], 考试名称: r["考试名称"], 考核类型: r["考核类型"], 题库: r["题库"], 分数: r["分数"], 答对数: r["答对数"], 总题数: r["总题数"], 答错数: r["答错数"], 是否通过: r["是否通过"], 用时秒数: r["用时秒数"], 提交时间: r["提交时间"],
       }))
     : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).map((record) => ({
         姓名: user.name,
@@ -1270,20 +1309,21 @@ function exportRecords() {
         考核类型: record.type || "练习模式",
         题库: record.bank,
         分数: record.percent,
-        答对: record.score,
+        考试名称: "金尊产品知识库学习考核",
+        答对数: record.score,
         总题数: record.total,
-        错题数: record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
+        答错数: record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
         是否通过: Number(record.percent) >= 80 ? "是" : "否",
-        用时秒: record.duration,
-        完成时间: record.finishedAt,
+        用时秒数: record.duration,
+        提交时间: record.finishedAt,
       })));
-  downloadText(`金尊考试记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "考核类型", "题库", "分数", "答对", "总题数", "错题数", "是否通过", "用时秒", "完成时间"], rows));
+  downloadText(`金尊考试记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "考试名称", "考核类型", "题库", "分数", "答对数", "总题数", "答错数", "是否通过", "用时秒数", "提交时间"], rows));
 }
 
 function exportMistakes() {
   const rows = state.cloudStats?.mistakes?.length
     ? state.cloudStats.mistakes.map((q) => ({
-        姓名: q["姓名"], 手机号: q["手机号"], 岗位: q["岗位"], 题库: q["题库"], 知识点: q["知识点"], 题目: q["题目"], 错选: q["错选答案"], 正确答案: q["正确答案"], 解析: q["解析"], 记录时间: q["出错时间"],
+        姓名: q["姓名"], 手机号: q["手机号"], 岗位: q["岗位"], 题库: q["题库"], 知识点: q["知识点"], 题目: q["题目"], 错选: q["错选"], 正确答案: q["正确答案"], 解析: q["解析"], 记录时间: q["记录时间"],
       }))
     : Object.values(userStore.users).flatMap((user) => getUserMistakes(user.phone).map((q) => ({
         姓名: user.name,

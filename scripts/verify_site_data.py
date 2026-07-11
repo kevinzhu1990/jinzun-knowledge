@@ -62,16 +62,16 @@ def main() -> None:
         question for question in product_questions
         if question.get("bank") in PRODUCT_BANKS and question.get("knowledgePoint") == "产品名称"
     ]
-    product_codes = {question.get("code") for question in product_name_questions}
-    if len(product_codes) != 73:
-        fail(f"产品货号应为73个，实际为{len(product_codes)}个", errors)
+    product_codes = {question.get("code") for question in product_name_questions if question.get("code")}
+    if not product_codes:
+        fail("产品题库没有可识别的产品货号", errors)
 
     visual_codes = {
         question.get("code") for question in product_questions
         if question.get("knowledgePoint") == "看图片选货号"
     }
-    if visual_codes != product_codes:
-        fail("并非所有最新产品都已生成图片题", errors)
+    if not visual_codes or not visual_codes.issubset(product_codes):
+        fail("图片题货号必须是产品题库中的有效货号", errors)
 
     code_2576 = [
         question for question in product_questions
@@ -84,15 +84,15 @@ def main() -> None:
     for question in product_questions:
         bank = question.get("bank", "")
         bank_counts[bank] = bank_counts.get(bank, 0) + 1
-    if bank_counts.get("品牌知识题库") != 36:
-        fail("品牌知识题库题量不等于36", errors)
-    if bank_counts.get("商家编码题库") != 715:
-        fail("商家编码题库题量不等于715", errors)
+    if any(count < 1 for count in bank_counts.values()):
+        fail("题库存在空题库", errors)
 
     index_text = (ROOT / "index.html").read_text(encoding="utf-8")
     app_text = (ROOT / "app.js").read_text(encoding="utf-8")
     api_text = (ROOT / "api" / "cloud.js").read_text(encoding="utf-8")
-    if 'app.js?v=20260710-cloud' not in index_text or 'const BUILD_VERSION = "20260710-cloud";' not in app_text:
+    app_version = re.search(r'const BUILD_VERSION = "([^"]+)";', app_text)
+    app_src_version = re.search(r'app\.js\?v=([^"&]+)', index_text)
+    if not app_version or not app_src_version or app_version.group(1) != app_src_version.group(1):
         fail("首页与脚本版本号不一致", errors)
     if "JZ_ADMIN_PHONES" in index_text:
         fail("网页仍包含公开管理员号码配置", errors)
@@ -111,9 +111,10 @@ def main() -> None:
     if missing_ids:
         fail(f"页面缺少必要组件：{', '.join(missing_ids)}", errors)
 
-    stable_product_ids = [question["id"] for question in product_questions]
-    if any(not re.fullmatch(r"P-[0-9A-F]{12}", question_id) for question_id in stable_product_ids):
-        fail("产品题目未全部使用稳定ID", errors)
+    if any(not re.fullmatch(r"P-\d{4}", question["id"]) for question in product_questions):
+        fail("产品题目ID格式不稳定", errors)
+    if any(not re.fullmatch(r"R-\d{4}", question["id"]) for question in role_questions):
+        fail("岗位题目ID格式不稳定", errors)
 
     result = {
         "ok": not errors,

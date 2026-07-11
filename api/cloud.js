@@ -1,4 +1,6 @@
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 const bcrypt = require('bcryptjs');
 
 const BASE_TOKEN = process.env.LARK_BASE_TOKEN || '';
@@ -12,7 +14,9 @@ const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://kevinzhu1990.githu
 const AUTH_SECRET = process.env.AUTH_SECRET || '';
 const EMPLOYEE_REGISTER_CODE = process.env.EMPLOYEE_REGISTER_CODE || '';
 const PASSWORD_PEPPER = process.env.PASSWORD_PEPPER || '';
-const AUTH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const AUTH_TOKEN_TTL_MS = 180 * 24 * 60 * 60 * 1000;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const RATE_LIMITS = { login: 20, register: 10, reset: 10 };
 
 const json = (req, res, status, body) => {
   const origin = String(req.headers.origin || '');
@@ -40,7 +44,9 @@ const configured = () => Boolean(
   LARK_APP_ID && LARK_APP_SECRET
 );
 
-const authConfigured = () => Boolean(AUTH_SECRET && EMPLOYEE_REGISTER_CODE && PASSWORD_PEPPER);
+const authConfigured = () => Boolean(
+  AUTH_SECRET && PASSWORD_PEPPER && EMPLOYEE_REGISTER_CODE.length >= 16,
+);
 
 const readBody = async (req) => {
   const chunks = [];
@@ -66,6 +72,7 @@ let cachedToken = null;
 let cachedTokenExpireAt = 0;
 let cachedTables = null;
 let cachedTablesExpireAt = 0;
+const rateLimitBuckets = new Map();
 
 class FeishuApiError extends Error {
   constructor(message, { code = '', status = 0 } = {}) {
@@ -158,9 +165,18 @@ const mistakeTableId = () => resolveTableId(MISTAKE_TABLE_ID, [
 
 const ACCOUNT_TEXT_FIELDS = [
   '员工ID', '密码哈希', '账号状态', '是否管理员', '注册时间',
-  '登录失败次数', '锁定截止时间', '密码更新时间', '客户端标识',
+  '登录失败次数', '锁定截止时间', '密码更新时间', '客户端标识', '会话版本',
 ];
 let accountFieldsReady = null;
+const EXAM_FIELD_NAMES = [
+  '考试名称', '考核类型', '题库', '总题数', '答对数', '答错数', '分数',
+  '是否通过', '用时秒数', '提交时间', '考试提交编号', '设备ID',
+];
+const MISTAKE_FIELD_NAMES = [
+  '记录时间', '错选', '正确答案', '解析', '题库', '知识点',
+  '考试提交编号', '题目', '姓名', '手机号', '岗位',
+];
+const tableFieldsReady = new Map();
 
 async function listFields(tableId) {
   const token = await getTenantToken();
@@ -201,9 +217,67 @@ async function ensureAccountFields() {
 
 const accountTableId = () => ensureAccountFields();
 
+async function ensureTableFields(tableIdPromise, fieldNames) {
+  const tableId = await tableIdPromise;
+  const cacheKey = `${tableId}:${fieldNames.join('|')}`;
+  if (tableFieldsReady.has(cacheKey)) return tableId;
+  const fields = await listFields(tableId);
+  const existing = new Set(fields.map((field) => String(field.field_name || '')));
+  const token = await getTenantToken();
+  for (const fieldName of fieldNames) {
+    if (existing.has(fieldName)) continue;
+    try {
+      await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/fields`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ field_name: fieldName, type: 1 }),
+      });
+    } catch (error) {
+      if (error?.code !== '1254067' && !String(error?.message || '').toLowerCase().includes('duplicate')) throw error;
+    }
+  }
+  tableFieldsReady.set(cacheKey, true);
+  return tableId;
+}
+
+const examTableReady = () => ensureTableFields(examTableId(), EXAM_FIELD_NAMES);
+const mistakeTableReady = () => ensureTableFields(mistakeTableId(), MISTAKE_FIELD_NAMES);
+
 const allowedRoles = new Set([
   '运营', '客服', '美工', '主播', '中控', '采购', '财务', '行政', '审单', '仓储', '管理', '新员工',
 ]);
+
+const PRODUCT_QUESTION_PATH = path.join(__dirname, '..', 'outputs', 'product_quiz', '金尊产品知识库题库.json');
+const ROLE_QUESTION_PATH = path.join(__dirname, '..', 'outputs', 'role_quiz', '岗位学习考核题库.json');
+let serverQuestionsPromise = null;
+
+function loadJsonFile(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+async function loadServerQuestions() {
+  if (!serverQuestionsPromise) {
+    serverQuestionsPromise = Promise.resolve([
+      ...loadJsonFile(PRODUCT_QUESTION_PATH),
+      ...loadJsonFile(ROLE_QUESTION_PATH),
+    ]);
+  }
+  return serverQuestionsPromise;
+}
+
+const publicQuestion = (question) => {
+  const { answer, answerText, explanation, source, note, ...safeQuestion } = question;
+  return safeQuestion;
+};
+
+const shuffleServer = (items) => {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = crypto.randomInt(i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+};
 
 const normalizeName = (value) => String(value || '').trim();
 const validatePassword = (value) => typeof value === 'string'
@@ -238,12 +312,35 @@ const authUserFromRecord = (record) => ({
   phone: cleanPhone(record['手机号']),
   role: record['岗位'] || '',
   isAdmin: String(record['是否管理员']).toLowerCase() === 'true',
+  sessionVersion: String(record['会话版本'] || '1'),
 });
+
+const nextSessionVersion = (record) => record?.['会话版本']
+  ? String(num(record['会话版本'], 1) + 1)
+  : '2';
 
 const authTokenFor = (user) => signToken({ ...user, exp: Date.now() + AUTH_TOKEN_TTL_MS });
 
 const getBearer = (req) => String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
 const tokenUser = (req, payload = {}) => verifyToken(payload.token || getBearer(req));
+
+const clientIp = (req) => String(
+  req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown',
+).split(',')[0].trim();
+
+function enforceRateLimit(req, action) {
+  const limit = RATE_LIMITS[action];
+  if (!limit) return;
+  const key = `${action}:${clientIp(req)}`;
+  const now = Date.now();
+  const current = rateLimitBuckets.get(key);
+  if (!current || now - current.startedAt >= RATE_LIMIT_WINDOW_MS) {
+    rateLimitBuckets.set(key, { startedAt: now, count: 1 });
+    return;
+  }
+  current.count += 1;
+  if (current.count > limit) throw httpError(429, '请求过于频繁，请稍后再试');
+}
 
 async function findAccountByPhone(phone) {
   const tableId = await accountTableId();
@@ -279,19 +376,27 @@ async function handleRegister(payload) {
   if (!validatePassword(password)) throw httpError(400, '密码至少8位，并包含字母和数字');
   const tableId = await accountTableId();
   const existing = await findAccountByPhone(phone);
-  const resettingExisting = Boolean(existing?.['密码哈希']);
-  if (resettingExisting && String(existing?.['账号状态'] || '正常') !== '正常') {
-    throw httpError(403, '当前账号已停用，请联系管理员');
+  if (existing) {
+    if (!existing['姓名'] || !existing['岗位']
+      || normalizeName(existing['姓名']) !== name
+      || normalizeName(existing['岗位']) !== role) {
+      throw httpError(409, '原员工姓名或岗位不匹配，无法激活该手机号');
+    }
+    if (existing['密码哈希']) throw httpError(409, '该手机号已经注册，请使用登录或忘记密码');
+    if (String(existing['账号状态'] || '正常') !== '正常') {
+      throw httpError(403, '当前账号已停用，请联系管理员');
+    }
   }
   const hash = await passwordHash(password);
   const employeeId = existing?.['员工ID'] || crypto.randomUUID();
+  const sessionVersion = existing ? nextSessionVersion(existing) : '1';
   const fields = {
     '员工ID': employeeId,
-    '姓名': resettingExisting ? (existing['姓名'] || name) : name,
+    '姓名': name,
     '手机号': phone,
-    '岗位': resettingExisting ? (existing['岗位'] || role) : role,
+    '岗位': role,
     '密码哈希': hash,
-    '账号状态': resettingExisting ? (existing['账号状态'] || '正常') : '正常',
+    '账号状态': '正常',
     '是否管理员': String(existing?.['是否管理员']).toLowerCase() === 'true' ? 'true' : 'false',
     '注册时间': existing?.['注册时间'] || dt(new Date()),
     '最后登录时间': dt(new Date()),
@@ -299,7 +404,8 @@ async function handleRegister(payload) {
     '锁定截止时间': '',
     '密码更新时间': dt(new Date()),
     '客户端标识': String(payload.clientId || '').slice(0, 500),
-    '备注': resettingExisting ? '知识库账号密码重置' : '知识库账号注册',
+    '会话版本': sessionVersion,
+    '备注': '知识库账号注册/旧员工激活',
   };
   const record = existing
     ? await updateRecord(tableId, existing.record_id, fields)
@@ -366,18 +472,25 @@ async function handlePasswordReset(payload) {
     '锁定截止时间': '',
     '密码更新时间': dt(new Date()),
     '客户端标识': String(payload.clientId || '').slice(0, 500),
+    '会话版本': nextSessionVersion(existing),
     '备注': '知识库账号密码找回',
   };
   await updateRecord(tableId, existing.record_id, fields);
-  const user = authUserFromRecord(existing);
+  const user = authUserFromRecord({ ...existing, ...fields });
   return { ok: true, token: authTokenFor(user), user };
 }
 
-function requireUser(req, payload) {
+async function requireActiveUser(req, payload) {
   const user = tokenUser(req, payload);
   if (!user) throw httpError(401, 'Unauthorized');
-  if (payload.user?.phone && cleanPhone(payload.user.phone) !== cleanPhone(user.phone)) throw httpError(403, 'Unauthorized');
-  return user;
+  const record = await findAccountByPhone(cleanPhone(user.phone));
+  if (!record || String(record['账号状态'] || '正常') !== '正常') throw httpError(401, '账号已失效，请重新登录');
+  if (String(record['会话版本'] || '1') !== String(user.sessionVersion || '1')) {
+    throw httpError(401, '登录状态已更新，请重新登录');
+  }
+  const currentIsAdmin = String(record['是否管理员']).toLowerCase() === 'true';
+  if (currentIsAdmin !== user.isAdmin) throw httpError(401, '账号权限已更新，请重新登录');
+  return authUserFromRecord(record);
 }
 
 async function createRecord(tableId, fields) {
@@ -416,20 +529,6 @@ async function searchRecords(tableId, fieldName, fieldValue) {
   return (data?.data?.items || []).map((item) => ({ record_id: item.record_id, ...item.fields }));
 }
 
-async function findEmployeeByPhone(phone) {
-  try {
-    const records = await searchRecords(await employeeTableId(), '手机号', phone);
-    return records.find((record) => cleanPhone(record['手机号']) === phone) || null;
-  } catch (error) {
-    // Keep compatibility with older Base permissions that allow list but not search.
-    if (error?.status === 400 || error?.status === 403) {
-      const records = await listRecords(await employeeTableId());
-      return records.find((record) => cleanPhone(record['手机号']) === phone) || null;
-    }
-    throw error;
-  }
-}
-
 async function listRecords(tableId) {
   const token = await getTenantToken();
   const items = [];
@@ -446,86 +545,110 @@ async function listRecords(tableId) {
   return items.map((item) => ({ record_id: item.record_id, ...item.fields }));
 }
 
-async function handleLogin(payload) {
-  const user = payload.user || payload;
-  const phone = cleanPhone(user.phone);
-  if (!user.name || phone.length !== 11 || !user.role) throw new Error('Invalid user data');
-  const fields = {
-    '最后登录时间': dt(new Date()),
-    '姓名': user.name,
-    '手机号': phone,
-    '岗位': user.role,
-    '设备ID': payload.deviceId || '',
-    '备注': '网页登录/进入学习',
-  };
-  const existing = await findEmployeeByPhone(phone);
-  const tableId = await employeeTableId();
-  const record = existing
-    ? await updateRecord(tableId, existing.record_id, fields)
-    : await createRecord(tableId, fields);
-  return { ok: true, record_id: record?.record_id || existing?.record_id || '' };
-}
-
-const wrongText = (items, mode = 'ids') => (Array.isArray(items) ? items : []).map((question, index) => {
-  if (mode === 'ids') return question.id ? `第${question.id}题` : `错题${index + 1}`;
-  return [
-    `${index + 1}. ${question.question || question.title || `错题${index + 1}`}`,
-    question.selected ? `错选：${question.selected}` : '',
-    question.answer ? `正确：${question.answer} ${question.answerText || ''}`.trim() : '',
-  ].filter(Boolean).join('；');
-}).join(mode === 'ids' ? '、' : '\n');
-
-async function handleExam(payload) {
-  const user = payload.user || {};
-  const record = payload.record || payload;
-  const total = num(record.total, 0);
-  const correct = num(record.score, 0);
-  const wrong = num(record.wrong, Math.max(0, total - correct));
-  const percent = num(record.percent, total ? Math.round((correct / total) * 100) : 0);
-  if (!user.name || cleanPhone(user.phone).length !== 11 || total < 1 || correct < 0 || correct > total || wrong !== total - correct) {
-    throw new Error('Invalid exam data');
+function examPool(questions, payload, user) {
+  const mode = payload.mode === 'role' ? 'role' : 'product';
+  const bank = String(payload.bank || '').trim();
+  const productBanks = new Set(['月饼题库', '日常年货题库', '业务场景题库', '品牌知识题库', '商家编码题库']);
+  if (mode === 'role') {
+    if (!bank || productBanks.has(bank)) throw httpError(400, '岗位考试题库不正确');
+    return questions.filter((question) => question.bank === bank
+      && (question.role === user.role || question.role === '全员'));
   }
-  const fields = {
-    '提交时间': dt(record.finishedAt || new Date()),
-    '姓名': user.name,
-    '手机号': cleanPhone(user.phone),
-    '岗位': user.role || '',
-    '考试名称': record.bank || '金尊产品知识考试',
-    '总题数': total,
-    '答对数': correct,
-    '答错数': wrong,
-    '分数': percent,
-    '是否通过': percent >= 80 ? '通过' : '未通过',
-    '用时秒数': num(record.duration, 0),
-    '错题编号': wrongText(record.wrongDetails, 'ids'),
-    '错题明细': wrongText(record.wrongDetails, 'details'),
-    '设备ID': payload.deviceId || '',
-  };
-  const created = await createRecord(await examTableId(), fields);
-  return { ok: true, record_id: created?.record_id || '' };
+  if (bank && !productBanks.has(bank)) throw httpError(400, '产品考试题库不正确');
+  return questions.filter((question) => productBanks.has(question.bank) && (!bank || question.bank === bank));
 }
 
-async function handleMistakes(payload) {
-  const user = payload.user || {};
-  const items = Array.isArray(payload.items) ? payload.items.slice(0, 20) : [];
-  if (!user.name || cleanPhone(user.phone).length !== 11) throw new Error('Invalid user data');
-  const tableId = await mistakeTableId();
-  for (const item of items) {
-    await createRecord(tableId, {
-      '记录时间': dt(item.savedAt || new Date()),
-      '姓名': user.name,
-      '手机号': cleanPhone(user.phone),
-      '岗位': user.role || '',
-      '错题编号': item.id ? `第${item.id}题` : '',
-      '题目': item.question || '',
-      '错选': item.selected || '',
-      '正确答案': item.answer ? `${item.answer} ${item.answerText || ''}`.trim() : '',
-      '题库': item.bank || '',
-      '知识点': item.knowledgePoint || '',
-      '设备ID': payload.deviceId || '',
+async function handleExamStart(payload, user) {
+  const size = Math.min(100, Math.max(1, Number(payload.size) || 50));
+  const pool = examPool(await loadServerQuestions(), payload, user);
+  if (pool.length < 1) throw httpError(400, '当前题库没有可用题目');
+  const selected = shuffleServer(pool).slice(0, Math.min(size, pool.length));
+  const examId = crypto.randomUUID();
+  const expiresAt = Date.now() + 2 * 60 * 60 * 1000;
+  const sessionToken = signToken({
+    kind: 'exam', examId, uid: user.id, phone: user.phone,
+    sessionVersion: user.sessionVersion, bank: payload.bank || '产品题库',
+    mode: payload.mode === 'role' ? 'role' : 'product',
+    questions: selected.map((question) => ({ id: question.id, answer: question.answer })), exp: expiresAt,
+  });
+  return { ok: true, examId, sessionToken, expiresAt, bank: payload.bank || '产品题库', questions: selected.map(publicQuestion) };
+}
+
+async function writeMistakeRecords(user, items, submissionId = '') {
+  const normalized = Array.isArray(items) ? items.slice(0, 100) : [];
+  if (!normalized.length) return [];
+  const tableId = await mistakeTableReady();
+  const existing = submissionId ? await searchRecords(tableId, '考试提交编号', submissionId) : [];
+  const existingByKey = new Map(existing.map((record) => [`${record['错题编号'] || ''}:${record['错选'] || ''}`, record.record_id]));
+  const recordIds = [];
+  for (const item of normalized) {
+    const key = `${item.id || ''}:${item.selected || ''}`;
+    if (existingByKey.has(key)) {
+      recordIds.push(existingByKey.get(key));
+      continue;
+    }
+    const created = await createRecord(tableId, {
+      '记录时间': dt(item.savedAt || new Date()), '姓名': user.name, '手机号': cleanPhone(user.phone),
+      '岗位': user.role || '', '错题编号': item.id || '', '题目': item.question || '',
+      '错选': item.selected || '', '正确答案': item.answer ? `${item.answer} ${item.answerText || ''}`.trim() : '',
+      '解析': item.explanation || '', '题库': item.bank || '', '知识点': item.knowledgePoint || '',
+      '考试提交编号': submissionId,
     });
+    if (!created?.record_id) throw httpError(503, '错题记录未返回记录ID');
+    recordIds.push(created.record_id);
   }
-  return { ok: true, created: items.length };
+  return recordIds;
+}
+
+async function handleMistakes(payload, user) {
+  const recordIds = await writeMistakeRecords(user, payload.items, payload.submissionId || '');
+  return { ok: true, record_ids: recordIds };
+}
+
+async function handleExamSubmit(payload, user) {
+  const session = verifyToken(payload.sessionToken);
+  if (!session || session.kind !== 'exam' || session.uid !== user.id || session.phone !== user.phone
+    || session.sessionVersion !== user.sessionVersion) throw httpError(401, '考试会话已失效，请重新开始考试');
+  const submissionId = String(payload.submissionId || '').trim();
+  if (!submissionId || submissionId.length > 100) throw httpError(400, '缺少考试提交编号');
+  const answers = new Map((Array.isArray(payload.answers) ? payload.answers : [])
+    .map((item) => [String(item.id), String(item.answer || '')]));
+  const questions = session.questions || [];
+  const correct = questions.reduce((count, question) => count + (answers.get(String(question.id)) === String(question.answer) ? 1 : 0), 0);
+  const total = questions.length;
+  const wrong = total - correct;
+  const percent = total ? Math.round((correct / total) * 100) : 0;
+  const allQuestions = await loadServerQuestions();
+  const questionMap = new Map(allQuestions.map((question) => [String(question.id), question]));
+  const wrongItems = questions.filter((question) => answers.get(String(question.id)) !== String(question.answer))
+    .map((question) => ({ ...questionMap.get(String(question.id)), selected: answers.get(String(question.id)) || '未作答', savedAt: new Date().toISOString() }));
+  const mistakeIds = await writeMistakeRecords(user, wrongItems, submissionId);
+  const examTable = await examTableReady();
+  const existing = await searchRecords(examTable, '考试提交编号', submissionId);
+  if (existing[0]?.record_id) return { ok: true, record_id: existing[0].record_id, mistake_record_ids: mistakeIds, duplicate: true, score: percent, correct, wrong, total };
+  const fields = {
+    '提交时间': dt(new Date()), '姓名': user.name, '手机号': cleanPhone(user.phone), '岗位': user.role || '',
+    '考试名称': '金尊产品知识库学习考核', '考核类型': '正式考试', '题库': session.bank || '',
+    '总题数': total, '答对数': correct, '答错数': wrong, '分数': percent,
+    '是否通过': percent >= 80 ? '通过' : '未通过', '用时秒数': Math.max(0, Number(payload.duration) || 0),
+    '考试提交编号': submissionId, '设备ID': String(payload.deviceId || '').slice(0, 500),
+  };
+  const created = await createRecord(examTable, fields);
+  if (!created?.record_id) throw httpError(503, '考试记录未返回记录ID');
+  return {
+    ok: true,
+    record_id: created.record_id,
+    mistake_record_ids: mistakeIds,
+    wrong_details: wrongItems.map((item) => ({
+      id: item.id, bank: item.bank, type: item.type, knowledgePoint: item.knowledgePoint,
+      question: item.question, answer: item.answer, answerText: item.answerText,
+      explanation: item.explanation, selected: item.selected, savedAt: item.savedAt,
+    })),
+    score: percent,
+    correct,
+    wrong,
+    total,
+  };
 }
 
 async function handleStats() {
@@ -539,7 +662,45 @@ async function handleStats() {
     listRecords(examId),
     listRecords(mistakeId),
   ]);
-  const [employees, exams, mistakes] = entries.map((entry) => entry.status === 'fulfilled' ? entry.value : []);
+  const [employeeRecords, examRecords, mistakeRecords] = entries.map((entry) => entry.status === 'fulfilled' ? entry.value : []);
+  const employees = employeeRecords.map((record) => ({
+    record_id: record.record_id,
+    姓名: record['姓名'] || '',
+    手机号: cleanPhone(record['手机号']),
+    岗位: record['岗位'] || '',
+    最后登录时间: record['最后登录时间'] || '',
+  }));
+  const exams = examRecords.map((record) => ({
+    record_id: record.record_id,
+    姓名: record['姓名'] || '',
+    手机号: cleanPhone(record['手机号']),
+    岗位: record['岗位'] || '',
+    考试名称: record['考试名称'] || '',
+    考核类型: record['考核类型'] || '',
+    题库: record['题库'] || '',
+    总题数: num(record['总题数']),
+    答对数: num(record['答对数']),
+    答错数: num(record['答错数']),
+    分数: num(record['分数']),
+    是否通过: record['是否通过'] || '',
+    用时秒数: num(record['用时秒数']),
+    提交时间: record['提交时间'] || '',
+    考试提交编号: record['考试提交编号'] || '',
+  }));
+  const mistakes = mistakeRecords.map((record) => ({
+    record_id: record.record_id,
+    姓名: record['姓名'] || '',
+    手机号: cleanPhone(record['手机号']),
+    岗位: record['岗位'] || '',
+    题目: record['题目'] || '',
+    错选: record['错选'] || '',
+    正确答案: record['正确答案'] || '',
+    解析: record['解析'] || '',
+    题库: record['题库'] || '',
+    知识点: record['知识点'] || '',
+    记录时间: record['记录时间'] || '',
+    考试提交编号: record['考试提交编号'] || '',
+  }));
   const errors = entries
     .map((entry, index) => entry.status === 'rejected' ? {
       table: ['employees', 'exams', 'mistakes'][index],
@@ -562,26 +723,30 @@ module.exports = async (req, res) => {
     const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
     const action = url.searchParams.get('action') || url.pathname.split('/').pop();
     if (req.method === 'GET' && action === 'stats') {
-      const user = tokenUser(req, {});
+      const user = await requireActiveUser(req, {});
       if (!user || !user.isAdmin) return json(req, res, 403, { ok: false, error: '管理员权限不足' });
       return json(req, res, 200, await handleStats());
     }
     if (req.method !== 'POST') return json(req, res, 405, { ok: false, error: 'Method not allowed' });
     if (!writeAuthorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
     const payload = await readBody(req);
+    enforceRateLimit(req, action);
     if (action === 'reset') return json(req, res, 200, await handlePasswordReset(payload));
     if (action === 'register') return json(req, res, 200, await handleRegister(payload));
     if (action === 'login' && Object.prototype.hasOwnProperty.call(payload, 'account')) {
       return json(req, res, 200, await handlePasswordLogin(payload));
     }
-    if (action === 'login') return json(req, res, 200, await handleLogin(payload));
-    if (action === 'exam') {
-      requireUser(req, payload);
-      return json(req, res, 200, await handleExam(payload));
+    if (action === 'exam-start') {
+      const user = await requireActiveUser(req, payload);
+      return json(req, res, 200, await handleExamStart(payload, user));
+    }
+    if (action === 'exam-submit') {
+      const user = await requireActiveUser(req, payload);
+      return json(req, res, 200, await handleExamSubmit(payload, user));
     }
     if (action === 'mistakes') {
-      requireUser(req, payload);
-      return json(req, res, 200, await handleMistakes(payload));
+      const user = await requireActiveUser(req, payload);
+      return json(req, res, 200, await handleMistakes(payload, user));
     }
     return json(req, res, 404, { ok: false, error: 'Unknown action' });
   } catch (error) {

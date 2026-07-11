@@ -1,1 +1,7 @@
-{"rewrites":[{"source":"/api/(.*)","destination":"/api/$1"},{"source":"/(.*)","destination":"/$1"}],"headers":[{"source":"/(.*)","headers":[{"key":"Access-Control-Allow-Origin","value":"*"}]}]}
+{
+  "functions": {
+    "api/cloud.js": {
+      "includeFiles": ["outputs/**/*.json"]
+    }
+  }
+}

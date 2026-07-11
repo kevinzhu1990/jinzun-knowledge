@@ -1,1 +1,1 @@
-{"scripts":{"start":"vercel dev","deploy":"vercel --prod","generate:products":"python scripts/generate_product_quiz.py","verify":"python scripts/verify_site_data.py"},"devDependencies":{"vercel":"latest"},"dependencies":{"bcryptjs":"^3.0.3"}}
+{"scripts":{"start":"vercel dev","deploy":"vercel --prod","generate:products":"python scripts/generate_product_quiz.py","verify":"python3 scripts/verify_site_data.py && python3 scripts/verify_api_contract.py"},"devDependencies":{"vercel":"latest"},"dependencies":{"bcryptjs":"^3.0.3"}}

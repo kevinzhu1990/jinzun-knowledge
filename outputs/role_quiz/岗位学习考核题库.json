@@ -2793,25 +2793,6 @@
     "note": ""
   },
   {
-    "id": "SD-001",
-    "bank": "审单题库",
-    "role": "审单",
-    "module": "审单基础",
-    "type": "单选题",
-    "difficulty": "基础",
-    "knowledgePoint": "审单流程",
-    "question": "（题目建设中）审单题库即将上线，敬请期待。",
-    "optionA": "期待中",
-    "optionB": "",
-    "optionC": "",
-    "optionD": "",
-    "answer": "A",
-    "answerText": "期待中",
-    "explanation": "审单题库正在建设中，题目将陆续补充完善。",
-    "source": "审单题库",
-    "note": "占位题，题目补充完成后请删除此条"
-  },
-  {
     "id": "R-0148",
     "bank": "岗位场景题库",
     "role": "审单",
