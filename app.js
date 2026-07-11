@@ -119,6 +119,13 @@ const els = {
   examSubmitStatus: document.querySelector("#examSubmitStatus"),
   retryExamSubmitBtn: document.querySelector("#retryExamSubmitBtn"),
   adminDataWarning: document.querySelector("#adminDataWarning"),
+  adminEmployeeForm: document.querySelector("#adminEmployeeForm"),
+  adminEmployeeName: document.querySelector("#adminEmployeeName"),
+  adminEmployeePhone: document.querySelector("#adminEmployeePhone"),
+  adminEmployeeRole: document.querySelector("#adminEmployeeRole"),
+  adminEmployeePassword: document.querySelector("#adminEmployeePassword"),
+  adminEmployeeList: document.querySelector("#adminEmployeeList"),
+  adminAccountStatus: document.querySelector("#adminAccountStatus"),
   mobileSidebarToggle: document.querySelector("#mobileSidebarToggle"),
   sidebarTools: document.querySelector("#sidebarTools"),
 };
@@ -1320,6 +1327,72 @@ function renderRanking() {
   });
 }
 
+async function refreshAdminEmployees() {
+  if (!isAdminUser() || !els.adminEmployeeList) return;
+  try {
+    const data = await cloudRequest("admin-list", {});
+    els.adminEmployeeList.innerHTML = (data.employees || []).map((employee) => `
+      <div class="admin-employee-row">
+        <div><strong>${escapeHtml(employee.name)}</strong><small>${escapeHtml(employee.phone)} · ${escapeHtml(employee.role)} · ${escapeHtml(employee.status)}</small></div>
+        <div class="admin-employee-actions">
+          <button class="secondary-btn admin-password-btn" type="button" data-phone="${escapeHtml(employee.phone)}">修改密码</button>
+          <button class="danger-btn admin-delete-btn" type="button" data-phone="${escapeHtml(employee.phone)}">删除员工</button>
+        </div>
+      </div>
+    `).join("") || '<div class="empty">暂无员工账号。</div>';
+  } catch (error) {
+    if (els.adminAccountStatus) els.adminAccountStatus.textContent = error.message || "员工账号读取失败";
+  }
+}
+
+async function addAdminEmployee(event) {
+  event.preventDefault();
+  if (!els.adminEmployeeForm) return;
+  els.adminAccountStatus.textContent = "";
+  const button = els.adminEmployeeForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try {
+    await cloudRequest("admin-add", {
+      name: els.adminEmployeeName.value.trim(),
+      phone: normalizePhone(els.adminEmployeePhone.value),
+      role: els.adminEmployeeRole.value,
+      password: els.adminEmployeePassword.value,
+    });
+    els.adminEmployeeForm.reset();
+    els.adminAccountStatus.textContent = "员工账号已添加";
+    await refreshAdminEmployees();
+  } catch (error) {
+    els.adminAccountStatus.textContent = error.message || "添加员工失败";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function handleAdminEmployeeAction(event) {
+  const button = event.target.closest("[data-phone]");
+  if (!button) return;
+  const phone = button.dataset.phone;
+  if (button.classList.contains("admin-delete-btn")) {
+    if (!window.confirm(`确定删除员工账号 ${phone} 吗？删除后该员工需要重新注册。`)) return;
+    try {
+      await cloudRequest("admin-delete", { phone });
+      els.adminAccountStatus.textContent = "员工账号已删除";
+      await refreshAdminEmployees();
+    } catch (error) {
+      els.adminAccountStatus.textContent = error.message || "删除员工失败";
+    }
+    return;
+  }
+  const password = window.prompt("请输入新密码（至少8位，包含字母和数字）", "");
+  if (!password) return;
+  try {
+    await cloudRequest("admin-password", { phone, password });
+    els.adminAccountStatus.textContent = "员工密码已修改";
+  } catch (error) {
+    els.adminAccountStatus.textContent = error.message || "修改密码失败";
+  }
+}
+
 function renderAdmin() {
   if (!isAdminUser()) {
     els.adminDataWarning?.classList.add("hidden");
@@ -1715,6 +1788,8 @@ function bindEvents() {
   els.registerForm.addEventListener("submit", registerEmployee);
   els.resetForm.addEventListener("submit", resetPassword);
   els.retryExamSubmitBtn?.addEventListener("click", finishQuiz);
+  els.adminEmployeeForm?.addEventListener("submit", addAdminEmployee);
+  els.adminEmployeeList?.addEventListener("click", handleAdminEmployeeAction);
   document.querySelectorAll(".password-toggle").forEach((button) => {
     button.addEventListener("click", () => {
       const input = document.getElementById(button.dataset.target);
