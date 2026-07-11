@@ -92,7 +92,10 @@ def main() -> None:
     api_text = (ROOT / "api" / "cloud.js").read_text(encoding="utf-8")
     app_version = re.search(r'const BUILD_VERSION = "([^"]+)";', app_text)
     app_src_version = re.search(r'app\.js\?v=([^"&]+)', index_text)
-    if not app_version or not app_src_version or app_version.group(1) != app_src_version.group(1):
+    styles_src_version = re.search(r'styles\.css\?v=([^"&]+)', index_text)
+    if (not app_version or not app_src_version or not styles_src_version
+            or app_version.group(1) != app_src_version.group(1)
+            or app_version.group(1) != styles_src_version.group(1)):
         fail("首页与脚本版本号不一致", errors)
     if "JZ_ADMIN_PHONES" in index_text:
         fail("网页仍包含公开管理员号码配置", errors)
@@ -105,7 +108,8 @@ def main() -> None:
     parser.feed(index_text)
     required_ids = {
         "authView", "bankSelect", "searchInput", "learnPagination", "quizSetupStatus",
-        "quizRunner", "quizResult", "mobileSidebarToggle", "sidebarTools",
+        "quizRunner", "quizResult", "mobileSidebarToggle", "sidebarTools", "resetName",
+        "resetRole", "examSubmitStatus", "retryExamSubmitBtn", "adminDataWarning",
     }
     missing_ids = sorted(required_ids - parser.ids)
     if missing_ids:

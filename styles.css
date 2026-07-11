@@ -1276,6 +1276,21 @@ input:disabled {
   border-radius: 8px;
 }
 
+.auto-next-hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.option-btn:disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
+.exam-submitting .option-btn {
+  pointer-events: none;
+}
+
 @media (max-width: 1080px) {
   .app-shell {
     grid-template-columns: 1fr;

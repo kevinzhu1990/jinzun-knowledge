@@ -45,7 +45,7 @@ const configured = () => Boolean(
 );
 
 const authConfigured = () => Boolean(
-  AUTH_SECRET && PASSWORD_PEPPER && EMPLOYEE_REGISTER_CODE.length >= 16,
+  AUTH_SECRET && PASSWORD_PEPPER && EMPLOYEE_REGISTER_CODE,
 );
 
 const readBody = async (req) => {
@@ -73,6 +73,7 @@ let cachedTokenExpireAt = 0;
 let cachedTables = null;
 let cachedTablesExpireAt = 0;
 const rateLimitBuckets = new Map();
+const examSubmitLocks = new Map();
 
 class FeishuApiError extends Error {
   constructor(message, { code = '', status = 0 } = {}) {
@@ -165,12 +166,12 @@ const mistakeTableId = () => resolveTableId(MISTAKE_TABLE_ID, [
 
 const ACCOUNT_TEXT_FIELDS = [
   '员工ID', '密码哈希', '账号状态', '是否管理员', '注册时间',
-  '登录失败次数', '锁定截止时间', '密码更新时间', '客户端标识', '会话版本',
+  '登录失败次数', '锁定截止时间', '密码更新时间', '客户端标识', '会话版本', '备注',
 ];
 let accountFieldsReady = null;
 const EXAM_FIELD_NAMES = [
   '考试名称', '考核类型', '题库', '总题数', '答对数', '答错数', '分数',
-  '是否通过', '用时秒数', '提交时间', '考试提交编号', '设备ID',
+  '是否通过', '用时秒数', '提交时间', '考试提交编号', '考试会话ID', '设备ID',
 ];
 const MISTAKE_FIELD_NAMES = [
   '记录时间', '错选', '正确答案', '解析', '题库', '知识点',
@@ -455,15 +456,24 @@ async function handlePasswordLogin(payload) {
   const tableId = await accountTableId();
   if (!valid) {
     const failures = num(record['登录失败次数'], 0) + 1;
-    const lockMs = failures >= 10 ? 2 * 60 * 60 * 1000 : failures >= 5 ? 15 * 60 * 1000 : 0;
+    const lockMs = failures >= 20
+      ? 24 * 60 * 60 * 1000
+      : failures >= 10
+        ? 2 * 60 * 60 * 1000
+        : failures >= 5
+          ? 15 * 60 * 1000
+          : 0;
     const updates = {
       '登录失败次数': String(failures),
       '锁定截止时间': lockMs ? dt(new Date(Date.now() + lockMs)) : '',
       '客户端标识': String(payload.clientId || '').slice(0, 500),
     };
-    if (failures >= 20) updates['账号状态'] = '停用';
+    if (failures >= 20) {
+      updates['账号状态'] = '正常';
+      updates['备注'] = `异常登录尝试达到${failures}次，已锁定24小时：${dt(new Date())}`;
+    }
     await updateRecord(tableId, record.record_id, updates);
-    throw httpError(failures >= 20 ? 403 : 401, failures >= 20 ? '当前账号已停用，请联系管理员' : '账号或密码错误');
+    throw httpError(401, lockMs ? '账号或密码错误，账号已暂时锁定' : '账号或密码错误');
   }
   const user = authUserFromRecord(record);
   await updateRecord(tableId, record.record_id, {
@@ -477,13 +487,20 @@ async function handlePasswordLogin(payload) {
 
 async function handlePasswordReset(payload) {
   if (!authConfigured()) throw httpError(503, 'Account service is not configured');
+  const name = normalizeName(payload.name);
   const phone = cleanPhone(payload.phone);
+  const role = normalizeName(payload.role);
   const password = String(payload.password || '');
   if (String(payload.registerCode || '').trim() !== EMPLOYEE_REGISTER_CODE) throw httpError(403, '公司注册口令错误');
+  if (!name || name.length > 30) throw httpError(400, '姓名格式不正确');
   if (!/^1\d{10}$/.test(phone)) throw httpError(400, '手机号格式不正确');
+  if (!allowedRoles.has(role)) throw httpError(400, '岗位信息不正确');
   if (!validatePassword(password)) throw httpError(400, '密码至少8位，并包含字母和数字');
   const existing = await findAccountByPhone(phone);
   if (!existing) throw httpError(404, '未找到该手机号对应的账号，请先注册');
+  if (normalizeName(existing['姓名']) !== name || normalizeName(existing['岗位']) !== role) {
+    throw httpError(403, '姓名、手机号或岗位与员工资料不一致');
+  }
   if (String(existing['账号状态'] || '正常') !== '正常') throw httpError(403, '当前账号已停用，请联系管理员');
   const tableId = await accountTableId();
   const fields = {
@@ -493,7 +510,7 @@ async function handlePasswordReset(payload) {
     '密码更新时间': dt(new Date()),
     '客户端标识': String(payload.clientId || '').slice(0, 500),
     '会话版本': nextSessionVersion(existing),
-    '备注': '知识库账号密码找回',
+    '备注': `员工使用内部口令重置密码：${dt(new Date())}`,
   };
   await updateRecord(tableId, existing.record_id, fields);
   const user = authUserFromRecord({ ...existing, ...fields });
@@ -572,16 +589,18 @@ async function searchRecordsReliable(tableId, fieldName, fieldValue) {
 }
 
 function examPool(questions, payload, user) {
-  const mode = payload.mode === 'role' ? 'role' : 'product';
+  const mode = ['random', 'product', 'role'].includes(payload.mode) ? payload.mode : 'random';
   const bank = String(payload.bank || '').trim();
   const productBanks = new Set(['月饼题库', '日常年货题库', '业务场景题库', '品牌知识题库', '商家编码题库']);
+  const coreBanks = new Set(['月饼题库', '日常年货题库', '业务场景题库']);
+  if (mode === 'random') return questions.filter((question) => coreBanks.has(question.bank));
   if (mode === 'role') {
     if (!bank || productBanks.has(bank)) throw httpError(400, '岗位考试题库不正确');
     return questions.filter((question) => question.bank === bank
       && (question.role === user.role || question.role === '全员'));
   }
-  if (bank && !productBanks.has(bank)) throw httpError(400, '产品考试题库不正确');
-  return questions.filter((question) => productBanks.has(question.bank) && (!bank || question.bank === bank));
+  if (!bank || !productBanks.has(bank)) throw httpError(400, '产品考试题库不正确');
+  return questions.filter((question) => question.bank === bank);
 }
 
 async function handleExamStart(payload, user) {
@@ -590,14 +609,16 @@ async function handleExamStart(payload, user) {
   if (pool.length < 1) throw httpError(400, '当前题库没有可用题目');
   const selected = shuffleServer(pool).slice(0, Math.min(size, pool.length));
   const examId = crypto.randomUUID();
-  const expiresAt = Date.now() + 2 * 60 * 60 * 1000;
+  const startedAt = Date.now();
+  const deadlineAt = startedAt + Math.max(60, Math.round(selected.length * 24)) * 1000;
   const sessionToken = sealExamSession({
     kind: 'exam', examId, uid: user.id, phone: user.phone,
     sessionVersion: user.sessionVersion, bank: payload.bank || '产品题库',
-    mode: payload.mode === 'role' ? 'role' : 'product',
-    questions: selected.map((question) => ({ id: question.id, answer: question.answer })), exp: expiresAt,
+    mode: ['random', 'product', 'role'].includes(payload.mode) ? payload.mode : 'random',
+    startedAt, deadlineAt,
+    questions: selected.map((question) => ({ id: question.id, answer: question.answer })), exp: deadlineAt + 30_000,
   });
-  return { ok: true, examId, sessionToken, expiresAt, bank: payload.bank || '产品题库', questions: selected.map(publicQuestion) };
+  return { ok: true, examId, sessionToken, startedAt, deadlineAt, expiresAt: deadlineAt + 30_000, bank: payload.bank || '综合产品题库', questions: selected.map(publicQuestion) };
 }
 
 async function writeMistakeRecords(user, items, submissionId = '') {
@@ -632,11 +653,44 @@ async function handleMistakes(payload, user) {
 }
 
 async function handleExamSubmit(payload, user) {
+  const sessionHint = openExamSession(payload.sessionToken);
+  const lockKey = sessionHint?.examId ? `${user.id}:${sessionHint.examId}` : `${user.id}:invalid`;
+  const previous = examSubmitLocks.get(lockKey) || Promise.resolve();
+  const current = previous.catch(() => undefined).then(() => handleExamSubmitOnce(payload, user));
+  examSubmitLocks.set(lockKey, current);
+  try {
+    return await current;
+  } finally {
+    if (examSubmitLocks.get(lockKey) === current) examSubmitLocks.delete(lockKey);
+  }
+}
+
+async function handleExamSubmitOnce(payload, user) {
   const session = openExamSession(payload.sessionToken);
   if (!session || session.kind !== 'exam' || session.uid !== user.id || session.phone !== user.phone
     || session.sessionVersion !== user.sessionVersion) throw httpError(401, '考试会话已失效，请重新开始考试');
+  const examSessionId = String(session.examId || '').trim();
+  if (!examSessionId) throw httpError(400, '考试会话ID无效');
+  const submittedAt = Date.now();
+  if (submittedAt > Number(session.deadlineAt || 0) + 30_000) throw httpError(408, '考试已超时，请重新开始考试');
+  const duration = Math.max(0, Math.round((submittedAt - Number(session.startedAt || submittedAt)) / 1000));
+  const examTable = await examTableReady();
+  const existingBySession = await searchRecordsReliable(examTable, '考试会话ID', examSessionId);
+  if (existingBySession[0]?.record_id) {
+    const record = existingBySession[0];
+    return {
+      ok: true,
+      duplicate: true,
+      record_id: record.record_id,
+      score: num(record['分数']),
+      correct: num(record['答对数']),
+      wrong: num(record['答错数']),
+      total: num(record['总题数']),
+      duration: num(record['用时秒数']),
+      wrong_details: [],
+    };
+  }
   const submissionId = String(payload.submissionId || '').trim();
-  if (!submissionId || submissionId.length > 100) throw httpError(400, '缺少考试提交编号');
   const answers = new Map((Array.isArray(payload.answers) ? payload.answers : [])
     .map((item) => [String(item.id), String(item.answer || '')]));
   const questions = session.questions || [];
@@ -648,16 +702,13 @@ async function handleExamSubmit(payload, user) {
   const questionMap = new Map(allQuestions.map((question) => [String(question.id), question]));
   const wrongItems = questions.filter((question) => answers.get(String(question.id)) !== String(question.answer))
     .map((question) => ({ ...questionMap.get(String(question.id)), selected: answers.get(String(question.id)) || '未作答', savedAt: new Date().toISOString() }));
-  const mistakeIds = await writeMistakeRecords(user, wrongItems, submissionId);
-  const examTable = await examTableReady();
-  const existing = await searchRecordsReliable(examTable, '考试提交编号', submissionId);
-  if (existing[0]?.record_id) return { ok: true, record_id: existing[0].record_id, mistake_record_ids: mistakeIds, duplicate: true, score: percent, correct, wrong, total };
+  const mistakeIds = await writeMistakeRecords(user, wrongItems, submissionId || examSessionId);
   const fields = {
     '提交时间': dt(new Date()), '姓名': user.name, '手机号': cleanPhone(user.phone), '岗位': user.role || '',
     '考试名称': '金尊产品知识库学习考核', '考核类型': '正式考试', '题库': session.bank || '',
     '总题数': total, '答对数': correct, '答错数': wrong, '分数': percent,
-    '是否通过': percent >= 80 ? '通过' : '未通过', '用时秒数': Math.max(0, Number(payload.duration) || 0),
-    '考试提交编号': submissionId, '设备ID': String(payload.deviceId || '').slice(0, 500),
+    '是否通过': percent >= 80 ? '通过' : '未通过', '用时秒数': duration,
+    '考试提交编号': submissionId || examSessionId, '考试会话ID': examSessionId, '设备ID': String(payload.deviceId || '').slice(0, 500),
   };
   const created = await createRecord(examTable, fields);
   if (!created?.record_id) throw httpError(503, '考试记录未返回记录ID');
@@ -674,6 +725,7 @@ async function handleExamSubmit(payload, user) {
     correct,
     wrong,
     total,
+    duration,
   };
 }
 
@@ -712,6 +764,7 @@ async function handleStats() {
     用时秒数: num(record['用时秒数']),
     提交时间: record['提交时间'] || '',
     考试提交编号: record['考试提交编号'] || '',
+    考试会话ID: record['考试会话ID'] || '',
   }));
   const mistakes = mistakeRecords.map((record) => ({
     record_id: record.record_id,
@@ -777,7 +830,7 @@ module.exports = async (req, res) => {
     return json(req, res, 404, { ok: false, error: 'Unknown action' });
   } catch (error) {
     console.error(error);
-    const status = [400, 401, 403, 409, 429, 500, 503].includes(Number(error?.status)) ? Number(error.status) : 400;
+    const status = [400, 401, 403, 404, 408, 409, 429, 500, 503].includes(Number(error?.status)) ? Number(error.status) : 400;
     return json(req, res, status, {
       ok: false,
       error: error?.message || 'Request rejected',

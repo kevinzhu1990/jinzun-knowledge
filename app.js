@@ -1,4 +1,7 @@
-const BUILD_VERSION = "20260711-round2";
+const BUILD_VERSION = "20260711-round4";
+const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
+const FORMAL_AUTO_NEXT_DELAY_MS = 350;
+let autoNextTimer = null;
 const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
 const API_BASE = "https://jinzun-knowledge.vercel.app";
@@ -30,6 +33,8 @@ const state = {
   examSessionToken: "",
   submissionId: "",
   serverRecordId: "",
+  serverDuration: null,
+  examSubmitting: false,
   answers: new Map(),
 };
 
@@ -101,6 +106,8 @@ const els = {
   registerCode: document.querySelector("#registerCode"),
   registerError: document.querySelector("#registerError"),
   resetPhone: document.querySelector("#resetPhone"),
+  resetName: document.querySelector("#resetName"),
+  resetRole: document.querySelector("#resetRole"),
   resetPassword: document.querySelector("#resetPassword"),
   resetPasswordConfirm: document.querySelector("#resetPasswordConfirm"),
   resetCode: document.querySelector("#resetCode"),
@@ -109,6 +116,9 @@ const els = {
   userMeta: document.querySelector("#userMeta"),
   logoutBtn: document.querySelector("#logoutBtn"),
   quizSetupStatus: document.querySelector("#quizSetupStatus"),
+  examSubmitStatus: document.querySelector("#examSubmitStatus"),
+  retryExamSubmitBtn: document.querySelector("#retryExamSubmitBtn"),
+  adminDataWarning: document.querySelector("#adminDataWarning"),
   mobileSidebarToggle: document.querySelector("#mobileSidebarToggle"),
   sidebarTools: document.querySelector("#sidebarTools"),
 };
@@ -123,6 +133,22 @@ const safeJson = (key, fallback) => {
     return fallback;
   }
 };
+
+function getClientId() {
+  let clientId = localStorage.getItem("jz_client_id");
+  if (!clientId) {
+    clientId = crypto.randomUUID();
+    localStorage.setItem("jz_client_id", clientId);
+  }
+  return clientId;
+}
+
+function clearAutoNextTimer() {
+  if (autoNextTimer) {
+    clearTimeout(autoNextTimer);
+    autoNextTimer = null;
+  }
+}
 
 const safeJsonArray = (key) => {
   const value = safeJson(key, []);
@@ -385,7 +411,7 @@ function setSyncStatus(text, type = "info") {
 async function cloudRequest(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   const token = localStorage.getItem("jz_auth_token") || "";
-  const body = JSON.stringify({ ...payload, token: payload.token || token, userAgent: navigator.userAgent, deviceId: navigator.userAgent });
+  const body = JSON.stringify({ ...payload, token: payload.token || token, userAgent: navigator.userAgent, deviceId: payload.deviceId || getClientId(), clientId: payload.clientId || getClientId() });
   let lastError = null;
   for (const base of API_BASES) {
     try {
@@ -608,6 +634,7 @@ function renderDashboard() {
 
   els.bankCards.querySelectorAll(".bank-card").forEach((card) => {
     card.addEventListener("click", () => {
+      clearAutoNextTimer();
       state.currentBank = card.dataset.bank;
       state.learnPage = 1;
       els.bankSelect.value = state.currentBank;
@@ -669,6 +696,7 @@ function renderLearnFilter() {
 
   els.learnFilter.querySelectorAll(".learn-filter-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
+      clearAutoNextTimer();
       state.currentBank = btn.dataset.bank;
       state.learnPage = 1;
       els.bankSelect.value = state.currentBank;
@@ -811,6 +839,7 @@ function renderQuizSetup() {
 }
 
 async function startQuiz() {
+  clearAutoNextTimer();
   const size = Number(els.quizSize.value) || EXAM_SIZE;
   state.examType = els.examType?.value || "practice";
   state.examLabelOverride = "";
@@ -818,11 +847,16 @@ async function startQuiz() {
   state.examSessionToken = "";
   state.submissionId = "";
   state.serverRecordId = "";
+  state.serverDuration = null;
+  state.examSubmitting = false;
   state.answers = new Map();
   let pool = [];
   if (state.examType === "formal") {
-    const mode = state.quizMode === "role" ? "role" : "product";
-    const bank = mode === "role" ? els.roleBankSelect.value : els.productBankSelect.value;
+    const allowedModes = ["random", "product", "role"];
+    const mode = allowedModes.includes(state.quizMode) ? state.quizMode : "random";
+    let bank = "";
+    if (mode === "product") bank = els.productBankSelect.value;
+    if (mode === "role") bank = els.roleBankSelect.value;
     try {
       const data = await cloudRequest("exam-start", { mode, bank, size });
       if (!data.sessionToken || !data.examId || !Array.isArray(data.questions) || !data.questions.length) {
@@ -832,7 +866,7 @@ async function startQuiz() {
       state.examSessionToken = data.sessionToken;
       state.submissionId = crypto.randomUUID();
       state.quiz = data.questions;
-      state.examLabelOverride = data.bank || bank;
+      state.examLabelOverride = data.bank || bank || "综合产品题库";
     } catch (error) {
       els.quizSetupStatus.textContent = `正式考试启动失败：${error.message}`;
       return;
@@ -868,6 +902,8 @@ async function startQuiz() {
   state.quizWrong = 0;
   state.wrongDetails = [];
   state.examFinished = false;
+  if (els.examSubmitStatus) els.examSubmitStatus.textContent = "";
+  if (els.retryExamSubmitBtn) els.retryExamSubmitBtn.classList.add("hidden");
   setExamLocked(state.examType === "formal");
   startTimer(quizTimeLimit(state.quiz.length));
   updateWrongCount();
@@ -875,6 +911,30 @@ async function startQuiz() {
   els.quizResult.classList.add("hidden");
   els.quizRunner.classList.remove("hidden");
   renderQuizCard();
+}
+
+function goToNextQuestion() {
+  clearAutoNextTimer();
+  if (state.quizIndex + 1 >= state.quiz.length) {
+    finishQuiz();
+    return;
+  }
+  state.quizIndex += 1;
+  state.answered = false;
+  renderQuizCard();
+  renderStats();
+  requestAnimationFrame(() => {
+    els.quizCard?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  });
+}
+
+function scheduleAutoNext() {
+  clearAutoNextTimer();
+  const delay = state.examType === "formal" ? FORMAL_AUTO_NEXT_DELAY_MS : PRACTICE_AUTO_NEXT_DELAY_MS;
+  autoNextTimer = setTimeout(goToNextQuestion, delay);
 }
 
 function renderQuizCard() {
@@ -954,23 +1014,17 @@ function chooseAnswer(letter) {
   });
   const feedback = document.querySelector("#feedback");
   feedback.classList.remove("hidden");
-  const isLast = state.quizIndex + 1 === state.quiz.length;
+  const isLast = state.quizIndex + 1 >= state.quiz.length;
   feedback.innerHTML = state.examType === "formal" ? `
     <strong>已作答</strong>
-    <p class="explain">正式考试模式：交卷后统一展示成绩和错题解析。</p>
-    <button class="primary-btn next-btn" id="nextQuestionBtn">${isLast ? "交卷看成绩" : "下一题"}</button>
+    <p class="explain">${isLast ? "正在提交试卷…" : "即将进入下一题…"}</p>
   ` : `
     <strong>${correct ? "回答正确" : "回答错误"}</strong>
     <p class="explain">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(displayAnswerText(question))}</p>
     <p class="explain">${escapeHtml(displayExplanation(question))}</p>
-    <button class="primary-btn next-btn" id="nextQuestionBtn">${isLast ? "查看成绩" : "下一题"}</button>
+    <p class="auto-next-hint">${isLast ? "即将显示成绩…" : "即将进入下一题…"}</p>
   `;
-  document.querySelector("#nextQuestionBtn").addEventListener("click", () => {
-    state.quizIndex += 1;
-    state.answered = false;
-    renderQuizCard();
-    renderStats();
-  });
+  scheduleAutoNext();
 }
 
 function saveMistake(question, selected) {
@@ -986,12 +1040,12 @@ async function submitFormalExam() {
     sessionToken: state.examSessionToken,
     submissionId: state.submissionId,
     answers: [...state.answers.entries()].map(([id, answer]) => ({ id, answer })),
-    duration: timerSeconds,
   });
   if (!data.record_id) throw new Error("服务器未返回正式考试记录ID");
   state.score = Number(data.correct || 0);
   state.quizWrong = Number(data.wrong || 0);
   state.serverRecordId = data.record_id;
+  state.serverDuration = Number.isFinite(Number(data.duration)) ? Number(data.duration) : null;
   state.wrongDetails = Array.isArray(data.wrong_details) ? data.wrong_details : [];
   state.wrongDetails.forEach((item) => saveMistake(item, item.selected || "未作答"));
   return data;
@@ -999,15 +1053,25 @@ async function submitFormalExam() {
 
 async function finishQuiz() {
   if (state.examFinished || !state.quiz.length) return;
+  if (state.examType === "formal" && state.examSubmitting) return;
+  clearAutoNextTimer();
   stopTimer();
   if (state.examType === "formal") {
+    state.examSubmitting = true;
+    document.body.classList.add("exam-submitting");
     try {
       await submitFormalExam();
     } catch (error) {
       state.examFinished = false;
       setExamLocked(true);
-      els.quizSetupStatus.textContent = `正式考试尚未提交：${error.message}，请保持网络后再次点击交卷。`;
+      if (els.examSubmitStatus) {
+        els.examSubmitStatus.textContent = `成绩提交失败：${error.message}`;
+        els.retryExamSubmitBtn.classList.remove("hidden");
+      }
       return;
+    } finally {
+      state.examSubmitting = false;
+      document.body.classList.remove("exam-submitting");
     }
   } else {
     const unansweredQuestions = state.quiz.filter((question) => !state.answeredQuestionIds.has(question.id));
@@ -1025,9 +1089,11 @@ async function finishQuiz() {
   }
   state.examFinished = true;
   setExamLocked(false);
+  if (els.examSubmitStatus) els.examSubmitStatus.textContent = "";
+  if (els.retryExamSubmitBtn) els.retryExamSubmitBtn.classList.add("hidden");
   updateWrongCount();
   const percent = state.quiz.length ? Math.round((state.score / state.quiz.length) * 100) : 0;
-  const timeStr = formatTime(timerSeconds);
+  const timeStr = formatTime(state.serverDuration ?? timerSeconds);
   saveExamRecord(percent);
   els.quizRunner.classList.add("hidden");
   els.quizResult.classList.remove("hidden");
@@ -1136,6 +1202,7 @@ function renderMistakes() {
 }
 
 function startMistakeQuiz() {
+  clearAutoNextTimer();
   const mistakes = storage.mistakes;
   if (!mistakes.length) return;
   state.quiz = shuffle(mistakes).slice(0, Math.min(30, mistakes.length));
@@ -1148,6 +1215,7 @@ function startMistakeQuiz() {
   state.wrongDetails = [];
   state.examType = "practice";
   state.examFinished = false;
+  state.examSubmitting = false;
   state.examLabelOverride = "错题重练";
   startTimer(quizTimeLimit(state.quiz.length));
   updateWrongCount();
@@ -1226,12 +1294,20 @@ function renderRanking() {
 
 function renderAdmin() {
   if (!isAdminUser()) {
+    els.adminDataWarning?.classList.add("hidden");
     els.adminMetrics.innerHTML = `<div class="empty">无权限访问管理看板。</div>`;
     els.adminUserTable.innerHTML = "";
     els.adminWeakList.innerHTML = "";
     return;
   }
   const cloud = state.cloudStats;
+  const errors = Array.isArray(cloud?.errors) ? cloud.errors : [];
+  if (els.adminDataWarning) {
+    els.adminDataWarning.classList.toggle("hidden", !errors.length);
+    els.adminDataWarning.textContent = errors.length
+      ? "部分飞书数据读取失败，本页统计可能不完整，请勿直接用于考核结论。"
+      : "";
+  }
   const users = cloud?.employees?.length
     ? cloud.employees.map((u) => ({ name: u["姓名"], phone: u["手机号"], role: u["岗位"] }))
     : Object.values(userStore.users);
@@ -1240,8 +1316,9 @@ function renderAdmin() {
       ? cloud.exams.filter((r) => String(r["手机号"]) === String(user.phone) && String(r["考核类型"] || "") === "正式考试").map((r) => ({
           percent: Number(r["分数"] || 0), score: Number(r["答对数"] || 0), total: Number(r["总题数"] || 0),
           wrong: Number(r["答错数"] || 0), duration: Number(r["用时秒数"] || 0), bank: r["题库"], type: r["考核类型"], finishedAt: r["提交时间"],
-        }))
+        })).sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime())
       : getUserRecords(user.phone).filter((r) => r.type === "正式考试");
+    records.sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime());
     const mistakes = cloud?.mistakes?.length
       ? cloud.mistakes.filter((r) => String(r["手机号"]) === String(user.phone)).map((r) => ({ knowledgePoint: r["知识点"], bank: r["题库"] }))
       : getUserMistakes(user.phone);
@@ -1300,7 +1377,7 @@ function renderAdmin() {
 function exportRecords() {
   const rows = state.cloudStats?.exams?.length
     ? state.cloudStats.exams.map((r) => ({
-        姓名: r["姓名"], 手机号: r["手机号"], 岗位: r["岗位"], 考试名称: r["考试名称"], 考核类型: r["考核类型"], 题库: r["题库"], 分数: r["分数"], 答对数: r["答对数"], 总题数: r["总题数"], 答错数: r["答错数"], 是否通过: r["是否通过"], 用时秒数: r["用时秒数"], 提交时间: r["提交时间"],
+        姓名: r["姓名"], 手机号: r["手机号"], 岗位: r["岗位"], 考试名称: r["考试名称"], 考核类型: r["考核类型"], 题库: r["题库"], 分数: r["分数"], 答对数: r["答对数"], 总题数: r["总题数"], 答错数: r["答错数"], 是否通过: r["是否通过"], 用时秒数: r["用时秒数"], 提交时间: r["提交时间"], 考试会话ID: r["考试会话ID"],
       }))
     : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).map((record) => ({
         姓名: user.name,
@@ -1317,7 +1394,7 @@ function exportRecords() {
         用时秒数: record.duration,
         提交时间: record.finishedAt,
       })));
-  downloadText(`金尊考试记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "考试名称", "考核类型", "题库", "分数", "答对数", "总题数", "答错数", "是否通过", "用时秒数", "提交时间"], rows));
+  downloadText(`金尊考试记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "考试名称", "考核类型", "题库", "分数", "答对数", "总题数", "答错数", "是否通过", "用时秒数", "提交时间", "考试会话ID"], rows));
 }
 
 function exportMistakes() {
@@ -1341,6 +1418,7 @@ function exportMistakes() {
 }
 
 function switchView(view) {
+  if (view !== "quiz") clearAutoNextTimer();
   if (!state.examFinished && state.examType === "formal" && view !== "quiz") return;
   if (view === "admin" && !isAdminUser()) {
     view = "dashboard";
@@ -1453,7 +1531,7 @@ async function loginEmployee(event) {
   button.disabled = true;
   button.textContent = "正在登录...";
   try {
-    const data = await cloudRequest("login", { account, password, clientId: navigator.userAgent });
+    const data = await cloudRequest("login", { account, password, clientId: getClientId() });
     if (!data.token || !data.user) throw new Error("账号或密码错误");
     saveAuthenticatedUser(data);
     els.loginPassword.value = "";
@@ -1487,7 +1565,7 @@ async function registerEmployee(event) {
   button.disabled = true;
   button.textContent = "正在注册...";
   try {
-    const data = await cloudRequest("register", { name, phone, role, password, registerCode, clientId: navigator.userAgent });
+    const data = await cloudRequest("register", { name, phone, role, password, registerCode, clientId: getClientId() });
     if (!data.token || !data.user) throw new Error("注册失败");
     saveAuthenticatedUser(data);
     els.registerForm.reset();
@@ -1506,12 +1584,16 @@ async function registerEmployee(event) {
 
 async function resetPassword(event) {
   event.preventDefault();
+  const name = els.resetName.value.trim();
   const phone = normalizePhone(els.resetPhone.value);
+  const role = els.resetRole.value;
   const password = els.resetPassword.value;
   const confirm = els.resetPasswordConfirm.value;
   const registerCode = els.resetCode.value.trim();
   els.resetError.textContent = "";
+  if (!name) return void (els.resetError.textContent = "请输入真实姓名");
   if (!/^1\d{10}$/.test(phone)) return void (els.resetError.textContent = "请输入正确的11位手机号");
+  if (!role) return void (els.resetError.textContent = "请选择岗位");
   const error = passwordError(password);
   if (error) return void (els.resetError.textContent = error);
   if (password !== confirm) return void (els.resetError.textContent = "两次输入的密码不一致");
@@ -1520,7 +1602,7 @@ async function resetPassword(event) {
   button.disabled = true;
   button.textContent = "正在重置...";
   try {
-    const data = await cloudRequest("reset", { phone, password, registerCode, clientId: navigator.userAgent });
+    const data = await cloudRequest("reset", { name, phone, role, password, registerCode, clientId: getClientId() });
     if (!data.token || !data.user) throw new Error("密码重置失败");
     saveAuthenticatedUser(data);
     els.resetForm.reset();
@@ -1535,8 +1617,10 @@ async function resetPassword(event) {
 }
 
 function logout() {
+  clearAutoNextTimer();
   stopTimer();
   state.examFinished = true;
+  state.examSubmitting = false;
   setExamLocked(false);
   userStore.currentPhone = "";
   localStorage.removeItem("jz_auth_token");
@@ -1556,6 +1640,7 @@ function logout() {
 function bindEvents() {
   els.navTabs.forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
   els.bankSelect.addEventListener("change", () => {
+    clearAutoNextTimer();
     state.currentBank = els.bankSelect.value;
     state.learnPage = 1;
     renderAll();
@@ -1570,6 +1655,7 @@ function bindEvents() {
   els.exportMistakesBtn.addEventListener("click", exportMistakes);
   document.querySelectorAll(".mode-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
+      clearAutoNextTimer();
       state.quizMode = tab.dataset.mode;
       document.querySelectorAll(".mode-tab").forEach((t) =>
         t.classList.toggle("active", t === tab)
@@ -1600,6 +1686,7 @@ function bindEvents() {
   els.loginForm.addEventListener("submit", loginEmployee);
   els.registerForm.addEventListener("submit", registerEmployee);
   els.resetForm.addEventListener("submit", resetPassword);
+  els.retryExamSubmitBtn?.addEventListener("click", finishQuiz);
   document.querySelectorAll(".password-toggle").forEach((button) => {
     button.addEventListener("click", () => {
       const input = document.getElementById(button.dataset.target);
