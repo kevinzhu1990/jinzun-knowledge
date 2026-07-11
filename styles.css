@@ -1414,3 +1414,12 @@ input:disabled {
   }
 }
 .cloud-sync-status{position:fixed;right:18px;bottom:18px;z-index:9999;max-width:360px;padding:12px 14px;border-radius:14px;font-size:13px;font-weight:700;box-shadow:0 16px 40px rgba(15,23,42,.18);background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}.cloud-sync-status.success{background:#ecfdf5;color:#047857;border-color:#a7f3d0}.cloud-sync-status.warn{background:#fffbeb;color:#b45309;border-color:#fde68a}.cloud-sync-status.error{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
+
+.admin-account-tools { margin: 18px 0; }
+.admin-account-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 10px; align-items: center; }
+.admin-account-form .text-input, .admin-account-form .select { min-width: 0; }
+.admin-employee-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line, #d8e0e6); }
+.admin-employee-row small { display: block; color: var(--muted, #6d7d8d); margin-top: 4px; }
+.admin-employee-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.danger-btn { border: 1px solid #c95757; background: #fff5f5; color: #a72c2c; border-radius: 6px; padding: 9px 12px; cursor: pointer; }
+@media (max-width: 760px) { .admin-account-form { grid-template-columns: 1fr; } .admin-employee-row { align-items: flex-start; flex-direction: column; } .admin-employee-actions { justify-content: flex-start; } }
