@@ -1,7 +1,9 @@
 {
   "functions": {
     "api/cloud.js": {
-      "includeFiles": "outputs/**/*.json"
+      "includeFiles": "outputs/**/*.json",
+      "maxDuration": 60
     }
   }
 }
+
