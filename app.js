@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260711-round5";
+const BUILD_VERSION = "20260711-admin";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
