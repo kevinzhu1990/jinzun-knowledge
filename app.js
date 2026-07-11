@@ -1817,6 +1817,15 @@ async function init() {
   try {
     await loadQuestions();
     loadCurrentUser();
+    if (state.currentUser) {
+      try {
+        const session = await cloudRequest("session", {});
+        if (session?.token && session?.user) saveAuthenticatedUser(session);
+      } catch {
+        localStorage.removeItem("jz_auth_token");
+        state.currentUser = null;
+      }
+    }
     reconcileStoredQuestions();
     renderBankSelect();
     renderQuizSetup();
