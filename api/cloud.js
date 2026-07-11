@@ -289,6 +289,26 @@ const signToken = (payload) => {
   const signature = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url');
   return `${body}.${signature}`;
 };
+const sessionKey = () => crypto.createHash('sha256').update(AUTH_SECRET).digest();
+const sealExamSession = (payload) => {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', sessionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(payload), 'utf8'), cipher.final()]);
+  return [iv, cipher.getAuthTag(), encrypted].map((part) => part.toString('base64url')).join('.');
+};
+const openExamSession = (token) => {
+  try {
+    const [ivText, tagText, encryptedText] = String(token || '').split('.');
+    if (!ivText || !tagText || !encryptedText) return null;
+    const decipher = crypto.createDecipheriv('aes-256-gcm', sessionKey(), Buffer.from(ivText, 'base64url'));
+    decipher.setAuthTag(Buffer.from(tagText, 'base64url'));
+    const raw = Buffer.concat([decipher.update(Buffer.from(encryptedText, 'base64url')), decipher.final()]);
+    const payload = JSON.parse(raw.toString('utf8'));
+    return payload.exp > Date.now() ? payload : null;
+  } catch {
+    return null;
+  }
+};
 const verifyToken = (token) => {
   if (!AUTH_SECRET || typeof token !== 'string') return null;
   const [body, signature] = token.split('.');
@@ -571,7 +591,7 @@ async function handleExamStart(payload, user) {
   const selected = shuffleServer(pool).slice(0, Math.min(size, pool.length));
   const examId = crypto.randomUUID();
   const expiresAt = Date.now() + 2 * 60 * 60 * 1000;
-  const sessionToken = signToken({
+  const sessionToken = sealExamSession({
     kind: 'exam', examId, uid: user.id, phone: user.phone,
     sessionVersion: user.sessionVersion, bank: payload.bank || '产品题库',
     mode: payload.mode === 'role' ? 'role' : 'product',
@@ -612,7 +632,7 @@ async function handleMistakes(payload, user) {
 }
 
 async function handleExamSubmit(payload, user) {
-  const session = verifyToken(payload.sessionToken);
+  const session = openExamSession(payload.sessionToken);
   if (!session || session.kind !== 'exam' || session.uid !== user.id || session.phone !== user.phone
     || session.sessionVersion !== user.sessionVersion) throw httpError(401, '考试会话已失效，请重新开始考试');
   const submissionId = String(payload.submissionId || '').trim();
