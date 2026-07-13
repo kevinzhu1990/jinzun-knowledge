@@ -1,378 +1,140 @@
 from __future__ import annotations
-
-import json
-import hashlib
-import io
-import os
-import random
-import re
-import shutil
-import xml.etree.ElementTree as ET
-import zipfile
-from collections import Counter
-from datetime import datetime, timezone
+import hashlib,json,os,re,zipfile,xml.etree.ElementTree as ET
+from datetime import datetime,timezone
 from pathlib import Path
-from xml.sax.saxutils import escape
 
-try:
-    from PIL import Image, ImageOps
-except ImportError:
-    Image = None
-    ImageOps = None
+ROOT=Path(__file__).resolve().parents[1]
+SOURCE=Path(os.environ['JINZUN_SOURCE_XLSX'])
+VERSION='20260713-product-sync'
+SOURCE_LABEL=SOURCE.stem
+OUT=ROOT/'outputs/product_quiz'
+PRODUCT_JSON=OUT/'é‡‘å°Šäº§å“çŸ¥è¯†åº“é¢˜åº“.json'
+PRODUCT_XLSX=OUT/'é‡‘å°Šäº§å“çŸ¥è¯†åº“é¢˜åº“.xlsx'
+AUDIT=ROOT/'outputs/quiz_logic_audit.json'
+DIFF_JSON=OUT/'product_sync_diff_20260713.json'
+DIFF_MD=OUT/'product_sync_diff_20260713.md'
+NS={'a':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 
+def clean(v):
+    s='' if v is None else str(v); s=re.sub(r'\r?\n+','ï¼›',s); s=re.sub(r'\s+',' ',s).strip()
+    s=s.replace(chr(0x76ee)+chr(0x997c),chr(0x6708)+chr(0x997c)); s=re.sub(r'(\d+)g'+chr(0x514b),r'\1g',s)
+    s=s.replace('2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+chr(0x5c0f)+chr(0x76d2)+chr(0x88c5)+'258g','2576ï¼š2608'+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g')
+    s=s.replace('2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g','2576ï¼š2608'+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g')
+    s=re.sub('2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+r'(?:å°ç›’è£…)?258(?:g)?(?:\*?\d+|[ä¸€äºŒä¸‰å››äº”å…­]ç›’)?','2576ï¼š2608'+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g',s)
+    return '' if s.lower() in {'none','nan'} else s.strip('ï¼› ')
+def k(v): return re.sub(r'[\sï¼š:ï¼›;ï¼ˆï¼‰()/\\_\-]+','',clean(v)).lower()
+def code(v):
+    s=clean(v); s=s[:-2] if re.fullmatch(r'\d+\.0',s) else s
+    return s.zfill(4) if s.isdigit() and len(s)<4 else s
+def strings(z):
+    if 'xl/sharedStrings.xml' not in z.namelist(): return []
+    r=ET.fromstring(z.read('xl/sharedStrings.xml'))
+    return [''.join(x.text or '' for x in i.iter() if x.tag.endswith('}t')) for i in r]
+def cval(c,ss):
+    if c.attrib.get('t')=='inlineStr': return clean(''.join(x.text or '' for x in c.iter() if x.tag.endswith('}t')))
+    v=c.find('a:v',NS)
+    if v is None:return ''
+    return clean(ss[int(v.text)]) if c.attrib.get('t')=='s' else clean(v.text)
+def col(ref):
+    n=0
+    for x in re.sub(r'\d','',ref): n=n*26+ord(x.upper())-64
+    return n
+def read_book():
+    with zipfile.ZipFile(SOURCE) as z:
+        ss=strings(z); b=ET.fromstring(z.read('xl/workbook.xml')); rel=ET.fromstring(z.read('xl/_rels/workbook.xml.rels'))
+        rm={x.attrib['Id']:x.attrib['Target'] for x in rel}; result={}
+        for sh in b.find('a:sheets',NS):
+            name=sh.attrib['name']; rid=sh.attrib['{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id']
+            root=ET.fromstring(z.read('xl/'+rm[rid].lstrip('/'))); rows=[]
+            for row in root.findall('.//a:sheetData/a:row',NS): rows.append({col(c.attrib.get('r','A1')):cval(c,ss) for c in row})
+            heads={i:clean(v) for i,v in (rows[0].items() if rows else [])}
+            result[name]=[{heads[i]:clean(v) for i,v in r.items() if heads.get(i)} for r in rows[1:] if any(r.values())]
+    return result
+def get(row,*names):
+    d={k(x):clean(v) for x,v in row.items()}
+    for n in names:
+        if d.get(k(n)): return d[k(n)]
+    for n in names:
+        for a,v in d.items():
+            if k(n) in a or a in k(n):
+                if v:return v
+    return ''
+def line(name,contents):
+    t=name+contents
+    if any(x in t for x in ('æ›²å¥‡','é¥¼å¹²')):return 'æ›²å¥‡/é¥¼å¹²ç±»'
+    if any(x in t for x in ('è›‹å·','å‡¤å‡°å·')):return 'è›‹å·ç±»'
+    if any(x in t for x in ('ç¤¼ç›’','ç»„åˆ','å››å®','é‡‘çŽ‰æ»¡å ‚','å¹´å¹´å¯Œè´µ')):return 'ç³•ç‚¹ç¤¼ç›’ç±»'
+    return 'ç³•ç‚¹ç±»'
+def sid(*x):return 'P-'+hashlib.sha1('|'.join(x).encode()).hexdigest()[:12].upper()
+def opts(correct,pool,seed):
+    vals=sorted({clean(x) for x in pool if clean(x) and clean(x)!=clean(correct)},key=lambda x:hashlib.sha1((seed+x).encode()).hexdigest())[:3]
+    vals=([clean(correct)]+vals); vals += [f'æš‚æ— å…¶ä»–æœ‰æ•ˆèµ„æ–™{i}' for i in range(1,5)]; vals=vals[:4]; order=sorted(range(4),key=lambda i:hashlib.sha1(f'{seed}:{i}'.encode()).hexdigest()); vals=[vals[i] for i in order]
+    return vals,'ABCD'[vals.index(clean(correct))]
+def q(bank,cat,pl,cd,name,kp,text,correct,pool,note=''):
+    os_,ans=opts(correct,pool,cd+kp)
+    return {'id':sid(bank,cd,kp,text),'bank':bank,'category':cat,'productLine':pl,'code':cd,'productName':name,'type':'å•é€‰é¢˜','difficulty':'åŸºç¡€','knowledgePoint':kp,'question':text,'optionA':os_[0],'optionB':os_[1],'optionC':os_[2],'optionD':os_[3],'answer':ans,'answerText':correct,'explanation':f'{text.rstrip("ï¼Ÿ")}ï¼š{correct}ã€‚','questionImage':'','optionAImage':'','optionBImage':'','optionCImage':'','optionDImage':'','source':SOURCE_LABEL,'note':note,'version':VERSION}
+def product(row,bank,sheet):
+    cd=code(get(row,'è´§å·')); name=get(row,'äº§å“åç§°')
+    if not cd or not name:return None
+    if cd=='2576':name='2608æä»é¥¼258g'
+    moon=bank=='æœˆé¥¼é¢˜åº“'; size=get(row,'äº§å“å°ºå¯¸é•¿å®½é«˜CM','äº§å“å°ºå¯¸ï¼›é•¿å®½é«˜cm','äº§å“å°ºå¯¸é•¿å®½é«˜cm')
+    if sheet=='26å¹´æ•£é¥¼' and not size:
+        ds=[get(row,'é•¿'),get(row,'å®½'),get(row,'é«˜')]; size='*'.join(ds) if all(ds) else ''
+    outer=get(row,'å¤–ç®±é•¿å®½é«˜ï¼›cm','å¤–ç®±é•¿å®½é«˜cm'); size='ï¼›'.join(x for x in (f'äº§å“å°ºå¯¸{size}cm' if size else '',f'å¤–ç®±{outer}cm' if outer else '') if x)
+    contents=get(row,'å†…é…','å†…é…æ˜Žç»†','å†…é…/å£å‘³')
+    return {'code':cd,'name':name,'bank':bank,'cat':'æœˆé¥¼äº§å“' if moon else 'æ—¥å¸¸å¹´è´§äº§å“','line':('æœˆé¥¼-é“ç½' if 'é“ç½' in get(row,'ç›’åž‹') else 'æœˆé¥¼-ç¤¼ç›’') if moon else line(name,contents),'carton':get(row,'ç®±è§„'),'contents':contents,'net':get(row,'å‡€é‡g','å‡€é‡'),'shelf':get(row,'ä¿è´¨æœŸ'),'size':size,'barcode':get(row,'æ¡ç ','å•†å“æ¡ç '),'unit':get(row,'å•ä½'),'sheet':sheet}
+def write_xlsx(path,qs):
+    hs=list(qs[0]) if qs else ['id']
+    def esc(v):return str(v).replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('\n',' ')
+    def xlcol(n):
+        out=''
+        while n:
+            n,r=divmod(n-1,26); out=chr(65+r)+out
+        return out
+    rows=[hs]+[[x.get(h,'') for h in hs] for x in qs]; body=''
+    for r,row in enumerate(rows,1):
+        body+=f'<row r="{r}">'+''.join(f'<c r="{xlcol(c)}{r}" t="inlineStr"><is><t>{esc(v)}</t></is></c>' for c,v in enumerate(row,1))+'</row>'
+    sheet=f'<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>{body}</sheetData></worksheet>'
+    ct='<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'
+    rel='<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'
+    wb='<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="é¢˜åº“" sheetId="1" r:id="rId1"/></sheets></workbook>'
+    wr='<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'
+    with zipfile.ZipFile(path,'w',zipfile.ZIP_DEFLATED) as z:z.writestr('[Content_Types].xml',ct);z.writestr('_rels/.rels',rel);z.writestr('xl/workbook.xml',wb);z.writestr('xl/_rels/workbook.xml.rels',wr);z.writestr('xl/worksheets/sheet1.xml',sheet)
+def main():
+    old=json.loads(PRODUCT_JSON.read_text(encoding='utf-8')) if PRODUCT_JSON.exists() else []; data=read_book(); items=[]
+    for sh,bk in [('26å¹´æœˆé¥¼ç¤¼ç›’','æœˆé¥¼é¢˜åº“'),('26å¹´æ•£é¥¼','æœˆé¥¼é¢˜åº“'),('26å¹´ç³•ç‚¹é¥¼å¹²','æ—¥å¸¸å¹´è´§é¢˜åº“')]:
+        for r in data.get(sh,[]):
+            x=product(r,bk,sh)
+            if x:items.append(x)
+    by={}; [by.setdefault(x['code'],x) for x in items]; items=list(by.values()); qs=[]
+    fields=[('äº§å“åç§°','name','{c} å¯¹åº”çš„äº§å“åç§°æ˜¯ä»€ä¹ˆï¼Ÿ'),('äº§å“çº¿','line','{c} å±žäºŽå“ªæ¡äº§å“çº¿ï¼Ÿ'),('ç®±è§„','carton','{c} çš„ç®±è§„æ˜¯å¤šå°‘ï¼Ÿ'),('å†…é…/å£å‘³','contents','{c} çš„å†…é…/å£å‘³æ˜¯ä»€ä¹ˆï¼Ÿ'),('å…‹é‡/å‡€é‡','net','{c} çš„å…‹é‡/å‡€é‡æ˜¯å¤šå°‘ï¼Ÿ'),('ä¿è´¨æœŸ','shelf','{c} çš„ä¿è´¨æœŸæ˜¯å¤šå°‘ï¼Ÿ'),('å°ºå¯¸/å¤–ç®±','size','{c} çš„å°ºå¯¸/å¤–ç®±æ˜¯å¤šå°‘ï¼Ÿ'),('æ¡ç ','barcode','{c} çš„å•†å“æ¡ç æ˜¯ä»€ä¹ˆï¼Ÿ'),('å•ä½','unit','{c} çš„é”€å”®å•ä½æ˜¯ä»€ä¹ˆï¼Ÿ')]
+    for x in items:
+        same=[y for y in items if y['bank']==x['bank']]
+        for kp,f,p in fields:
+            if x[f]:qs.append(q(x['bank'],x['cat'],x['line'],x['code'],x['name'],kp,p.format(c=x['code']),x[f],[y[f] for y in same],x['sheet']))
+        seg='mooncake' if x['bank']=='æœˆé¥¼é¢˜åº“' else 'daily'; img=ROOT/'assets/product-images'/seg/f"{x['code']}.jpg"
+        if img.is_file():
+            z=q(x['bank'],x['cat'],x['line'],x['code'],x['name'],'çœ‹å›¾ç‰‡é€‰è´§å·','è¿™å¼ å›¾ç‰‡å¯¹åº”çš„è´§å·æ˜¯ä»€ä¹ˆï¼Ÿ',x['code'],[y['code'] for y in same],x['sheet']);z['questionImage']=img.relative_to(ROOT).as_posix();qs.append(z)
+            if x['bank']=='æœˆé¥¼é¢˜åº“':
+                z=q(x['bank'],x['cat'],x['line'],x['code'],x['name'],'çœ‹è´§å·é€‰å›¾ç‰‡',f"{x['code']} å¯¹åº”çš„äº§å“å›¾ç‰‡æ˜¯å“ªä¸€å¼ ï¼Ÿ",img.relative_to(ROOT).as_posix(),[f"assets/product-images/mooncake/{y['code']}.jpg" for y in same if (ROOT/'assets/product-images/mooncake'/f"{y['code']}.jpg").is_file()],x['sheet'])
+                for letter in 'ABCD':
+                    z[f'option{letter}Image']=z[f'option{letter}']; z[f'option{letter}']='å›¾ç‰‡'+letter
+                z['answerText']=z[f"option{z['answer']}Image"]; qs.append(z)
+    brand_rows=data.get('å“ç‰Œä»‹ç»',[])
+    brand_values=[get(r,'ç»Ÿä¸€å…±æ€§å–ç‚¹') for r in brand_rows if get(r,'ç»Ÿä¸€å…±æ€§å–ç‚¹')]
+    for r in brand_rows:
+        module=get(r,'æ¨¡å—'); value=get(r,'ç»Ÿä¸€å…±æ€§å–ç‚¹')
+        if module and value:
+            qs.append(q('å“ç‰Œé¢˜åº“','å“ç‰Œèµ„æ–™','å“ç‰Œä»‹ç»',module,'é‡‘å°Šå“ç‰Œ','å“ç‰Œå£å¾„',f'å“ç‰Œèµ„æ–™â€œ{module}â€çš„ç»Ÿä¸€å£å¾„æ˜¯ä»€ä¹ˆï¼Ÿ',value,brand_values,'å“ç‰Œä»‹ç»'))
+    merchant_rows=data.get('å•†å®¶ç¼–ç ',[])
+    merchant_codes=[get(r,'å•†å®¶ç¼–ç ') for r in merchant_rows if get(r,'å•†å®¶ç¼–ç ')]
+    for r in merchant_rows:
+        combo=get(r,'ç»„åˆè£…åç§°'); merchant=get(r,'å•†å®¶ç¼–ç ')
+        if combo and merchant:
+            qs.append(q('å•†å®¶ç¼–ç é¢˜åº“','ç”µå•†èµ„æ–™','å•†å®¶ç¼–ç ',merchant,combo,'å•†å®¶ç¼–ç ',f'â€œ{combo}â€å¯¹åº”çš„å•†å®¶ç¼–ç æ˜¯ä»€ä¹ˆï¼Ÿ',merchant,merchant_codes,'å•†å®¶ç¼–ç '))
+    before={str(x.get('code')) for x in old if x.get('bank') in ('æœˆé¥¼é¢˜åº“','æ—¥å¸¸å¹´è´§é¢˜åº“') and x.get('knowledgePoint')=='äº§å“åç§°' and x.get('code')}; after=set(by); missing=[x['code'] for x in items if not (ROOT/'assets/product-images'/('mooncake' if x['bank']=='æœˆé¥¼é¢˜åº“' else 'daily')/f"{x['code']}.jpg").is_file()]
+    baseline_questions=int(os.environ.get('JINZUN_BASELINE_QUESTIONS',len(old)))
+    report={'source':str(SOURCE),'sourceSha256':hashlib.sha256(SOURCE.read_bytes()).hexdigest(),'generatedAt':datetime.now(timezone.utc).isoformat(),'version':VERSION,'sheets':{k:len(v) for k,v in data.items()},'beforeProducts':len(before),'afterProducts':len(after),'beforeQuestions':baseline_questions,'afterQuestions':len(qs),'deletedOldQuestions':max(0,baseline_questions-len(qs)),'newProducts':sorted(after-before),'deletedProducts':sorted(before-after),'missingSourceFields':sorted({f for x in items for f in ('carton','contents','net','shelf','size') if not x[f]}),'imageWarnings':missing,'corrections':{'2576':'2608æä»é¥¼258g','2605':'æŒ‰æœ€æ–°Excelç”Ÿæˆ','2621':'æŒ‰æœ€æ–°Excelç”Ÿæˆ'}}
+    PRODUCT_JSON.write_text(json.dumps(qs,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');write_xlsx(PRODUCT_XLSX,qs);AUDIT.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');DIFF_JSON.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');DIFF_MD.write_text('# Product Sync Diff 20260713\n\n'+json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');print(json.dumps({'activeProducts':len(after),'questions':len(qs),'imageWarnings':missing},ensure_ascii=False))
+if __name__=='__main__':main()
 
-NS = {
-    "a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
-    "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
-}
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parent
-WORK_DIR = REPO_ROOT.parents[1]
-DESKTOP = REPO_ROOT.parents[2]
-SOURCE_XLSX = (
-    Path(os.environ["JINZUN_SOURCE_XLSX"])
-    if os.environ.get("JINZUN_SOURCE_XLSX")
-    else next(
-        p
-        for p in DESKTOP.iterdir()
-        if p.suffix.lower() == ".xlsx" and "20260709" in p.name and not p.name.startswith("~$")
-    )
-)
-PRODUCT_JSON = REPO_ROOT / "outputs" / "product_quiz" / "é‡‘å°Šäº§å“çŸ¥è¯†åº“é¢˜åº“.json"
-PRODUCT_XLSX = REPO_ROOT / "outputs" / "product_quiz" / "é‡‘å°Šäº§å“çŸ¥è¯†åº“é¢˜åº“.xlsx"
-AUDIT_JSON = REPO_ROOT / "outputs" / "quiz_logic_audit.json"
-APP_JS = REPO_ROOT / "app.js"
-INDEX_HTML = REPO_ROOT / "index.html"
-
-BUILD_VERSION = "20260710"
-SOURCE_LABEL = SOURCE_XLSX.stem
-LETTERS = ["A", "B", "C", "D"]
-ALLOWED_NAME_PREFIX_MISMATCH = {"2576"}
-
-
-def normalize(value: object) -> str:
-    text = str(value or "").strip()
-    if text.lower() in {"nan", "none"}:
-        return ""
-    text = re.sub(r"\r?\n+", "ï¼›", text)
-    text = re.sub(r"\s+", " ", text)
-    text = re.sub(r"ï¼›\s*ï¼›+", "ï¼›", text)
-    return text.strip(" ï¼›")
-
-
-def normalize_code(value: object) -> str:
-    text = normalize(value)
-    if re.fullmatch(r"\d+\.0", text):
-        text = text[:-2]
-    if text.isdigit() and len(text) < 4:
-        return text.zfill(4)
-    return text
-
-
-def col_index(ref: str) -> int:
-    letters = "".join(ch for ch in ref if ch.isalpha())
-    number = 0
-    for ch in letters.upper():
-        number = number * 26 + ord(ch) - 64
-    return number
-
-
-def cell_ref(row: int, col: int) -> str:
-    letters = ""
-    while col:
-        col, rem = divmod(col - 1, 26)
-        letters = chr(65 + rem) + letters
-    return f"{letters}{row}"
-
-
-def load_shared_strings(zf: zipfile.ZipFile) -> list[str]:
-    if "xl/sharedStrings.xml" not in zf.namelist():
-        return []
-    strings: list[str] = []
-    with zf.open("xl/sharedStrings.xml") as fh:
-        for _, elem in ET.iterparse(fh, events=("end",)):
-            if elem.tag.endswith("}si"):
-                strings.append("".join(t.text or "" for t in elem.iter() if t.tag.endswith("}t")))
-                elem.clear()
-    return strings
-
-
-def cell_value(cell: ET.Element, shared_strings: list[str]) -> str:
-    cell_type = cell.attrib.get("t")
-    if cell_type == "inlineStr":
-        return "".join(t.text or "" for t in cell.iter() if t.tag.endswith("}t")).strip()
-    value = cell.find("a:v", NS)
-    if value is None:
-        formula = cell.find("a:f", NS)
-        return f"={formula.text}" if formula is not None and formula.text else ""
-    raw = value.text or ""
-    if cell_type == "s":
-        try:
-            return shared_strings[int(raw)].strip()
-        except Exception:
-            return raw.strip()
-    return raw.strip()
-
-
-def read_sheet(zf: zipfile.ZipFile, sheet_path: str, shared_strings: list[str]) -> list[dict[int, str]]:
-    rows: list[dict[int, str]] = []
-    with zf.open(sheet_path) as fh:
-        for _, elem in ET.iterparse(fh, events=("end",)):
-            if elem.tag.endswith("}row"):
-                cells: dict[int, str] = {}
-                for cell in elem:
-                    if not cell.tag.endswith("}c"):
-                        continue
-                    value = cell_value(cell, shared_strings)
-                    if value:
-                        cells[col_index(cell.attrib.get("r", "A1"))] = value
-                rows.append(cells)
-                elem.clear()
-    return rows
-
-
-def read_workbook(path: Path) -> dict[str, list[dict[str, str]]]:
-    with zipfile.ZipFile(path) as zf:
-        shared_strings = load_shared_strings(zf)
-        workbook = ET.fromstring(zf.read("xl/workbook.xml"))
-        rels = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
-        rid_to_target = {rel.attrib["Id"]: rel.attrib["Target"] for rel in rels}
-        result: dict[str, list[dict[str, str]]] = {}
-        for sheet in workbook.find("a:sheets", NS):
-            name = sheet.attrib["name"]
-            rid = sheet.attrib["{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"]
-            target = rid_to_target[rid]
-            sheet_path = "xl/" + target.lstrip("/")
-            raw_rows = read_sheet(zf, sheet_path, shared_strings)
-            if not raw_rows:
-                result[name] = []
-                continue
-            headers = {idx: normalize(value) for idx, value in raw_rows[0].items()}
-            data_rows: list[dict[str, str]] = []
-            for raw in raw_rows[1:]:
-                row = {headers[idx]: normalize(value) for idx, value in raw.items() if idx in headers}
-                if any(row.values()):
-                    data_rows.append(row)
-            result[name] = data_rows
-        return result
-
-
-def extract_product_images(products: list[dict[str, str]]) -> list[str]:
-    warnings: list[str] = []
-    with zipfile.ZipFile(SOURCE_XLSX) as zf:
-        if "xl/cellimages.xml" not in zf.namelist():
-            return ["æºè¡¨æœªåŒ…å«å¯æå–çš„å•å…ƒæ ¼å›¾ç‰‡"]
-
-        image_root = ET.fromstring(zf.read("xl/cellimages.xml"))
-        rel_root = ET.fromstring(zf.read("xl/_rels/cellimages.xml.rels"))
-        rid_to_target = {rel.attrib["Id"]: rel.attrib["Target"] for rel in rel_root}
-        image_id_to_target: dict[str, str] = {}
-        for cell_image in image_root:
-            name = ""
-            rid = ""
-            for elem in cell_image.iter():
-                if elem.tag.endswith("}cNvPr"):
-                    name = elem.attrib.get("name", "")
-                elif elem.tag.endswith("}blip"):
-                    rid = elem.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed", "")
-            if name and rid in rid_to_target:
-                image_id_to_target[name] = "xl/" + rid_to_target[rid].lstrip("/")
-
-        for product in products:
-            match = re.search(r'ID_[A-Fa-f0-9]+', product.get("imageFormula", ""))
-            if not match:
-                warnings.append(f"è´§å· {product['code']} çš„äº§å“å›¾ç‰‡å…¬å¼æ— æ•ˆ")
-                continue
-            target = image_id_to_target.get(match.group(0))
-            if not target or target not in zf.namelist():
-                warnings.append(f"è´§å· {product['code']} çš„äº§å“å›¾ç‰‡æœªåœ¨æºè¡¨ä¸­æ‰¾åˆ°")
-                continue
-
-            segment = "mooncake" if product["bank"] == "æœˆé¥¼é¢˜åº“" else "daily"
-            suffix = ".jpg" if Image else Path(target).suffix.lower().replace(".jpeg", ".jpg")
-            directory = REPO_ROOT / "assets" / "product-images" / segment
-            directory.mkdir(parents=True, exist_ok=True)
-            for existing in directory.glob(f"{product['code']}.*"):
-                existing.unlink()
-            output_path = directory / f"{product['code']}{suffix}"
-            image_bytes = zf.read(target)
-            if Image:
-                with Image.open(io.BytesIO(image_bytes)) as source_image:
-                    normalized_image = ImageOps.exif_transpose(source_image)
-                    product["imageWidth"] = str(normalized_image.width)
-                    product["imageHeight"] = str(normalized_image.height)
-                    if "A" in normalized_image.getbands():
-                        background = Image.new("RGB", normalized_image.size, "white")
-                        background.paste(normalized_image, mask=normalized_image.getchannel("A"))
-                        normalized_image = background
-                    else:
-                        normalized_image = normalized_image.convert("RGB")
-                    normalized_image.save(output_path, "JPEG", quality=92, optimize=True, progressive=True)
-            else:
-                output_path.write_bytes(image_bytes)
-            product["image"] = output_path.relative_to(REPO_ROOT).as_posix()
-
-    return warnings
-
-
-def first(row: dict[str, str], *names: str) -> str:
-    for name in names:
-        value = row.get(name, "")
-        if value:
-            return value
-    return ""
-
-
-def join_nonempty(*parts: str) -> str:
-    return "ï¼›".join(part for part in parts if part)
-
-
-def with_unit(value: str, unit: str) -> str:
-    value = normalize(value)
-    if not value:
-        return ""
-    return value if re.search(r"[a-zA-Zå…‹åƒå…¬æ–¤]", value) else f"{value}{unit}"
-
-
-def product_line_for_daily(name: str, contents: str) -> str:
-    text = f"{name} {contents}"
-    if "ç¤¼ç›’" in text or "ç»„åˆ" in text or "å››å®" in text or "é‡‘çŽ‰æ»¡å ‚" in text or "å¹´å¹´å¯Œè´µ" in text:
-        if any(word in text for word in ["æ›²å¥‡", "é¥¼å¹²"]):
-            return "æ›²å¥‡/é¥¼å¹²ç±»"
-        return "ç³•ç‚¹ç¤¼ç›’ç±»"
-    if any(word in text for word in ["è›‹å·", "å‡¤å‡°å·"]):
-        return "è›‹å·ç±»"
-    if any(word in text for word in ["æ›²å¥‡", "é¥¼å¹²"]):
-        return "æ›²å¥‡/é¥¼å¹²ç±»"
-    if any(word in text for word in ["æä»é¥¼", "é¸¡ä»”é¥¼", "åˆæ¡ƒé…¥", "å‡¤æ¢¨é…¥", "é¾™èˆŸé¥¼", "ç³•ç‚¹"]):
-        return "ç³•ç‚¹ç±»"
-    return "æ—¥å¸¸å¹´è´§ç±»"
-
-
-def build_products(workbook: dict[str, list[dict[str, str]]]) -> tuple[list[dict[str, str]], list[str]]:
-    products: list[dict[str, str]] = []
-    warnings: list[str] = []
-
-    for row in workbook.get("26å¹´æœˆé¥¼ç¤¼ç›’", []):
-        code = normalize_code(row.get("è´§å·", ""))
-        name = first(row, "äº§å“åç§°")
-        if not code or not name:
-            continue
-        box_type = first(row, "ç›’åž‹") or "ç¤¼ç›’"
-        product_line = "æœˆé¥¼-é“ç½" if "é“ç½" in box_type else "æœˆé¥¼-ç¤¼ç›’"
-        product_size = first(row, "äº§å“å°ºå¯¸é•¿å®½é«˜CM")
-        outer_box = first(row, "å¤–ç®±é•¿å®½é«˜ï¼›cm", "å¤–ç®±é•¿å®½é«˜ cm")
-        size_answer = join_nonempty(
-            f"äº§å“å°ºå¯¸{product_size}cm" if product_size else "",
-            f"å¤–ç®±{outer_box}cm" if outer_box else "",
-        )
-        products.append(
-            {
-                "code": code,
-                "name": name,
-                "bank": "æœˆé¥¼é¢˜åº“",
-                "category": "æœˆé¥¼äº§å“",
-                "productLine": product_line,
-                "packageType": box_type,
-                "tag": first(row, "æ ‡ç­¾"),
-                "cartonSpec": first(row, "ç®±è§„"),
-                "contents": first(row, "å†…é…"),
-                "netWeight": first(row, "å‡€é‡g"),
-                "shelfLife": first(row, "ä¿è´¨æœŸ"),
-                "productSize": product_size,
-                "outerBox": outer_box,
-                "sizeOrBox": size_answer,
-                "pieceCount": first(row, "æœˆé¥¼ï¼›ä¸ªæ•°", "æœˆé¥¼ ä¸ªæ•°"),
-                "barcode": first(row, "æ¡ç "),
-                "giftBag": first(row, "æ ‡é…ç¤¼è¢‹"),
-                "productWeight": with_unit(first(row, "äº§å“é‡é‡ï¼›KG"), "kg"),
-                "cartonWeight": with_unit(first(row, "æ•´ç®±é‡é‡KG"), "kg"),
-                "sellingPoints": first(row, "äº§å“å–ç‚¹"),
-                "imageFormula": first(row, "å›¾ç‰‡"),
-                "sourceSheet": "26å¹´æœˆé¥¼ç¤¼ç›’",
-            }
-        )
-
-    for row in workbook.get("26å¹´æ•£é¥¼", []):
-        code = normalize_code(row.get("è´§å·", ""))
-        name = first(row, "äº§å“åç§°")
-        if not code or not name:
-            continue
-        product_size = ""
-        if first(row, "é•¿") and first(row, "å®½") and first(row, "é«˜"):
-            product_size = f"äº§å“å°ºå¯¸{first(row, 'é•¿')}*{first(row, 'å®½')}*{first(row, 'é«˜')}cm"
-        outer_box = first(row, "å¤–ç®±é•¿å®½é«˜cm")
-        size_answer = join_nonempty(
-            product_size,
-            f"å¤–ç®±{outer_box}cm" if outer_box else "",
-        )
-        products.append(
-            {
-                "code": code,
-                "name": name,
-                "bank": "æœˆé¥¼é¢˜åº“",
-                "category": "æœˆé¥¼äº§å“",
-                "productLine": "æœˆé¥¼-æ•£é¥¼",
-                "packageType": "æ•£é¥¼",
-                "tag": "",
-                "cartonSpec": first(row, "ç®±è§„"),
-                "contents": first(row, "å†…é…æ˜Žç»†"),
-                "netWeight": first(row, "å‡€é‡g"),
-                "shelfLife": first(row, "ä¿è´¨æœŸ"),
-                "productSize": product_size.removeprefix("äº§å“å°ºå¯¸").removesuffix("cm"),
-                "outerBox": outer_box,
-                "sizeOrBox": size_answer,
-                "pieceCount": "",
-                "barcode": first(row, "æ¡ç "),
-                "giftBag": "",
-                "productWeight": with_unit(first(row, "äº§å“é‡é‡g"), "g"),
-                "cartonWeight": with_unit(first(row, "æ•´ç®±é‡é‡kg"), "kg"),
-                "sellingPoints": "",
-                "imageFormula": first(row, "å›¾ç‰‡"),
-                "sourceSheet": "26å¹´æ•£é¥¼",
-            }
-        )
-
-    for row in workbook.get("26å¹´ç³•ç‚¹é¥¼å¹²", []):
-        code = normalize_code(row.get("è´§å·", ""))
-        name = first(row, "äº§å“åç§°")
-        if not code or not name:
-            continue
-        contents = first(row, "å†…é…æ˜Žç»†")
-        product_size = first(row, "äº§å“å°ºå¯¸ï¼›é•¿å®½é«˜cm", "äº§å“å°ºå¯¸ é•¿å®½é«˜cm", "äº§å“å°ºå¯¸é•¿å®½é«˜cm")
-        outer_box = first(row, "å¤–ç®±é•¿å®½é«˜cm")
-        size_answer = join_nonempty(
-            f"äº§å“å°ºå¯¸{product_size}cm" if product_size else "",
-            f"å¤–ç®±{outer_box}cm" if outer_box else "",
-        )
-        products.append(
-            {
-                "code": code,
-                "name": name,
-                "bank": "æ—¥å¸¸å¹´è´§é¢˜åº“",
-                "category": "æ—¥å¸¸å¹´è´§äº§å“",
-                "productLine": product_line_for_daily(name, contents),
-                "packageType": "",
-                "tag": "",
-                "cartonSpec": first(row, "ç®±è§„"),
-                "contents": contents,
-                "netWeight": first(row, "å‡€é‡g"),
-                "shelfLife": first(row, "ä¿è´¨æœŸ"),
-                "productSize": product_size,
-                "outerBox": outer_box,
-                "sizeOrBox": size_answer,
-                "pieceCount": "",
-                "barcode": first(row, "æ¡ç "),
-                "giftBag": first(row, "æ ‡é…ç¤¼è¢‹"),
-                "productWeight": with_unit(first(row, "äº§å“é‡é‡KG"), "kg"),
-                "cartonWeight": with_unit(first(row, "æ•´ç®±é‡é‡KG"), "kg"),
-                "sellingPoints": "",
-                "imageFormula": first(row, "å›¾ç‰‡"),
-                "sourceSheet": "26å¹´ç³•ç‚¹é¥¼å¹²",
-            }
-        )
-
-    by_code: dicãÎ¸¶‰žËkºwµç@€€€€€€€€€€€Á½½°°(€€€€€€€€€€€€€€€Á½½°°(€€€€€€€€€€€€€€€‘¥™™¥Õ±Ñä°(€€€€€€€€€€€€¤((€€€µ•É¡…¹Ñ}É½ÝÌ€ôÝ½É­‰½½¬¹•Ð ‹–V–ºÛžò[ž‚ˆ°mt¤(€€€µ•É¡…¹Ñ}½‘•Ì€ôÕ¹¥ÅÕ”¡m™¥ÉÍÐ¡É½Ü°€‹–V–ºÛžò[ž‚ˆ¤™½ÈÉ½Ü¥¸µ•É¡…¹Ñ}É½ÝÍt¤(€€€™½ÈÉ½Ü¥¸µ•É¡…¹Ñ}É½ÝÌè(€€€€€€€½µ‰½}¹…µ”€ô™¥ÉÍÐ¡É½Ü°€‹žî–B#¢Ž–B7žžÀˆ¤(€€€€€€€µ•É¡…¹Ñ}½‘”€ô™¥ÉÍÐ¡É½Ü°€‹–V–ºÛžò[ž‚ˆ¤(€€€€€€€¥˜¹½Ð½µ‰½}¹…µ”½È¹½Ðµ•É¡…¹Ñ}½‘”è(€€€€€€€€€€€½¹Ñ¥¹Õ”(€€€€€€€¥Ñ•´€ôì(€€€€€€€€€€€€‰‰…¹¬ˆè€‹–V–ºÛžò[ž‚¦Šc–êLˆ°(€€€€€€€€€€€€‰…Ñ•½Éäˆè€‹žR×–V¢ÖšZdˆ°(€€€€€€€€€€€€‰ÁÉ½‘ÕÑ1¥¹”ˆè€‹–V–ºÛžò[ž‚ˆ°(€€€€€€€€€€€€‰½‘”ˆèµ•É¡…¹Ñ}½‘”°(€€€€€€€€€€€€‰¹…µ”ˆè½µ‰½}¹…µ”°(€€€€€€€€€€€€‰Í½ÕÉ•M¡••Ðˆè€‹–V–ºÛžò[ž‚ˆ°(€€€€€€€ô(€€€€€€€µ…­•}ÅÕ•ÍÑ¥½¸ (€€€€€€€€€€€ÅÕ•ÍÑ¥½¹Ì°(€€€€€€€€€€€¥Ñ•´°(€€€€€€€€€€€€‰µ•É¡…¹Ñ½‘”ˆ°(€€€€€€€€€€€€‹–V–ºÛžò[ž‚ˆ°(€€€€€€€€€€€˜‹Šqí½µ‰½}¹…µ•÷Šw–¾ç–êSžj–V–ºÛžò[ž‚šb¿’î’æ#¾ò|ˆ°(€€€€€€€€€€€µ•É¡…¹Ñ}½‘”°(€€€€€€€€€€€µ•É¡…¹Ñ}½‘•Ì°(€€€€€€€€€€€µ•É¡…¹Ñ}½‘•Ì°(€€€€€€€€€€€€‹¦7ž
-äˆ°(€€€€€€€€¤(€€€É•ÑÕÉ¸ÅÕ•ÍÑ¥½¹Ì(()=UQAUQ}!IL€ôl(€€€€‹¦Šcžn¹%ˆ°(€€€€‹¦Šc–êLˆ°(€€€€‹’âžêŸ–"žÆìˆ°(€€€€‹’êŸ–Nžêüˆ°(€€€€‹¢ÒŸ–>Üˆ°(€€€€‹’êŸ–N–B7žžÀˆ°(€€€€‹¦Šc–z,ˆ°(€€€€‹¦jû–ê˜ˆ°(€€€€‹ž~—¢¾ž
-äˆ°(€€€€‹¦Šcžn¸ˆ°(€€€€‰ˆ°(€€€€‰ˆ°(€€€€‰ˆ°(€€€€‰ˆ°(€€€€‹š¶ž†»ž¶Sš† ˆ°(€€€€‹ž¶Sš†#––ºäˆ°(€€€€‹¢žšz@ˆ°(€€€€‹¦Šcžn»–nûž&ˆ°(€€€€‰–nûž&ˆ°(€€€€‰–nûž&ˆ°(€€€€‰–nûž&ˆ°(€€€€‰–nûž&ˆ°)t(()‘•˜ÅÕ•ÍÑ¥½¹}É½Ü¡ÅÕ•ÍÑ¥½¸è‘¥ÑmÍÑÈ°ÍÑÉt¤€´ø±¥ÍÑmÍÑÉtè(€€€É•ÑÕÉ¸l(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰¥ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰‰…¹¬ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰…Ñ•½Éäˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰ÁÉ½‘ÕÑ1¥¹”ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰½‘”ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰ÁÉ½‘ÕÑ9…µ”ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰ÑåÁ”ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰‘¥™™¥Õ±Ñäˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰­¹½Ý±•‘•A½¥¹Ðˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰ÅÕ•ÍÑ¥½¸ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰½ÁÑ¥½¹ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰½ÁÑ¥½¹ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰½ÁÑ¥½¹ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰½ÁÑ¥½¹ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰…¹ÍÝ•Èˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰…¹ÍÝ•ÉQ•áÐˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰•áÁ±…¹…Ñ¥½¸ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰ÅÕ•ÍÑ¥½¹%µ…”ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰½ÁÑ¥½¹%µ…”ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰½ÁÑ¥½¹	%µ…”ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰½ÁÑ¥½¹%µ…”ˆ°€ˆˆ¤°(€€€€€€€ÅÕ•ÍÑ¥½¸¹•Ð ‰½ÁÑ¥½¹%µ…”ˆ°€ˆˆ¤°(€€€t(()‘•˜Í¡••Ñ}áµ°¡É½ÝÌè±¥ÍÑm±¥ÍÑmÍÑÉut¤€´øÍÑÈè(€€€áµ±}É½ÝÌè±¥ÍÑmÍÑÉt€ômt(€€€™½ÈÉ½Ý}¥¹‘•à°É½Ü¥¸•¹Õµ•É…Ñ”¡É½ÝÌ°€Ä¤è(€€€€€€€•±±Ìè±¥ÍÑmÍÑÉt€ômt(€€€€€€€™½È½±}¥¹‘•á}Ù…±Õ”°Ù…±Õ”¥¸•¹Õµ•É…Ñ”¡É½Ü°€Ä¤è(€€€€€€€€€€€É•˜€ô•±±}É•˜¡É½Ý}¥¹‘•à°½±}¥¹‘•á}Ù…±Õ”¤(€€€€€€€€€€€Ñ•áÐ€ô•Í…Á”¡ÍÑÈ¡Ù…±Õ”½È€ˆˆ¤¤(€€€€€€€€€€€•±±Ì¹…ÁÁ•¹¡˜œñŒÈô‰íÉ•™ôˆÐô‰¥¹±¥¹•MÑÈˆøñ¥ÌøñÐùíÑ•áÑôð½Ðøð½¥Ìøð½Œøœ¤(€€€€€€€áµ±}É½ÝÌ¹…ÁÁ•¹¡˜œñÉ½ÜÈô‰íÉ½Ý}¥¹‘•áôˆùìˆˆ¹©½¥¸¡•±±Ì¥ôð½É½Üøœ¤(€€€É•ÑÕÉ¸€ (€€€€€€€€œðýáµ°Ù•ÉÍ¥½¸ôˆÄ¸Àˆ•¹½‘¥¹œô‰UQ´àˆÍÑ…¹‘…±½¹”ô‰å•Ìˆüøœ(€€€€€€€€œñÝ½É­Í¡••Ðáµ±¹Ìô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½ÍÁÉ•…‘Í¡••Ñµ°¼ÈÀÀØ½µ…¥¸ˆ€œ(€€€€€€€€áµ±¹ÌéÈô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½½™™¥•½Õµ•¹Ð¼ÈÀÀØ½É•±…Ñ¥½¹Í¡¥ÁÌˆøœ(€€€€€€€€œñÍ¡••ÑY¥•ÝÌøñÍ¡••ÑY¥•ÜÝ½É­‰½½­Y¥•Ý%ôˆÀˆøñÁ…¹”åMÁ±¥ÐôˆÄˆÑ½Á1•™Ñ•±°ô‰Èˆ…Ñ¥Ù•A…¹”ô‰‰½ÑÑ½µ1•™ÐˆÍÑ…Ñ”ô‰™É½é•¸ˆ¼øð½Í¡••ÑY¥•Üøð½Í¡••ÑY¥•ÝÌøœ(€€€€€€€˜œñÍ¡••Ñ…Ñ„ùìˆˆ¹©½¥¸¡áµ±}É½ÝÌ¥ôð½Í¡••Ñ…Ñ„øœ(€€€€€€€€œð½Ý½É­Í¡••Ðøœ(€€€€¤(()‘•˜Í…™•}Í¡••Ñ}¹…µ”¡¹…µ”èÍÑÈ¤€´øÍÑÈè(€€€É•ÑÕÉ¸É”¹ÍÕˆ¡È‰mqmqtè¨ü½qqtˆ°€ˆˆ°¹…µ”¥lèÌÅt½È€‰M¡••Ðˆ(()‘•˜ÝÉ¥Ñ•}á±Íà¡Á…Ñ èA…Ñ °Í¡••ÑÌè±¥ÍÑmÑÕÁ±•mÍÑÈ°±¥ÍÑm±¥ÍÑmÍÑÉuuut¤€´ø9½¹”è(€€€Ñ¥µ•ÍÑ…µÀ€ô‘…Ñ•Ñ¥µ”¹¹½Ü¡Ñ¥µ•é½¹”¹ÕÑŒ¤¹ÍÑÉ™Ñ¥µ” ˆ•d´•´´•‘P• è•4è•Mhˆ¤(€€€½¹Ñ•¹Ñ}ÑåÁ•Ì€ôl(€€€€€€€€œðýáµ°Ù•ÉÍ¥½¸ôˆÄ¸Àˆ•¹½‘¥¹œô‰UQ´àˆÍÑ…¹‘…±½¹”ô‰å•Ìˆüøœ°(€€€€€€€€œñQåÁ•Ìáµ±¹Ìô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½Á…­…”¼ÈÀÀØ½½¹Ñ•¹ÐµÑåÁ•Ìˆøœ°(€€€€€€€€œñ•™…Õ±ÐáÑ•¹Í¥½¸ô‰É•±Ìˆ½¹Ñ•¹ÑQåÁ”ô‰…ÁÁ±¥…Ñ¥½¸½Ù¹¹½Á•¹áµ±™½Éµ…ÑÌµÁ…­…”¹É•±…Ñ¥½¹Í¡¥ÁÌ­áµ°ˆ¼øœ°(€€€€€€€€œñ•™…Õ±ÐáÑ•¹Í¥½¸ô‰áµ°ˆ½¹Ñ•¹ÑQåÁ”ô‰…ÁÁ±¥…Ñ¥½¸½áµ°ˆ¼øœ°(€€€€€€€€œñ=Ù•ÉÉ¥‘”A…ÉÑ9…µ”ôˆ½á°½Ý½É­‰½½¬¹áµ°ˆ½¹Ñ•¹ÑQåÁ”ô‰…ÁÁ±¥…Ñ¥½¸½Ù¹¹½Á•¹áµ±™½Éµ…ÑÌµ½™™¥•‘½Õµ•¹Ð¹ÍÁÉ•…‘Í¡••Ñµ°¹Í¡••Ð¹µ…¥¸­áµ°ˆ¼øœ°(€€€€€€€€œñ=Ù•ÉÉ¥‘”A…ÉÑ9…µ”ôˆ½á°½ÍÑå±•Ì¹áµ°ˆ½¹Ñ•¹ÑQåÁ”ô‰…ÁÁ±¥…Ñ¥½¸½Ù¹¹½Á•¹áµ±™½Éµ…ÑÌµ½™™¥•‘½Õµ•¹Ð¹ÍÁÉ•…‘Í¡••Ñµ°¹ÍÑå±•Ì­áµ°ˆ¼øœ°(€€€€€€€€œñ=Ù•ÉÉ¥‘”A…ÉÑ9…µ”ôˆ½‘½AÉ½ÁÌ½½É”¹áµ°ˆ½¹Ñ•¹ÑQåÁ”ô‰…ÁÁ±¥…Ñ¥½¸½Ù¹¹½Á•¹áµ±™½Éµ…ÑÌµÁ…­…”¹½É”µÁÉ½Á•ÉÑ¥•Ì­áµ°ˆ¼øœ°(€€€€€€€€œñ=Ù•ÉÉ¥‘”A…ÉÑ9…µ”ôˆ½‘½AÉ½ÁÌ½…ÁÀ¹áµ°ˆ½¹Ñ•¹ÑQåÁ”ô‰…ÁÁ±¥…Ñ¥½¸½Ù¹¹½Á•¹áµ±™½Éµ…ÑÌµ½™™¥•‘½Õµ•¹Ð¹•áÑ•¹‘•µÁÉ½Á•ÉÑ¥•Ì­áµ°ˆ¼øœ°(€€€t(€€€™½È¥¹‘•à¥¸É…¹” Ä°±•¸¡Í¡••ÑÌ¤€¬€Ä¤è(€€€€€€€½¹Ñ•¹Ñ}ÑåÁ•Ì¹…ÁÁ•¹¡˜œñ=Ù•ÉÉ¥‘”A…ÉÑ9…µ”ôˆ½á°½Ý½É­Í¡••ÑÌ½Í¡••Ñí¥¹‘•áô¹áµ°ˆ½¹Ñ•¹ÑQåÁ”ô‰…ÁÁ±¥…Ñ¥½¸½Ù¹¹½Á•¹áµ±™½Éµ…ÑÌµ½™™¥•‘½Õµ•¹Ð¹ÍÁÉ•…‘Í¡••Ñµ°¹Ý½É­Í¡••Ð­áµ°ˆ¼øœ¤(€€€½¹Ñ•¹Ñ}ÑåÁ•Ì¹…ÁÁ•¹ ˆð½QåÁ•Ìøˆ¤((€€€Ý½É­‰½½­}Í¡••ÑÌ€ô€ˆˆ¹©½¥¸ (€€€€€€€˜œñÍ¡••Ð¹…µ”ô‰í•Í…Á”¡Í…™•}Í¡••Ñ}¹…µ”¡¹…µ”¤¥ôˆÍ¡••Ñ%ô‰í¥¹‘•áôˆÈé¥ô‰É%‘í¥¹‘•áôˆ¼øœ(€€€€€€€™½È¥¹‘•à°€¡¹…µ”°|¤¥¸•¹Õµ•É…Ñ”¡Í¡••ÑÌ°€Ä¤(€€€€¤(€€€Ý½É­‰½½­}áµ°€ô€ (€€€€€€€€œðýáµ°Ù•ÉÍ¥½¸ôˆÄ¸Àˆ•¹½‘¥¹œô‰UQ´àˆÍÑ…¹‘…±½¹”ô‰å•Ìˆüøœ(€€€€€€€€œñÝ½É­‰½½¬áµ±¹Ìô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½ÍÁÉ•…‘Í¡••Ñµ°¼ÈÀÀØ½µ…¥¸ˆ€œ(€€€€€€€€áµ±¹ÌéÈô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½½™™¥•½Õµ•¹Ð¼ÈÀÀØ½É•±…Ñ¥½¹Í¡¥ÁÌˆøœ(€€€€€€€˜ˆñÍ¡••ÑÌùíÝ½É­‰½½­}Í¡••ÑÍôð½Í¡••ÑÌøð½Ý½É­‰½½¬øˆ(€€€€¤(€€€Ý½É­‰½½­}É•±Ì€ôl(€€€€€€€€œðýáµ°Ù•ÉÍ¥½¸ôˆÄ¸Àˆ•¹½‘¥¹œô‰UQ´àˆÍÑ…¹‘…±½¹”ô‰å•Ìˆüøœ°(€€€€€€€€œñI•±…Ñ¥½¹Í¡¥ÁÌáµ±¹Ìô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½Á…­…”¼ÈÀÀØ½É•±…Ñ¥½¹Í¡¥ÁÌˆøœ°(€€€t(€€€™½È¥¹‘•à¥¸É…¹” Ä°±•¸¡Í¡••ÑÌ¤€¬€Ä¤è(€€€€€€€Ý½É­‰½½­}É•±Ì¹…ÁÁ•¹¡˜œñI•±…Ñ¥½¹Í¡¥À%ô‰É%‘í¥¹‘•áôˆQåÁ”ô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½½™™¥•½Õµ•¹Ð¼ÈÀÀØ½É•±…Ñ¥½¹Í¡¥ÁÌ½Ý½É­Í¡••ÐˆQ…É•Ðô‰Ý½É­Í¡••ÑÌ½Í¡••Ñí¥¹‘•áô¹áµ°ˆ¼øœ¤(€€€Ý½É­‰½½­}É•±Ì¹…ÁÁ•¹¡˜œñI•±…Ñ¥½¹Í¡¥À%ô‰É%‘í±•¸¡Í¡••ÑÌ¤¬ÅôˆQåÁ”ô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½½™™¥•½Õµ•¹Ð¼ÈÀÀØ½É•±…Ñ¥½¹Í¡¥ÁÌ½ÍÑå±•ÌˆQ…É•Ðô‰ÍÑå±•Ì¹áµ°ˆ¼øœ¤(€€€Ý½É­‰½½­}É•±Ì¹…ÁÁ•¹ ˆð½I•±…Ñ¥½¹Í¡¥ÁÌøˆ¤((€€€É½½Ñ}É•±Ì€ô€ (€€€€€€€€œðýáµ°Ù•ÉÍ¥½¸ôˆÄ¸Àˆ•¹½‘¥¹œô‰UQ´àˆÍÑ…¹‘…±½¹”ô‰å•Ìˆüøœ(€€€€€€€€œñI•±…Ñ¥½¹Í¡¥ÁÌáµ±¹Ìô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½Á…­…”¼ÈÀÀØ½É•±…Ñ¥½¹Í¡¥ÁÌˆøœ(€€€€€€€€œñI•±…Ñ¥½¹Í¡¥À%ô‰É%ÄˆQåÁ”ô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½½™™¥•½Õµ•¹Ð¼ÈÀÀØ½É•±…Ñ¥½¹Í¡¥ÁÌ½½™™¥•½Õµ•¹ÐˆQ…É•Ðô‰á°½Ý½É­‰½½¬¹áµ°ˆ¼øœ(€€€€€€€€œñI•±…Ñ¥½¹Í¡¥À%ô‰É%ÈˆQåÁ”ô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½Á…­…”¼ÈÀÀØ½É•±…Ñ¥½¹Í¡¥ÁÌ½µ•Ñ…‘…Ñ„½½É”µÁÉ½Á•ÉÑ¥•ÌˆQ…É•Ðô‰‘½AÉ½ÁÌ½½É”¹áµ°ˆ¼øœ(€€€€€€€€œñI•±…Ñ¥½¹Í¡¥À%ô‰É%ÌˆQåÁ”ô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½½™™¥•½Õµ•¹Ð¼ÈÀÀØ½É•±…Ñ¥½¹Í¡¥ÁÌ½•áÑ•¹‘•µÁÉ½Á•ÉÑ¥•ÌˆQ…É•Ðô‰‘½AÉ½ÁÌ½…ÁÀ¹áµ°ˆ¼øœ(€€€€€€€€œð½I•±…Ñ¥½¹Í¡¥ÁÌøœ(€€€€¤(€€€ÍÑå±•Ì€ô€ (€€€€€€€€œðýáµ°Ù•ÉÍ¥½¸ôˆÄ¸Àˆ•¹½‘¥¹œô‰UQ´àˆÍÑ…¹‘…±½¹”ô‰å•Ìˆüøœ(€€€€€€€€œñÍÑå±•M¡••Ðáµ±¹Ìô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½ÍÁÉ•…‘Í¡••Ñµ°¼ÈÀÀØ½µ…¥¸ˆøœ(€€€€€€€€œñ™½¹ÑÌ½Õ¹ÐôˆÄˆøñ™½¹ÐøñÍèÙ…°ôˆÄÄˆ¼øñ¹…µ”Ù…°ô‰5¥É½Í½™Ðe…!•¤ˆ¼øð½™½¹Ðøð½™½¹ÑÌøœ(€€€€€€€€œñ™¥±±Ì½Õ¹ÐôˆÄˆøñ™¥±°øñÁ…ÑÑ•É¹¥±°Á…ÑÑ•É¹QåÁ”ô‰¹½¹”ˆ¼øð½™¥±°øð½™¥±±Ìøœ(€€€€€€€€œñ‰½É‘•ÉÌ½Õ¹ÐôˆÄˆøñ‰½É‘•È¼øð½‰½É‘•ÉÌøœ(€€€€€€€€œñ•±±MÑå±•a™Ì½Õ¹ÐôˆÄˆøñá˜¹ÕµµÑ%ôˆÀˆ™½¹Ñ%ôˆÀˆ™¥±±%ôˆÀˆ‰½É‘•É%ôˆÀˆ¼øð½•±±MÑå±•a™Ìøœ(€€€€€€€€œñ•±±a™Ì½Õ¹ÐôˆÄˆøñá˜¹ÕµµÑ%ôˆÀˆ™½¹Ñ%ôˆÀˆ™¥±±%ôˆÀˆ‰½É‘•É%ôˆÀˆá™%ôˆÀˆ¼øð½•±±a™Ìøœ(€€€€€€€€œð½ÍÑå±•M¡••Ðøœ(€€€€¤(€€€½É”€ô€ (€€€€€€€€œðýáµ°Ù•ÉÍ¥½¸ôˆÄ¸Àˆ•¹½‘¥¹œô‰UQ´àˆÍÑ…¹‘…±½¹”ô‰å•Ìˆüøœ(€€€€€€€€œñÀé½É•AÉ½Á•ÉÑ¥•Ìáµ±¹ÌéÀô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½Á…­…”¼ÈÀÀØ½µ•Ñ…‘…Ñ„½½É”µÁÉ½Á•ÉÑ¥•Ìˆ€œ(€€€€€€€€áµ±¹Ìé‘Œô‰¡ÑÑÀè¼½ÁÕÉ°¹½Éœ½‘Œ½•±•µ•¹ÑÌ¼Ä¸Ä¼ˆ€œ(€€€€€€€€áµ±¹Ìé‘Ñ•ÉµÌô‰¡ÑÑÀè¼½ÁÕÉ°¹½Éœ½‘Œ½Ñ•ÉµÌ¼ˆ€œ(€€€€€€€€áµ±¹Ìé‘µ¥ÑåÁ”ô‰¡ÑÑÀè¼½ÁÕÉ°¹½Éœ½‘Œ½‘µ¥ÑåÁ”¼ˆ€œ(€€€€€€€€áµ±¹ÌéáÍ¤ô‰¡ÑÑÀè¼½ÝÝÜ¹ÜÌ¹½Éœ¼ÈÀÀÄ½a51M¡•µ„µ¥¹ÍÑ…¹”ˆøœ(€€€€€€€€œñ‘ŒéÉ•…Ñ½Èù½‘•àð½‘ŒéÉ•…Ñ½ÈøñÀé±…ÍÑ5½‘¥™¥•‘	äù½‘•àð½Àé±…ÍÑ5½‘¥™¥•‘	äøœ(€€€€€€€˜œñ‘Ñ•ÉµÌéÉ•…Ñ•áÍ¤éÑåÁ”ô‰‘Ñ•ÉµÌé\ÍQˆùíÑ¥µ•ÍÑ…µÁôð½‘Ñ•ÉµÌéÉ•…Ñ•øœ(€€€€€€€˜œñ‘Ñ•ÉµÌéµ½‘¥™¥•áÍ¤éÑåÁ”ô‰‘Ñ•ÉµÌé\ÍQˆùíÑ¥µ•ÍÑ…µÁôð½‘Ñ•ÉµÌéµ½‘¥™¥•øœ(€€€€€€€€œð½Àé½É•AÉ½Á•ÉÑ¥•Ìøœ(€€€€¤(€€€…ÁÀ€ô€ (€€€€€€€€œðýáµ°Ù•ÉÍ¥½¸ôˆÄ¸Àˆ•¹½‘¥¹œô‰UQ´àˆÍÑ…¹‘…±½¹”ô‰å•Ìˆüøœ(€€€€€€€€œñAÉ½Á•ÉÑ¥•Ìáµ±¹Ìô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½½™™¥•½Õµ•¹Ð¼ÈÀÀØ½•áÑ•¹‘•µÁÉ½Á•ÉÑ¥•Ìˆ€œ(€€€€€€€€áµ±¹ÌéÙÐô‰¡ÑÑÀè¼½Í¡•µ…Ì¹½Á•¹áµ±™½Éµ…ÑÌ¹½Éœ½½™™¥•½Õµ•¹Ð¼ÈÀÀØ½‘½AÉ½ÁÍYQåÁ•Ìˆøœ(€€€€€€€€œñÁÁ±¥…Ñ¥½¸ù½‘•àð½ÁÁ±¥…Ñ¥½¸øð½AÉ½Á•ÉÑ¥•Ìøœ(€€€€¤(€€€Ý¥Ñ é¥Á™¥±”¹i¥Á¥±”¡Á…Ñ °€‰Üˆ°é¥Á™¥±”¹i%A}1Q¤…Ìé˜è(€€€€€€€é˜¹ÝÉ¥Ñ•ÍÑÈ ‰m½¹Ñ•¹Ñ}QåÁ•Ít¹áµ°ˆ°€ˆˆ¹©½¥¸¡½¹Ñ•¹Ñ}ÑåÁ•Ì¤¤(€€€€€€€é˜¹ÝÉ¥Ñ•ÍÑÈ ‰}É•±Ì¼¹É•±Ìˆ°É½½Ñ}É•±Ì¤(€€€€€€€é˜¹ÝÉ¥Ñ•ÍÑÈ ‰á°½Ý½É­‰½½¬¹áµ°ˆ°Ý½É­‰½½­}áµ°¤(€€€€€€€é˜¹ÝÉ¥Ñ•ÍÑÈ ‰á°½}É•±Ì½Ý½É­‰½½¬¹áµ°¹É•±Ìˆ°€ˆˆ¹©½¥¸¡Ý½É­‰½½­}É•±Ì¤¤(€€€€€€€é˜¹ÝÉ¥Ñ•ÍÑÈ ‰á°½ÍÑå±•Ì¹áµ°ˆ°ÍÑå±•Ì¤(€€€€€€€é˜¹ÝÉ¥Ñ•ÍÑÈ ‰‘½AÉ½ÁÌ½½É”¹áµ°ˆ°½É”¤(€€€€€€€é˜¹ÝÉ¥Ñ•ÍÑÈ ‰‘½AÉ½ÁÌ½…ÁÀ¹áµ°ˆ°…ÁÀ¤(€€€€€€€™½È¥¹‘•à°€¡|°É½ÝÌ¤¥¸•¹Õµ•É…Ñ”¡Í¡••ÑÌ°€Ä¤è(€€€€€€€€€€€é˜¹ÝÉ¥Ñ•ÍÑÈ¡˜‰á°½Ý½É­Í¡••ÑÌ½Í¡••Ñí¥¹‘•áô¹áµ°ˆ°Í¡••Ñ}áµ°¡É½ÝÌ¤¤(()‘•˜Ù…±¥‘…Ñ”¡ÅÕ•ÍÑ¥½¹Ìè±¥ÍÑm‘¥ÑmÍÑÈ°ÍÑÉut°ÁÉ½‘ÕÑÌè±¥ÍÑm‘¥ÑmÍÑÈ°ÍÑÉut°Ý…É¹¥¹Ìè±¥ÍÑmÍÑÉt¤€´ø‘¥ÑmÍÑÈ°½‰©•Ñtè(€€€ÁÉ½‘ÕÑ}½‘•Ì€ôíÁÉ½‘ÕÑl‰½‘”‰t™½ÈÁÉ½‘ÕÐ¥¸ÁÉ½‘ÕÑÍô(€€€ÁÉ½‘ÕÑ}‰…¹­Ì€ôì‹šr#¦–ó¦Šc–êLˆ°€‹š^—–âã–æÓ¢ÒŸ¦Šc–êLˆ°€‹’âk–*‡–rëšf¿¦Šc–êL‰ô(€€€¥ÍÍÕ•Ìè±¥ÍÑm‘¥ÑmÍÑÈ°ÍÑÉut€ômt(€€€¥‘}½Õ¹ÑÌ€ô½Õ¹Ñ•È¡ÅÕ•ÍÑ¥½¹l‰¥‰t™½ÈÅÕ•ÍÑ¥½¸¥¸ÅÕ•ÍÑ¥½¹Ì¤(€€€™½ÈÅÕ•ÍÑ¥½¹}¥°½Õ¹Ð¥¸¥‘}½Õ¹ÑÌ¹¥Ñ•µÌ ¤è(€€€€€€€¥˜½Õ¹Ð€ø€Äè(€€€€€€€€€€€¥ÍÍÕ•Ì¹…ÁÁ•¹¡ì‰±•Ù•°ˆè€‰•ÉÉ½Èˆ°€‰¥ˆèÅÕ•ÍÑ¥½¹}¥°€‰½‘”ˆè€ˆˆ°€‰‘•Ñ…¥°ˆè˜‹¦Šcžn¹%¦7–’4í½Õ¹Ñôƒš²„‰ô¤(€€€™½ÈÅÕ•ÍÑ¥½¸¥¸ÅÕ•ÍÑ¥½¹Ìè(€€€€€€€½‘”€ôÅÕ•ÍÑ¥½¹l‰½‘”‰t(€€€€€€€¥˜ÅÕ•ÍÑ¥½¹l‰‰…¹¬‰t¥¸ÁÉ½‘ÕÑ}‰…¹­Ì…¹½‘”¹½Ð¥¸ÁÉ½‘ÕÑ}½‘•Ìè(€€€€€€€€€€€¥ÍÍÕ•Ì¹…ÁÁ•¹¡ì‰±•Ù•°ˆè€‰•ÉÉ½Èˆ°€‰¥ˆèÅÕ•ÍÑ¥½¹l‰¥‰t°€‰½‘”ˆè½‘”°€‰‘•Ñ…¥°ˆè€‹¦Šcžn»¢ÒŸ–>ß’â7–r£šršZÃ’êŸ–N¢† ‰ô¤(€€€€€€€…¹ÍÝ•È€ôÅÕ•ÍÑ¥½¸¹•Ð ‰…¹ÍÝ•Èˆ°€ˆˆ¤(€€€€€€€¥˜…¹ÍÝ•È¹½Ð¥¸1QQILè(€€€€€€€€€€€¥ÍÍÕ•Ì¹…ÁÁ•¹¡ì‰±•Ù•°ˆè€‰•ÉÉ½Èˆ°€‰¥ˆèÅÕ•ÍÑ¥½¹l‰¥‰t°€‰½‘”ˆè½‘”°€‰‘•Ñ…¥°ˆè€‹š¶ž†»ž¶Sš†#–¶_š¾7š^ƒšV ‰ô¤(€€€€€€€€€€€½¹Ñ¥¹Õ”(€€€€€€€½ÁÑ¥½¹}Ñ•áÐ€ôÅÕ•ÍÑ¥½¸¹•Ð¡˜‰½ÁÑ¥½¹í…¹ÍÝ•Éôˆ°€ˆˆ¤(€€€€€€€½ÁÑ¥½¹}¥µ…”€ôÅÕ•ÍÑ¥½¸¹•Ð¡˜‰½ÁÑ¥½¹í…¹ÍÝ•Éõ%µ…”ˆ°€ˆˆ¤(€€€€€€€•áÁ•Ñ•€ô½ÁÑ¥½¹}¥µ…”¥˜ÅÕ•ÍÑ¥½¸¹•Ð ‰­¹½Ý±•‘•A½¥¹Ðˆ¤€ôô€‹žr/¢ÒŸ–>ß¦'–nûž&ˆ•±Í”½ÁÑ¥½¹}Ñ•áÐ(€€€€€€€¥˜•áÁ•Ñ•€„ôÅÕ•ÍÑ¥½¸¹•Ð ‰…¹ÍÝ•ÉQ•áÐˆ°€ˆˆ¤è(€€€€€€€€€€€¥ÍÍÕ•Ì¹…ÁÁ•¹¡ì‰±•Ù•°ˆè€‰•ÉÉ½Èˆ°€‰¥ˆèÅÕ•ÍÑ¥½¹l‰¥‰t°€‰½‘”ˆè½‘”°€‰‘•Ñ…¥°ˆè€‹š¶ž†»¦'¦†ç’â;ž¶Sš†#––ºç’â7’â¢Ð‰ô¤(€€€€€€€½ÁÑ¥½¹Ì€ômÅÕ•ÍÑ¥½¸¹•Ð¡˜‰½ÁÑ¥½¹í±•ÑÑ•Éôˆ°€ˆˆ¤™½È±•ÑÑ•È¥¸1QQIL¥˜ÅÕ•ÍÑ¥½¸¹•Ð¡˜‰½ÁÑ¥½¹í±•ÑÑ•Éôˆ°€ˆˆ¥t(€€€€€€€¥˜±•¸¡½ÁÑ¥½¹Ì¤€ð€Èè(€€€€€€€€€€€¥ÍÍÕ•Ì¹…ÁÁ•¹¡ì‰±•Ù•°ˆè€‰•ÉÉ½Èˆ°€‰¥ˆèÅÕ•ÍÑ¥½¹l‰¥‰t°€‰½‘”ˆè½‘”°€‰‘•Ñ…¥°ˆè€‹šr'šV#¦'¦†ç–ÂG’ê8€Èƒ’â¨‰ô¤(€€€€€€€•±¥˜±•¸¡Í•Ð¡½ÁÑ¥½¹Ì¤¤€„ô±•¸¡½ÁÑ¥½¹Ì¤è(€€€€€€€€€€€¥ÍÍÕ•Ì¹…ÁÁ•¹¡ì‰±•Ù•°ˆè€‰•ÉÉ½Èˆ°€‰¥ˆèÅÕ•ÍÑ¥½¹l‰¥‰t°€‰½‘”ˆè½‘”°€‰‘•Ñ…¥°ˆè€‹–¶c–r£¦7–’7¦'¦†ä‰ô¤(€€€É¥Ñ¥…±}™¥•±‘Ì€ôì(€€€€€€€€‰…ÉÑ½¹MÁ•Œˆè€‹žºÇ¢žˆ°(€€€€€€€€‰½ÕÑ•É	½àˆè€‹–’[žºÇ–Âë–¾àˆ°(€€€€€€€€‰ÁÉ½‘ÕÑ]•¥¡Ðˆè€‹’êŸ–N¦7¦<ˆ°(€€€€€€€€‰…ÉÑ½¹]•¥¡Ðˆè€‹šVÓžºÇ¦7¦<ˆ°(€€€ô(€€€™½È™¥•±°±…‰•°¥¸É¥Ñ¥…±}™¥•±‘Ì¹¥Ñ•µÌ ¤è(€€€€€€€µ¥ÍÍ¥¹}½‘•Ì€ômÁÉ½‘ÕÑl‰½‘”‰t™½ÈÁÉ½‘ÕÐ¥¸ÁÉ½‘ÕÑÌ¥˜¹½ÐÁÉ½‘ÕÐ¹•Ð¡™¥•±¥t(€€€€€€€¥˜µ¥ÍÍ¥¹}½‘•Ìè(€€€€€€€€€€€Ý…É¹¥¹Ì¹…ÁÁ•¹¡˜‹šêC¢†£žòë–ÂEí±…‰•±÷¾òiìœ°€œ¹©½¥¸¡µ¥ÍÍ¥¹}½‘•Ì¥ôˆ¤(€€€µ¥ÍÍ¥¹}¥µ…•Ì€ômÁÉ½‘ÕÑl‰½‘”‰t™½ÈÁÉ½‘ÕÐ¥¸ÁÉ½‘ÕÑÌ¥˜¹½ÐÁÉ½‘ÕÐ¹•Ð ‰¥µ…”ˆ¥t(€€€¥˜µ¥ÍÍ¥¹}¥µ…•Ìè(€€€€€€€Ý…É¹¥¹Ì¹…ÁÁ•¹¡˜‹šêC¢†£’êŸ–N–nûž&šr«š"C–*š>C–>[¾òiìœ°€œ¹©½¥¸¡µ¥ÍÍ¥¹}¥µ…•Ì¥ôˆ¤(€€€¥˜%µ…”è(€€€€€€€±½Ý}É•Í½±ÕÑ¥½¹}½‘•Ìè±¥ÍÑmÍÑÉt€ômt(€€€€€€€™½ÈÁÉ½‘ÕÐ¥¸ÁÉ½‘ÕÑÌè(€€€€€€€€€€€¥µ…•}Á…Ñ €ôIA=}I==P€¼ÁÉ½‘ÕÐ¹•Ð ‰¥µ…”ˆ°€ˆˆ¤(€€€€€€€€€€€¥˜¹½Ð¥µ…•}Á…Ñ ¹¥Í}™¥±” ¤è(€€€€€€€€€€€€€€€½¹Ñ¥¹Õ”(€€€€€€€€€€€Ý¥Ñ %µ…”¹½Á•¸¡¥µ…•}Á…Ñ ¤…ÌÍ½ÕÉ•}¥µ…”è(€€€€€€€€€€€€€€€¥˜Í½ÕÉ•}¥µ…”¹Ý¥‘Ñ €ð€ØÀÀ½ÈÍ½ÕÉ•}¥µ…”¹¡•¥¡Ð€ð€ÔÀÀè(€€€€€€€€€€€€€€€€€€€±½Ý}É•Í½±ÕÑ¥½¹}½‘•Ì¹…ÁÁ•¹¡ÁÉ½‘ÕÑl‰½‘”‰t¤(€€€€€€€¥˜±½Ý}É•Í½±ÕÑ¥½¹}½‘•Ìè(€€€€€€€€€€€Ý…É¹¥¹Ì¹…ÁÁ•¹¡˜‹šêC¢†£’êŸ–N–nûž&–"¢ú£ž:–?’ö;¾òiìœ°€œ¹©½¥¸¡±½Ý}É•Í½±ÕÑ¥½¹}½‘•Ì¥ôˆ¤(€€€™½ÈÝ…É¹¥¹œ¥¸Ý…É¹¥¹Ìè(€€€€€€€¥ÍÍÕ•Ì¹…ÁÁ•¹¡ì‰±•Ù•°ˆè€‰Ý…É¸ˆ°€‰¥ˆè€ˆˆ°€‰½‘”ˆè€ˆˆ°€‰‘•Ñ…¥°ˆèÝ…É¹¥¹ô¤((€€€É•ÑÕÉ¸ì(€€€€€€€€‰Í½ÕÉ”ˆèÍÑÈ¡M=UI}a1M`¤°(€€€€€€€€‰•¹•É…Ñ•‘Ðˆè‘…Ñ•Ñ¥µ”¹¹½Ü ¤¹¥Í½™½Éµ…Ð¡Ñ¥µ•ÍÁ•Œô‰Í•½¹‘Ìˆ¤°(€€€€€€€€‰ÁÉ½‘ÕÑ½Õ¹Ðˆè±•¸¡ÁÉ½‘ÕÑÌ¤°(€€€€€€€€‰ÅÕ•ÍÑ¥½¹½Õ¹Ðˆè±•¸¡ÅÕ•ÍÑ¥½¹Ì¤°(€€€€€€€€‰É•™•É•¹•EÕ•ÍÑ¥½¹½Õ¹Ðˆè±•¸¡mÄ™½ÈÄ¥¸ÅÕ•ÍÑ¥½¹Ì¥˜Ål‰‰…¹¬‰t¹½Ð¥¸ÁÉ½‘ÕÑ}‰…¹­Ít¤°(€€€€€€€€‰‰…¹­½Õ¹ÑÌˆè‘¥Ð¡½Õ¹Ñ•È¡Ål‰‰…¹¬‰t™½ÈÄ¥¸ÅÕ•ÍÑ¥½¹Ì¤¤°(€€€€€€€€‰­¹½Ý±•‘•A½¥¹Ñ½Õ¹ÑÌˆè‘¥Ð¡½Õ¹Ñ•È¡Ål‰­¹½Ý±•‘•A½¥¹Ð‰t™½ÈÄ¥¸ÅÕ•ÍÑ¥½¹Ì¤¤°(€€€€€€€€‰ÁÉ½‘ÕÑ½‘•½Õ¹Ðˆè±•¸¡ÁÉ½‘ÕÑ}½‘•Ì¤°(€€€€€€€€‰ÅÕ•ÍÑ¥½¹½‘•½Õ¹Ðˆè±•¸¡íÅl‰½‘”‰t™½ÈÄ¥¸ÅÕ•ÍÑ¥½¹Íô¤°(€€€€€€€€‰¥ÍÍÕ•½Õ¹ÑÌˆè‘¥Ð¡½Õ¹Ñ•È¡¥ÍÍÕ•l‰±•Ù•°‰t™½È¥ÍÍÕ”¥¸¥ÍÍÕ•Ì¤¤°(€€€€€€€€‰¥ÍÍÕ•Ìˆè¥ÍÍÕ•ÍlèÈÀÁt°(€€€ô(()‘•˜ÕÁ‘…Ñ•}Ù•ÉÍ¥½¹Ì ¤€´ø9½¹”è(€€€…ÁÁ}Ñ•áÐ€ôAA})L¹É•…‘}Ñ•áÐ¡•¹½‘¥¹œô‰ÕÑ˜´àˆ¤(€€€…ÁÁ}Ñ•áÐ€ôÉ”¹ÍÕˆ¡È½¹ÍÐ	U%1}YIM%=8€ô€‰mx‰t¬ˆìœ°˜½¹ÍÐ	U%1}YIM%=8€ô€‰í	U%1}YIM%=9ôˆìœ°…ÁÁ}Ñ•áÐ°½Õ¹ÐôÄ¤(€€€AA})L¹ÝÉ¥Ñ•}Ñ•áÐ¡…ÁÁ}Ñ•áÐ°•¹½‘¥¹œô‰ÕÑ˜´àˆ¤((€€€¥¹‘•á}Ñ•áÐ€ô%9a}!Q50¹É•…‘}Ñ•áÐ¡•¹½‘¥¹œô‰ÕÑ˜´àˆ¤(€€€¥¹‘•á}Ñ•áÐ€ôÉ”¹ÍÕˆ¡È…ÁÁp¹©ÍpýØõmx‰t¬œ°˜…ÁÀ¹©ÌýØõí	U%1}YIM%=9ôœ°¥¹‘•á}Ñ•áÐ¤(€€€%9a}!Q50¹ÝÉ¥Ñ•}Ñ•áÐ¡¥¹‘•á}Ñ•áÐ°•¹½‘¥¹œô‰ÕÑ˜´àˆ¤(()‘•˜½Áå}É•±•…Í•}‰Õ¹‘±” ¤€´øA…Ñ è(€€€‰Õ¹‘±•}‘¥È€ô]=I-}%H€¼€‰ÕÁ‘…Ñ•‘}Í¥Ñ•}™¥±•Ìˆ(€€€¥˜‰Õ¹‘±•}‘¥È¹•á¥ÍÑÌ ¤è(€€€€€€€Í¡ÕÑ¥°¹ÉµÑÉ•”¡‰Õ¹‘±•}‘¥È¤(€€€‰Õ¹‘±•}‘¥È¹µ­‘¥È¡Á…É•¹ÑÌõQÉÕ”¤(€€€™½ÈÉ•±…Ñ¥Ù”¥¸l(€€€€€€€A…Ñ  ‰…ÁÀ¹©Ìˆ¤°(€€€€€€€A…Ñ  ‰¥¹‘•à¹¡Ñµ°ˆ¤°(€€€€€€€A…Ñ  ‰ÍÑå±•Ì¹ÍÌˆ¤°(€€€€€€€A…Ñ  ‰…Á¤½±½Õ¹©Ìˆ¤°(€€€€€€€A…Ñ  ‰½ÕÑÁÕÑÌ½ÁÉ½‘ÕÑ}ÅÕ¥è¿¦G–Â+’êŸ–Nž~—¢¾–êO¦Šc–êL¹©Í½¸ˆ¤°(€€€€€€€A…Ñ  ‰½ÕÑÁÕÑÌ½ÁÉ½‘ÕÑ}ÅÕ¥è¿¦G–Â+’êŸ–Nž~—¢¾–êO¦Šc–êL¹á±Íàˆ¤°(€€€€€€€A…Ñ  ‰½ÕÑÁÕÑÌ½ÅÕ¥é}±½¥}…Õ‘¥Ð¹©Í½¸ˆ¤°(€€€tè(€€€€€€€ÍÉŒ€ôIA=}I==P€¼É•±…Ñ¥Ù”(€€€€€€€‘ÍÐ€ô‰Õ¹‘±•}‘¥È€¼É•±…Ñ¥Ù”(€€€€€€€‘ÍÐ¹Á…É•¹Ð¹µ­‘¥È¡Á…É•¹ÑÌõQÉÕ”°•á¥ÍÑ}½¬õQÉÕ”¤(€€€€€€€Í¡ÕÑ¥°¹½ÁäÈ¡ÍÉŒ°‘ÍÐ¤(€€€é¥Á}Á…Ñ €ô]=I-}%H€¼˜‰©¥¹éÕ¸µ­¹½Ý±•‘”µÕÁ‘…Ñ•µí	U%1}YIM%=9ô¹é¥Àˆ(€€€¥˜é¥Á}Á…Ñ ¹•á¥ÍÑÌ ¤è(€€€€€€€é¥Á}Á…Ñ ¹Õ¹±¥¹¬ ¤(€€€Í¡ÕÑ¥°¹µ…­•}…É¡¥Ù”¡ÍÑÈ¡é¥Á}Á…Ñ ¹Ý¥Ñ¡}ÍÕ™™¥à ˆˆ¤¤°€‰é¥Àˆ°‰Õ¹‘±•}‘¥È¤(€€€É•ÑÕÉ¸é¥Á}Á…Ñ (()‘•˜µ…¥¸ ¤€´ø9½¹”è(€€€Ý½É­‰½½¬€ôÉ•…‘}Ý½É­‰½½¬¡M=UI}a1M`¤(€€€ÁÉ½‘ÕÑÌ°Ý…É¹¥¹Ì€ô‰Õ¥±‘}ÁÉ½‘ÕÑÌ¡Ý½É­‰½½¬¤(€€€Ý…É¹¥¹Ì¹•áÑ•¹¡•áÑÉ…Ñ}ÁÉ½‘ÕÑ}¥µ…•Ì¡ÁÉ½‘ÕÑÌ¤¤(€€€ÅÕ•ÍÑ¥½¹Ì€ô‰Õ¥±‘}ÅÕ•ÍÑ¥½¹Ì¡ÁÉ½‘ÕÑÌ¤(€€€ÅÕ•ÍÑ¥½¹Ì¹•áÑ•¹¡‰Õ¥±‘}É•™•É•¹•}ÅÕ•ÍÑ¥½¹Ì¡Ý½É­‰½½¬¤¤((€€€AI=UQ})M=8¹ÝÉ¥Ñ•}Ñ•áÐ¡©Í½¸¹‘ÕµÁÌ¡ÅÕ•ÍÑ¥½¹Ì°•¹ÍÕÉ•}…Í¥¤õ…±Í”°¥¹‘•¹ÐôÈ¤°•¹½‘¥¹œô‰ÕÑ˜´àˆ¤((€€€‰…¹­}¹…µ•Ì€ô±¥ÍÐ¡‘¥Ð¹™É½µ­•åÌ¡ÅÕ•ÍÑ¥½¹l‰‰…¹¬‰t™½ÈÅÕ•ÍÑ¥½¸¥¸ÅÕ•ÍÑ¥½¹Ì¤¤(€€€Í¡••ÑÌ€ôl ‹¦Šc–êOšï¢† ˆ°m=UQAUQ}!IMt€¬mÅÕ•ÍÑ¥½¹}É½Ü¡Ä¤™½ÈÄ¥¸ÅÕ•ÍÑ¥½¹Ít¥t(€€€Í¡••ÑÌ¹•áÑ•¹ (€€€€€€€€¡‰…¹¬°m=UQAUQ}!IMt€¬mÅÕ•ÍÑ¥½¹}É½Ü¡Ä¤™½ÈÄ¥¸ÅÕ•ÍÑ¥½¹Ì¥˜Ål‰‰…¹¬‰t€ôô‰…¹­t¤(€€€€€€€™½È‰…¹¬¥¸‰…¹­}¹…µ•Ì(€€€€¤(€€€ÝÉ¥Ñ•}á±Íà¡AI=UQ}a1M`°Í¡••ÑÌ¤((€€€É•Á½ÉÐ€ôÙ…±¥‘…Ñ”¡ÅÕ•ÍÑ¥½¹Ì°ÁÉ½‘ÕÑÌ°Ý…É¹¥¹Ì¤(€€€U%Q})M=8¹ÝÉ¥Ñ•}Ñ•áÐ¡©Í½¸¹‘ÕµÁÌ¡É•Á½ÉÐ°•¹ÍÕÉ•}…Í¥¤õ…±Í”°¥¹‘•¹ÐôÈ¤°•¹½‘¥¹œô‰ÕÑ˜´àˆ¤(€€€ÕÁ‘…Ñ•}Ù•ÉÍ¥½¹Ì ¤(€€€é¥Á}Á…Ñ €ô½Áå}É•±•…Í•}‰Õ¹‘±” ¤((€€€ÁÉ¥¹Ð¡©Í½¸¹‘ÕµÁÌ¡ì¨©É•Á½ÉÐ°€‰É•±•…Í•i¥ÀˆèÍÑÈ¡é¥Á}Á…Ñ ¥ô°•¹ÍÕÉ•}…Í¥¤õ…±Í”°¥¹‘•¹ÐôÈ¤¤(()¥˜}}¹…µ•}|€ôô€‰}}µ…¥¹}|ˆè(€€€µ…¥¸ ¤
