@@ -1,0 +1,40 @@
+{
+  "sourceId": "PIPL-2021",
+  "sourceLevel": "B",
+  "platform": "跨平台法律",
+  "ruleTitle": "中华人民共和国个人信息保护法",
+  "publisher": "全国人民代表大会常务委员会",
+  "officialUrl": "https://www.npc.gov.cn/npc/c2/c30834/202108/t20210820_313088.html",
+  "publishDate": "2021-08-20",
+  "effectiveDate": "2021-11-01",
+  "expiryDate": "",
+  "status": "current",
+  "applicableRoles": [
+    "客服",
+    "运营",
+    "仓库/打单",
+    "财务/审单"
+  ],
+  "applicableScenes": [
+    "履约",
+    "售后",
+    "订单信息",
+    "营销"
+  ],
+  "sourceSha256": "d2c8668448e4e4cda199cdee58244573284442c1b7fcc175c0dfe1ab62b775ae",
+  "clauses": [
+    {
+      "clauseId": "PIPL-4",
+      "heading": "个人信息定义与处理",
+      "text": "个人信息是与已识别或者可识别的自然人有关的信息；个人信息的处理包括收集、存储、使用、加工、传输、提供、公开、删除。",
+      "certainty": "explicit"
+    },
+    {
+      "clauseId": "PIPL-5-6",
+      "heading": "合法正当必要与最小范围",
+      "text": "处理个人信息应当遵循合法、正当、必要和诚信原则；应当具有明确合理的目的并与处理目的直接相关，收集应限于实现处理目的的最小范围。",
+      "certainty": "explicit"
+    }
+  ]
+}
+
