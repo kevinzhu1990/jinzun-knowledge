@@ -55,6 +55,10 @@ def main() -> None:
     if moon_codes != moon_image_codes:
         errors.append("并非所有月饼货号都有看货号选图片题")
 
+    answer_counts = {letter: sum(q.get("answer") == letter for q in all_questions) for letter in LETTERS}
+    if max(answer_counts.values()) - min(answer_counts.values()) > 1:
+        errors.append("全题库答案字母分布不均衡：" + json.dumps(answer_counts, ensure_ascii=False))
+
     index_text = (ROOT / "index.html").read_text(encoding="utf-8")
     app_text = (ROOT / "app.js").read_text(encoding="utf-8")
     parser = IdParser()
@@ -109,3 +113,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
