@@ -9,6 +9,7 @@
   "effectiveDate": "2019-08-30",
   "expiryDate": "",
   "status": "current",
+  "sourceKind": "user_agreement",
   "applicableRoles": [
     "客服",
     "运营",
