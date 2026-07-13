@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 import shutil
 from collections import Counter, defaultdict
@@ -128,6 +129,26 @@ def enrich_question(question: dict) -> dict:
     return enriched
 
 
+def randomize_options(questions: list[dict]) -> list[dict]:
+    """Place correct answers in a balanced, deterministic random order."""
+    target_letters = list("A" * 33 + "B" * 33 + "C" * 32 + "D" * 32)
+    random.Random("20260713-operations-quiz1").shuffle(target_letters)
+    randomized = []
+    for index, original in enumerate(questions):
+        question = dict(original)
+        correct_text = question["answerText"]
+        distractors = [question[f"option{letter}"] for letter in "ABCD" if letter != question["answer"]]
+        random.Random(f"20260713-operations-quiz1:{question['id']}").shuffle(distractors)
+        answer = target_letters[index]
+        values = iter(distractors)
+        for letter in "ABCD":
+            question[f"option{letter}"] = correct_text if letter == answer else next(values)
+        question["answer"] = answer
+        question["answerText"] = correct_text
+        randomized.append(question)
+    return randomized
+
+
 def main() -> None:
     seed = load_seed()
     for question in seed:
@@ -135,7 +156,7 @@ def main() -> None:
     if len({q["id"] for q in seed}) != len(seed):
         raise ValueError("seed存在重复ID")
     unique, removed_duplicates = dedupe_questions(seed)
-    imported = [enrich_question(question) for question in unique]
+    imported = randomize_options([enrich_question(question) for question in unique])
     for question in imported:
         validate_question(question)
 
@@ -162,6 +183,7 @@ def main() -> None:
         "newQuestions": len(imported),
         "newQuestionsByPlatform": platform_counts(imported),
         "redlineQuestions": sum(q.get("riskLevel") == "redline" for q in imported),
+        "answerDistribution": dict(Counter(q.get("answer") for q in imported)),
         "finalOperationsQuestions": len(imported),
         "finalRoleQuestionCount": len(retained) + len(imported),
         "finalQuestionCount": len(read_json(ROLE_JSON)),
