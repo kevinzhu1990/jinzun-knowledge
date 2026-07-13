@@ -1,0 +1,38 @@
+{
+  "specVersion": "20260713",
+  "questions": [
+    {
+      "specId": "LAW-OPS-PRICE-001",
+      "role": "运营",
+      "platform": "通用",
+      "module": "价格与库存",
+      "riskLevel": "redline",
+      "riskCategory": "虚假价格、虚假库存",
+      "mandatory": true,
+      "sourceId": "ADLAW-2021",
+      "sourceClause": "AD-3-4",
+      "verificationStatus": "verified",
+      "effectiveForFormalExam": false,
+      "humanReviewStatus": "pending",
+      "sourceConflict": false,
+      "scenario": {
+        "actor": "运营",
+        "orderStatus": "活动海报待发布",
+        "facts": [
+          "海报写着原价99元、限时39.9元",
+          "无法提供近期99元实际成交依据",
+          "仓库实际库存还有800盒，但海报写着仅剩20盒"
+        ]
+      },
+      "question": "运营准备发布活动海报，海报写着“原价99元，限时39.9元，仅剩最后20盒”。但运营无法提供近期99元实际成交依据，仓库实际库存还有800盒。正确处理是什么？",
+      "correctAction": "暂停发布，核实原价依据和真实库存后重新制作",
+      "distractors": [
+        "库存数字只是营销文案，可以继续发布",
+        "只删掉原价，保留虚假库存",
+        "先发布，投诉后再修改"
+      ],
+      "explanation": "价格、库存等宣传内容应有真实依据。无法核实前应暂停发布，核对资料后再上线；本题不使用平台处罚金额或赔付数字。"
+    }
+  ]
+}
+
