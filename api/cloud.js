@@ -636,14 +636,21 @@ function examPool(questions, payload, user) {
   const bank = String(payload.bank || '').trim();
   const productBanks = new Set(['月饼题库', '日常年货题库', '业务场景题库', '品牌知识题库', '商家编码题库']);
   const coreBanks = new Set(['月饼题库', '日常年货题库', '业务场景题库']);
-  if (mode === 'random') return questions.filter((question) => coreBanks.has(question.bank));
+  const eligible = (question) => !question.role
+    || (question.verificationStatus === 'verified'
+      && question.effectiveForFormalExam === true
+      && question.sourceConflict === false
+      && question.semanticDuplicate === false
+      && question.humanReviewStatus === 'approved');
+  if (mode === 'random') return questions.filter((question) => coreBanks.has(question.bank) && eligible(question));
   if (mode === 'role') {
     if (!bank || productBanks.has(bank)) throw httpError(400, '岗位考试题库不正确');
     return questions.filter((question) => question.bank === bank
-      && (question.role === user.role || question.role === '全员'));
+      && (question.role === user.role || question.role === '全员')
+      && eligible(question));
   }
   if (!bank || !productBanks.has(bank)) throw httpError(400, '产品考试题库不正确');
-  return questions.filter((question) => question.bank === bank);
+  return questions.filter((question) => question.bank === bank && eligible(question));
 }
 
 async function handleExamStart(payload, user) {
@@ -892,4 +899,5 @@ module.exports = async (req, res) => {
     });
   }
 };
+
 
