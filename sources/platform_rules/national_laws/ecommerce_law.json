@@ -1,0 +1,40 @@
+{
+  "sourceId": "ECOMLAW-2018",
+  "sourceLevel": "B",
+  "platform": "跨平台法律",
+  "ruleTitle": "中华人民共和国电子商务法",
+  "publisher": "全国人民代表大会常务委员会",
+  "officialUrl": "https://fgk.chinatax.gov.cn/zcfgk/c100009/c5212256/content.html",
+  "publishDate": "2018-08-31",
+  "effectiveDate": "2019-01-01",
+  "expiryDate": "",
+  "status": "current",
+  "applicableRoles": [
+    "客服",
+    "运营",
+    "仓库/打单",
+    "财务/审单",
+    "直播/短视频"
+  ],
+  "applicableScenes": [
+    "电子商务经营",
+    "商品信息",
+    "交易履约"
+  ],
+  "sourceSha256": "088343099f9a0378e11eacc0030b930c5ad9bc047f1f71b0d55b5482aad73ccc",
+  "clauses": [
+    {
+      "clauseId": "ECOM-5",
+      "heading": "诚信经营与消费者保护",
+      "text": "电子商务经营者从事经营活动，应当遵循自愿、平等、公平、诚信原则，履行消费者权益保护、知识产权保护、网络安全与个人信息保护等义务。",
+      "certainty": "explicit"
+    },
+    {
+      "clauseId": "ECOM-17",
+      "heading": "商品信息真实准确",
+      "text": "电子商务经营者应当全面、真实、准确、及时地披露商品或者服务信息，保障消费者的知情权和选择权。",
+      "certainty": "explicit"
+    }
+  ]
+}
+
