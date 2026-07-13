@@ -54,6 +54,37 @@ def _reorder_option_fields(question: dict, source_order: list[str], target_order
             question[prefix + suffix] = value
 
 
+def _move_correct_answer(question: dict, target: str) -> None:
+    available = [letter for letter in LETTERS if _has_option(question, letter)]
+    old = question.get("answer")
+    if old == target or target not in available:
+        return
+    source_order = [old, *[letter for letter in available if letter != old]]
+    target_order = [target, *[letter for letter in available if letter != target]]
+    image_answer = question.get("answerText") == question.get(f"option{old}Image")
+    _reorder_option_fields(question, source_order, target_order)
+    question["answer"] = target
+    actual = question.get(f"option{target}Image") if image_answer else question.get(f"option{target}")
+    if actual != question.get("answerText"):
+        raise ValueError(f"{question.get('id')}移动答案位置后内容不一致")
+
+
+def rebalance_total(product: list[dict], role: list[dict]) -> None:
+    combined = product + role
+    while True:
+        counts = {letter: sum(q.get("answer") == letter for q in combined) for letter in LETTERS}
+        high = max(counts, key=counts.get)
+        low = min(counts, key=counts.get)
+        if counts[high] - counts[low] <= 1:
+            return
+        candidate = next((q for q in product if q.get("answer") == high and _has_option(q, low)), None)
+        if candidate is None:
+            candidate = next((q for q in role if q.get("answer") == high and _has_option(q, low)), None)
+        if candidate is None:
+            raise ValueError(f"无法将答案从{high}调整到{low}")
+        _move_correct_answer(candidate, low)
+
+
 def balance_questions(questions: list[dict], seed: str = "20260713-all-quiz-answers", group_by_bank: bool = True) -> list[dict]:
     groups = defaultdict(list)
     for question in questions:
@@ -90,8 +121,11 @@ def _write(path: Path, questions: list[dict]) -> None:
 def main() -> None:
     product = json.loads(PRODUCT_JSON.read_text(encoding="utf-8"))
     role = json.loads(ROLE_JSON.read_text(encoding="utf-8"))
-    _write(PRODUCT_JSON, balance_questions(product, seed="20260713-product-answers", group_by_bank=False))
-    _write(ROLE_JSON, balance_questions(role, seed="20260713-role-answers", group_by_bank=False))
+    product = balance_questions(product, seed="20260713-product-answers", group_by_bank=False)
+    role = balance_questions(role, seed="20260713-role-answers", group_by_bank=False)
+    rebalance_total(product, role)
+    _write(PRODUCT_JSON, product)
+    _write(ROLE_JSON, role)
     print("已完成产品题和岗位题的选项均衡打散")
 
 
