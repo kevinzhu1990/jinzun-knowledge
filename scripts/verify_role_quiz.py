@@ -27,6 +27,9 @@ def main() -> None:
         errors.append(f"运营题应为130道，当前为：{len(operations)}")
     if actual_banks != expected_banks:
         errors.append(f"运营平台题量不正确：{actual_banks}")
+    answer_counts = {letter: sum(q.get("answer") == letter for q in operations) for letter in "ABCD"}
+    if answer_counts and max(answer_counts.values()) - min(answer_counts.values()) > 1:
+        errors.append(f"运营题答案字母分布不均衡：{answer_counts}")
     if not OPERATIONS_REPORT.exists():
         errors.append("缺少运营题库导入报告")
     for question in questions:
