@@ -1,0 +1,17 @@
+{
+  "retrievedAt": "2026-07-13",
+  "sources": [
+    {"sourceId":"PIPL-2021","file":"national_laws/personal_information_protection_law.json"},
+    {"sourceId":"ADLAW-2021","file":"national_laws/advertising_law.json"},
+    {"sourceId":"FOODLAW-2015","file":"national_laws/food_safety_law.json"},
+    {"sourceId":"ECOMLAW-2018","file":"national_laws/ecommerce_law.json"},
+    {"sourceId":"IAD-2023","file":"national_laws/internet_advertising_measures.json"},
+    {"sourceId":"TAOBAO-PUBLIC-AGREEMENT","file":"taobao/public_agreement.json"},
+    {"sourceId":"PDD-PUBLIC-AGREEMENT","file":"pinduoduo/public_agreement.json"}
+  ],
+  "pendingVerification": [
+    {"platform":"淘宝/天猫","topic":"商家后台导流、发货、售后、评价和赔付细则","reason":"当前环境无法取得商家后台规则正文","requiredAccess":"淘宝/天猫商家后台规则中心"},
+    {"platform":"拼多多","topic":"商家后台导流、发货、售后、评价和赔付细则","reason":"当前环境无法取得商家后台规则正文","requiredAccess":"拼多多商家后台规则中心"}
+  ]
+}
+
