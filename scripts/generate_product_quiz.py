@@ -71,7 +71,9 @@ def opts(correct,pool,seed):
     vals=([clean(correct)]+vals); vals += [f'暂无其他有效资料{i}' for i in range(1,5)]; vals=vals[:4]; order=sorted(range(4),key=lambda i:hashlib.sha1(f'{seed}:{i}'.encode()).hexdigest()); vals=[vals[i] for i in order]
     return vals,'ABCD'[vals.index(clean(correct))]
 def q(bank,cat,pl,cd,name,kp,text,correct,pool,note=''):
-    if cd=='2535' and kp=='保质期':
+    if bank=='月饼题库' and kp=='产品线':
+        pool=['月饼-铁罐','月饼-礼盒','月饼-散饼','糕点类']
+    if bank=='月饼题库' and kp=='保质期':
         correct='90天'; pool=['60天','6个月','12个月']
     os_,ans=opts(correct,pool,cd+kp)
     return {'id':sid(bank,cd,kp,text),'bank':bank,'category':cat,'productLine':pl,'code':cd,'productName':name,'type':'单选题','difficulty':'基础','knowledgePoint':kp,'question':text,'optionA':os_[0],'optionB':os_[1],'optionC':os_[2],'optionD':os_[3],'answer':ans,'answerText':correct,'explanation':f'{text.rstrip("？")}：{correct}。','questionImage':'','optionAImage':'','optionBImage':'','optionCImage':'','optionDImage':'','source':SOURCE_LABEL,'note':note,'version':VERSION}
