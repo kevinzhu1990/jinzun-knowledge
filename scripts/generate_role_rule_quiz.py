@@ -32,11 +32,11 @@ COMMON=[
  ('IAD-2023','IAD-2','把网页、直播和短视频中的推销内容按互联网广告要求审核','认为直播口播不属于需要审核的商业宣传')]
 
 ROLE_SPECS=[
- ('客服',120,['微信转账、个人微信、QQ或银行卡私下付款','客户地址、手机号、订单截图和聊天记录','赠品、快递、发货、退款和补偿承诺','食品保质期、配料、过敏原和特殊人群咨询','差评、投诉、退款原因和平台介入']),
- ('运营',80,['标题、属性、SKU图片和净含量','原价、折扣、销量、库存和到手价','活动报名前的库存、毛利、发货和售后能力','未经授权的商标、字体、图片和素材','页面承诺与实际履约']),
- ('仓库/打单',45,['货号、SKU、口味、数量和礼袋','面单、订单、物流单号和出库记录','生产日期、批次、保质期和先进先出','破损、漏气、鼓包、少件和错发','称重、拍照、作废面单和客户信息']),
- ('美工',40,['产品名称、货号、净含量、口味和包装','澳门风味与澳门制造的文字边界','医疗功效、绝对化用语和虚假荣誉','AI或修图导致的配料、数量、切面和包装失真','活动价、到手价和使用条件']),
- ('直播/短视频',30,['历史最低价、库存紧张和发货时间','赠品、价格条件和平台内交易','食品功效、特殊人群和品牌荣誉','错误货号、包装、内配和口误纠正','脚本上线前的运营、客服和产品资料审核']),
+ ('客服',160,['微信转账、个人微信、QQ或银行卡私下付款','客户地址、手机号、订单截图和聊天记录','赠品、快递、发货、退款和补偿承诺','食品保质期、配料、过敏原和特殊人群咨询','差评、投诉、退款原因和平台介入']),
+ ('运营',100,['标题、属性、SKU图片和净含量','原价、折扣、销量、库存和到手价','活动报名前的库存、毛利、发货和售后能力','未经授权的商标、字体、图片和素材','页面承诺与实际履约']),
+ ('仓库/打单',55,['货号、SKU、口味、数量和礼袋','面单、订单、物流单号和出库记录','生产日期、批次、保质期和先进先出','破损、漏气、鼓包、少件和错发','称重、拍照、作废面单和客户信息']),
+ ('美工',50,['产品名称、货号、净含量、口味和包装','澳门风味与澳门制造的文字边界','医疗功效、绝对化用语和虚假荣誉','AI或修图导致的配料、数量、切面和包装失真','活动价、到手价和使用条件']),
+ ('直播/短视频',35,['历史最低价、库存紧张和发货时间','赠品、价格条件和平台内交易','食品功效、特殊人群和品牌荣誉','错误货号、包装、内配和口误纠正','脚本上线前的运营、客服和产品资料审核']),
  ('采购/跟单/品控',25,['供应商资质、许可证和执行标准','配料表、营养成分、过敏原和标签样稿','净含量、生产日期、批次和留样','包材版本、首件确认和新旧包装切换','异常批次隔离和追溯']),
  ('财务/审单',20,['平台内收款和个人账户收款','退款原路、补偿审批和重复退款','发票、账单、ERP订单和优惠承担方','异常大额退款、拒付和证据保存','客户支付和发票信息权限'])]
 
@@ -47,7 +47,7 @@ def make(qid,role,topic,source,clause,redline,idx):
     # deterministic order, not a duplicate-by-permutation question
     order=sorted(range(4),key=lambda i:hashlib.sha1(f'{qid}:{i}'.encode()).hexdigest()); vals=[opts[i] for i in order]; answer='ABCD'[vals.index(correct)]
     explanation='依据《'+source['ruleTitle']+'》'+clause+'：'+c['text']+'。因此应当：'+correct+'。'
-    return {'id':qid,'bank':role+'红线规则与实操','role':role,'module':topic,'platform':source['platform'],'type':'场景题','difficulty':'红线' if redline else '实操','riskLevel':'redline' if redline else 'practice','mandatory':bool(redline),'knowledgePoint':c['heading'],'question':'【'+topic+'】在处理“'+topic+'”场景时，发现具体情况为：'+topic+'涉及客户、商品或订单信息。此时最合规的第一步是什么？（场景编号'+qid[-4:]+'）','optionA':vals[0],'optionB':vals[1],'optionC':vals[2],'optionD':vals[3],'answer':answer,'answerText':correct,'explanation':explanation,'sourceId':s,'sourceLevel':source['sourceLevel'],'sourceTitle':source['ruleTitle'],'sourceUrl':source['officialUrl'],'sourceClause':clause,'sourceEffectiveDate':source['effectiveDate'],'sourceRetrievedAt':TODAY,'sourceSha256':source['sourceSha256'],'reviewDue':REVIEW,'note':'公开官方正文可核验；不含平台后台处罚金额、时限或赔付比例。'}
+    return {'id':qid,'bank':role+'红线规则与实操','role':role,'module':topic,'platform':source['platform'],'type':'场景题','difficulty':'红线' if redline else '实操','riskLevel':'redline' if redline else 'practice','mandatory':bool(redline),'knowledgePoint':c['heading'],'question':'【'+topic+'】在处理“'+topic+'”场景时，发现具体情况为：'+topic+'涉及客户、商品或订单信息。此时最合规的第一步是什么？（场景编号'+qid[-4:]+'）','optionA':vals[0],'optionB':vals[1],'optionC':vals[2],'optionD':vals[3],'answer':answer,'answerText':correct,'explanation':explanation,'sourceId':s,'sourceLevel':source['sourceLevel'],'sourceTitle':source['ruleTitle'],'sourceUrl':source['officialUrl'],'sourceClause':clause,'sourceEffectiveDate':source['effectiveDate'],'sourceRetrievedAt':TODAY,'sourceSha256':source['sourceSha256'],'reviewDue':REVIEW,'answerBasis':'law' if source['sourceLevel']=='B' else 'official_rule','verificationStatus':'verified','sourceConflict':False,'conflictNotes':'','effectiveForFormalExam':True,'note':'公开官方正文可核验；不含平台后台处罚金额、时限或赔付比例。'}
 
 def main():
     index,sources=load_sources(); all_old=json.loads(ROLE_JSON.read_text(encoding='utf-8')); old=[q for q in all_old if not str(q.get('id','')).startswith('RULE-')]; new=[]; counts={}; total=0
