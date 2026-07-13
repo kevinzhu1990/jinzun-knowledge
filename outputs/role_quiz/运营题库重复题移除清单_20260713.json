@@ -448,6 +448,16 @@
     "id": "R-0105",
     "question": "京东店铺中，复盘一场活动最重要的输出是？",
     "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0146",
+    "question": "客服遇到不确定的产品参数，可以先凭印象回答，之后再更正。",
+    "rejectionReason": "missing_options"
+  },
+  {
+    "id": "R-0147",
+    "question": "美工制作产品详情页时，应优先保证图文信息与知识库一致。",
+    "rejectionReason": "missing_options"
   }
 ]
 
