@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260713-product-sync";
+const BUILD_VERSION = "20260713-role-rules";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -12,6 +12,7 @@ const state = {
   allQuestions: [],
   filtered: [],
   currentBank: "全部题库",
+  ruleFilters: { role: "", platform: "", riskLevel: "", module: "", sourceLevel: "" },
   currentView: "dashboard",
   quiz: [],
   quizIndex: 0,
@@ -57,6 +58,12 @@ const els = {
   summaryCards: document.querySelector("#summaryCards"),
   bankCards: document.querySelector("#bankCards"),
   learnFilter: document.querySelector("#learnFilter"),
+  ruleFilters: document.querySelector("#ruleFilters"),
+  ruleRoleFilter: document.querySelector("#ruleRoleFilter"),
+  rulePlatformFilter: document.querySelector("#rulePlatformFilter"),
+  ruleRiskFilter: document.querySelector("#ruleRiskFilter"),
+  ruleModuleFilter: document.querySelector("#ruleModuleFilter"),
+  ruleSourceFilter: document.querySelector("#ruleSourceFilter"),
   learnList: document.querySelector("#learnList"),
   learnCount: document.querySelector("#learnCount"),
   learnPagination: document.querySelector("#learnPagination"),
@@ -582,6 +589,12 @@ function bankQuestions() {
   return state.allQuestions.filter((question) => {
     const bankMatch = state.currentBank === "全部题库" || question.bank === state.currentBank;
     if (!bankMatch) return false;
+    const filter = state.ruleFilters;
+    if (filter.role && question.role !== filter.role) return false;
+    if (filter.platform && question.platform !== filter.platform) return false;
+    if (filter.riskLevel && question.riskLevel !== filter.riskLevel) return false;
+    if (filter.module && question.module !== filter.module) return false;
+    if (filter.sourceLevel && question.sourceLevel !== filter.sourceLevel) return false;
     if (!keyword) return true;
     return [
       question.id,
@@ -728,6 +741,20 @@ function renderLearnFilter() {
     <span class="filter-sep"></span>
     ${roleGroup.map((b) => makeBtn(b, b)).join("")}
   `;
+
+  const ruleQuestions = state.allQuestions.filter((q) => q.role && q.riskLevel);
+  els.ruleFilters.classList.toggle("hidden", !ruleQuestions.length);
+  const fillRuleSelect = (element, values, placeholder) => {
+    if (!element) return;
+    const current = element.value;
+    element.innerHTML = `<option value="">${placeholder}</option>${values.sort().map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("")}`;
+    element.value = current;
+  };
+  fillRuleSelect(els.ruleRoleFilter, [...new Set(ruleQuestions.map((q) => q.role))], "全部岗位");
+  fillRuleSelect(els.rulePlatformFilter, [...new Set(ruleQuestions.map((q) => q.platform))], "全部平台");
+  fillRuleSelect(els.ruleModuleFilter, [...new Set(ruleQuestions.map((q) => q.module))], "全部模块");
+  els.ruleRiskFilter.value = state.ruleFilters.riskLevel;
+  els.ruleSourceFilter.value = state.ruleFilters.sourceLevel;
 
   els.learnFilter.querySelectorAll(".learn-filter-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -908,7 +935,10 @@ async function startQuiz() {
     }
   } else {
     // 练习模式也只从考试控件选择的题库取题，不受搜索框和左侧学习筛选影响。
-    if (state.quizMode === "product") {
+    if (state.examType === "redline") {
+      pool = state.allQuestions.filter((q) => q.riskLevel === "redline" && (!q.role || q.role === state.currentUser?.role || q.role === "全员"));
+      state.examLabelOverride = "岗位红线规则题库";
+    } else if (state.quizMode === "product") {
       const bank = els.productBankSelect.value;
       pool = state.allQuestions.filter((q) => q.bank === bank);
       state.examLabelOverride = bank;
@@ -962,6 +992,13 @@ function goToNextQuestion() {
     els.quizCard?.scrollIntoView({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
       block: "start",
+    });
+  });
+  [[els.ruleRoleFilter, "role"], [els.rulePlatformFilter, "platform"], [els.ruleRiskFilter, "riskLevel"], [els.ruleModuleFilter, "module"], [els.ruleSourceFilter, "sourceLevel"]].forEach(([element, key]) => {
+    element?.addEventListener("change", () => {
+      state.ruleFilters[key] = element.value;
+      state.learnPage = 1;
+      renderAll();
     });
   });
 }
@@ -1128,6 +1165,7 @@ async function finishQuiz() {
   if (els.retryExamSubmitBtn) els.retryExamSubmitBtn.classList.add("hidden");
   updateWrongCount();
   const percent = state.quiz.length ? Math.round((state.score / state.quiz.length) * 100) : 0;
+  const passMark = state.examType === "redline" ? 100 : 80;
   const timeStr = formatTime(state.serverDuration ?? timerSeconds);
   const examSyncSuccess = state.examType === "formal" && state.serverRecordId
     ? `<p class="exam-sync-success" role="status">正式考试已同步到飞书</p>`
@@ -1157,9 +1195,9 @@ async function finishQuiz() {
       <span>✓ 答对 ${state.score} 题</span>
       <span class="${state.quizWrong > 0 ? "result-wrong" : ""}">✗ 答错 ${state.quizWrong} 题</span>
       <span>⏱ 用时 ${timeStr}</span>
-      <span>${percent >= 80 ? "已通过" : "未通过"}</span>
+      <span>${percent >= passMark ? "已通过" : state.examType === "redline" ? "红线模块未通过" : "未通过"}</span>
     </div>
-    <p class="explain">${percent >= 90 ? "表现很稳，可以进入下一组题库。" : percent >= 80 ? "已达到合格线，建议继续重练错题冲刺优秀。" : "建议先复习错题，再重新考一次。"}</p>
+    <p class="explain">${state.examType === "redline" && percent < 100 ? "红线题错1题即未通过，请先复习错题后重新学习。" : percent >= 90 ? "表现很稳，可以进入下一组题库。" : percent >= 80 ? "已达到合格线，建议继续重练错题冲刺优秀。" : "建议先复习错题，再重新考一次。"}</p>
     ${wrongReview}
     <div class="result-actions">
       <button class="primary-btn" id="retryQuizBtn">重新考核</button>
@@ -1188,7 +1226,7 @@ function saveExamRecord(percent) {
     total: state.quiz.length,
     wrong: state.quizWrong,
     percent,
-    passed: percent >= 80,
+    passed: state.examType === "redline" ? percent >= 100 : percent >= 80,
     duration: timerSeconds,
     finishedAt: new Date().toISOString(),
     buildVersion: BUILD_VERSION,
