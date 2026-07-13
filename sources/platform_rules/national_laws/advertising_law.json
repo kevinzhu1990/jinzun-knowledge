@@ -1,0 +1,44 @@
+{
+  "sourceId": "ADLAW-2021",
+  "sourceLevel": "B",
+  "platform": "跨平台法律",
+  "ruleTitle": "中华人民共和国广告法",
+  "publisher": "国家市场监督管理总局",
+  "officialUrl": "https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/fgs/art/2023/art_5474cf75173c45d6a0379730fb4e8d97.html",
+  "publishDate": "2021-04-29",
+  "effectiveDate": "2021-04-29",
+  "expiryDate": "",
+  "status": "current",
+  "applicableRoles": [
+    "运营",
+    "美工",
+    "直播/短视频"
+  ],
+  "applicableScenes": [
+    "商品页面",
+    "广告素材",
+    "直播口播"
+  ],
+  "sourceSha256": "f9d14ce3af6d3f57a9aca33e85e9c839a46cd3227fb62a4a8d742426a8d677d1",
+  "clauses": [
+    {
+      "clauseId": "AD-3-4",
+      "heading": "真实合法与不得误导",
+      "text": "广告应当真实、合法；广告不得含有虚假或者引人误解的内容，不得欺骗、误导消费者。",
+      "certainty": "explicit"
+    },
+    {
+      "clauseId": "AD-8",
+      "heading": "商品信息真实准确",
+      "text": "广告对商品性能、功能、产地、用途、质量、成分、价格、生产者、有效期限、允诺等作表示的，应当准确、清楚、明白。",
+      "certainty": "explicit"
+    },
+    {
+      "clauseId": "AD-9",
+      "heading": "广告内容限制",
+      "text": "广告不得使用法律法规禁止的内容，不得以虚假、夸大或引人误解的方式表达商品信息。",
+      "certainty": "explicit"
+    }
+  ]
+}
+
