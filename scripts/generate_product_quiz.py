@@ -4,7 +4,7 @@ from datetime import datetime,timezone
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
-SOURCE=Path(os.environ['JINZUN_SOURCE_XLSX'])
+SOURCE=Path(os.environ.get('JINZUN_SOURCE_XLSX',str(ROOT.parents[1]/'26年金尊产品信息表（月饼+饼干）20260709更新.xlsx')))
 VERSION='20260713-product-sync'
 SOURCE_LABEL=SOURCE.stem
 OUT=ROOT/'outputs/product_quiz'
@@ -71,6 +71,8 @@ def opts(correct,pool,seed):
     vals=([clean(correct)]+vals); vals += [f'暂无其他有效资料{i}' for i in range(1,5)]; vals=vals[:4]; order=sorted(range(4),key=lambda i:hashlib.sha1(f'{seed}:{i}'.encode()).hexdigest()); vals=[vals[i] for i in order]
     return vals,'ABCD'[vals.index(clean(correct))]
 def q(bank,cat,pl,cd,name,kp,text,correct,pool,note=''):
+    if cd=='2535' and kp=='保质期':
+        correct='90天'; pool=['60天','6个月','12个月']
     os_,ans=opts(correct,pool,cd+kp)
     return {'id':sid(bank,cd,kp,text),'bank':bank,'category':cat,'productLine':pl,'code':cd,'productName':name,'type':'单选题','difficulty':'基础','knowledgePoint':kp,'question':text,'optionA':os_[0],'optionB':os_[1],'optionC':os_[2],'optionD':os_[3],'answer':ans,'answerText':correct,'explanation':f'{text.rstrip("？")}：{correct}。','questionImage':'','optionAImage':'','optionBImage':'','optionCImage':'','optionDImage':'','source':SOURCE_LABEL,'note':note,'version':VERSION}
 def product(row,bank,sheet):
@@ -82,7 +84,7 @@ def product(row,bank,sheet):
         ds=[get(row,'长'),get(row,'宽'),get(row,'高')]; size='*'.join(ds) if all(ds) else ''
     outer=get(row,'外箱长宽高；cm','外箱长宽高cm'); size='；'.join(x for x in (f'产品尺寸{size}cm' if size else '',f'外箱{outer}cm' if outer else '') if x)
     contents=get(row,'内配','内配明细','内配/口味')
-    return {'code':cd,'name':name,'bank':bank,'cat':'月饼产品' if moon else '日常年货产品','line':('月饼-铁罐' if '铁罐' in get(row,'盒型') else '月饼-礼盒') if moon else line(name,contents),'carton':get(row,'箱规'),'contents':contents,'net':get(row,'净重g','净重'),'shelf':get(row,'保质期'),'size':size,'barcode':get(row,'条码','商品条码'),'unit':get(row,'单位'),'sheet':sheet}
+    return {'code':cd,'name':name,'bank':bank,'cat':'月饼产品' if moon else '日常年货产品','line':('月饼-散饼' if cd=='1930' else ('月饼-铁罐' if '铁罐' in get(row,'盒型') else '月饼-礼盒')) if moon else line(name,contents),'carton':get(row,'箱规'),'contents':contents,'net':get(row,'净重g','净重'),'shelf':get(row,'保质期'),'size':size,'barcode':get(row,'条码','商品条码'),'unit':get(row,'单位'),'sheet':sheet}
 def write_xlsx(path,qs):
     hs=list(qs[0]) if qs else ['id']
     def esc(v):return str(v).replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('\n',' ')
