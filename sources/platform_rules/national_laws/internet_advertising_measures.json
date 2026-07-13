@@ -1,0 +1,33 @@
+{
+  "sourceId": "IAD-2023",
+  "sourceLevel": "B",
+  "platform": "跨平台法律",
+  "ruleTitle": "互联网广告管理办法",
+  "publisher": "国家市场监督管理总局",
+  "officialUrl": "https://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20234/W020230320579023662253.pdf?fileName=W020230320579023662253.pdf",
+  "publishDate": "2023-02-25",
+  "effectiveDate": "2023-05-01",
+  "expiryDate": "",
+  "status": "current",
+  "applicableRoles": [
+    "运营",
+    "美工",
+    "直播/短视频"
+  ],
+  "applicableScenes": [
+    "网页广告",
+    "直播",
+    "短视频",
+    "商品详情"
+  ],
+  "sourceSha256": "b54be26d2a655cd199eb28a9fc89737738f12e64fd4b92beb183eabf7ba5a97b",
+  "clauses": [
+    {
+      "clauseId": "IAD-2",
+      "heading": "互联网商业广告适用范围",
+      "text": "利用网站、网页、互联网应用程序等互联网媒介，以文字、图片、音频、视频等形式直接或者间接推销商品或者服务的商业广告活动，适用广告法和本办法。",
+      "certainty": "explicit"
+    }
+  ]
+}
+
