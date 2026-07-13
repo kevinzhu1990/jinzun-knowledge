@@ -1,0 +1,31 @@
+{
+  "sourceId": "PDD-PUBLIC-AGREEMENT",
+  "sourceLevel": "A",
+  "platform": "拼多多",
+  "ruleTitle": "拼多多用户服务协议（V4.1）",
+  "publisher": "拼多多",
+  "officialUrl": "https://www.yangkeduo.com/pdd_user_services_agreement.pdf",
+  "publishDate": "2025-08-31",
+  "effectiveDate": "2025-08-31",
+  "expiryDate": "",
+  "status": "current",
+  "applicableRoles": [
+    "客服",
+    "运营"
+  ],
+  "applicableScenes": [
+    "平台交易",
+    "商品信息",
+    "评价"
+  ],
+  "sourceSha256": "c91f1c2b09f7926558262a4dee6f9bdaa1ac8a9cd6d7874e875dd1ecc780a914",
+  "clauses": [
+    {
+      "clauseId": "PDD-INFO-1",
+      "heading": "商品信息真实完整",
+      "text": "平台上的商品信息由商家提供，商家应提供准确、完整、可靠、有效且没有错误的信息，并遵守平台规则。",
+      "certainty": "explicit"
+    }
+  ]
+}
+
