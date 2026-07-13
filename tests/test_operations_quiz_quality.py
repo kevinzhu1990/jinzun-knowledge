@@ -47,3 +47,12 @@ def test_imported_questions_have_valid_answers_and_unique_options_after_dedupe()
         if question.get("riskLevel") == "redline":
             assert question.get("mandatory") is True
 
+
+def test_answer_letters_are_balanced_after_randomized_option_order():
+    questions, _ = module.dedupe_questions(module.load_seed())
+    randomized = module.randomize_options([dict(question) for question in questions])
+    counts = {letter: sum(q["answer"] == letter for q in randomized) for letter in "ABCD"}
+    assert max(counts.values()) - min(counts.values()) <= 1
+    for question in randomized:
+        assert question["answerText"] == question[f"option{question['answer']}"]
+
