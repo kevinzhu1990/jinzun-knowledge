@@ -1,23 +1,61 @@
 from __future__ import annotations
-import json,re
+
+import json
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1]; Q=ROOT/'outputs/role_quiz/岗位学习考核题库.json'; INDEX=ROOT/'sources/platform_rules/index.json'
-def main():
-    qs=json.loads(Q.read_text(encoding='utf8')); idx=json.loads(INDEX.read_text(encoding='utf8')); rules=[q for q in qs if str(q.get('id','')).startswith('RULE-')]; errors=[]
-    if len(rules)<360: errors.append(f'新增岗位规则题不足360：{len(rules)}')
-    if sum(q.get('role')=='客服' for q in rules)<120: errors.append('客服题不足120')
-    if sum(q.get('role')=='运营' for q in rules)<80: errors.append('运营题不足80')
-    if sum(q.get('role')=='仓库/打单' for q in rules)<45: errors.append('仓库题不足45')
-    if sum(q.get('role')=='美工' for q in rules)<40: errors.append('美工题不足40')
-    if sum(q.get('role')=='直播/短视频' for q in rules)<30: errors.append('直播题不足30')
-    if sum(q.get('role')=='采购/跟单/品控' for q in rules)<25: errors.append('采购品控题不足25')
-    if sum(q.get('role')=='财务/审单' for q in rules)<20: errors.append('财务题不足20')
-    if sum(q.get('riskLevel')=='redline' for q in rules)<180: errors.append('红线题不足180')
-    for q in rules:
-        if q.get('sourceLevel') not in ('A','B','C'): errors.append(f"{q.get('id')} source level invalid")
-        if q.get('riskLevel')=='redline' and q.get('mandatory') is not True: errors.append(f"{q.get('id')} mandatory/risk invalid")
-        if '以平台最新规则为准' in q.get('question','') and not q.get('sourceId'): errors.append(f"{q.get('id')} vague source")
-    if errors: print('\n'.join(errors)); raise SystemExit(1)
-    print(json.dumps({'ok':True,'existingQuestions':len(qs)-len(rules),'newQuestions':len(rules),'redlineQuestions':sum(q.get('riskLevel')=='redline' for q in rules),'pendingVerification':len(idx['pendingVerification'])},ensure_ascii=False,indent=2))
-if __name__=='__main__':main()
+
+from audit_rule_sources import formal_exam_questions, semantic_duplicate_groups, template_garbage_reasons
+
+ROOT = Path(__file__).resolve().parents[1]
+Q = ROOT / "outputs" / "role_quiz" / "岗位学习考核题库.json"
+REJECTED = ROOT / "outputs" / "role_quiz" / "rejected_rule_questions_20260713.json"
+REVIEW = ROOT / "outputs" / "role_quiz" / "existing_question_review_20260713.json"
+
+
+def main() -> None:
+    questions = json.loads(Q.read_text(encoding="utf8"))
+    errors = []
+    generated = [q for q in questions if str(q.get("id", "")).startswith("RULE-")]
+    if generated:
+        errors.append(f"正式题库不允许包含RULE自动题：{len(generated)}")
+    if len(questions) != 156:
+        errors.append(f"清理后应保留原156题，当前为：{len(questions)}")
+    for question in questions:
+        garbage = template_garbage_reasons(question)
+        if garbage:
+            errors.append(f"{question.get('id')} contains template garbage: {','.join(garbage)}")
+        if question.get("effectiveForFormalExam") is True:
+            if question.get("verificationStatus") != "verified" or question.get("humanReviewStatus") != "approved" or question.get("sourceConflict") is not False:
+                errors.append(f"{question.get('id')} bypasses human review gate")
+    duplicates = semantic_duplicate_groups(questions)
+    formal_candidates = [q for q in questions if q.get("effectiveForFormalExam") is True]
+    formal_duplicates = semantic_duplicate_groups(formal_candidates)
+    if formal_duplicates:
+        errors.append(f"正式岗位题库存在语义重复组：{len(formal_duplicates)}")
+    if not REJECTED.exists():
+        errors.append("缺少RULE题拒绝清单")
+    else:
+        rejected = json.loads(REJECTED.read_text(encoding="utf8"))
+        if len(rejected) != 445:
+            errors.append(f"拒绝清单应包含445题，当前为：{len(rejected)}")
+        if any(not q.get("rejectionReason") for q in rejected):
+            errors.append("拒绝清单存在未填写原因的题目")
+    if not REVIEW.exists():
+        errors.append("缺少原156题审计报告")
+    report = {
+        "ok": not errors,
+        "totalQuestions": len(questions),
+        "legacyQuestions": len(questions),
+        "rejectedRuleQuestions": len(json.loads(REJECTED.read_text(encoding="utf8"))) if REJECTED.exists() else 0,
+        "semanticDuplicateGroups": len(duplicates),
+        "formalSemanticDuplicateGroups": len(formal_duplicates),
+        "formalExamQuestions": len(formal_exam_questions(questions)),
+        "errors": errors,
+    }
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    if errors:
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()
 
