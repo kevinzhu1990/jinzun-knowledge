@@ -1,0 +1,41 @@
+{
+  "sourceId": "FOODLAW-2015",
+  "sourceLevel": "B",
+  "platform": "跨平台法律",
+  "ruleTitle": "中华人民共和国食品安全法",
+  "publisher": "国家卫生健康委员会",
+  "officialUrl": "https://www.nhc.gov.cn/fzs/c100048/201808/31b2202291464a5fb9e1f64bebc4d877.shtml",
+  "publishDate": "2015-04-24",
+  "effectiveDate": "2015-10-01",
+  "expiryDate": "",
+  "status": "current",
+  "applicableRoles": [
+    "客服",
+    "运营",
+    "美工",
+    "直播/短视频",
+    "采购/跟单/品控"
+  ],
+  "applicableScenes": [
+    "食品宣传",
+    "商品信息",
+    "标签",
+    "售后"
+  ],
+  "sourceSha256": "da4135cd923c739bfa0824af1896f165ab116beff32e260eeee226567ae8f8cf",
+  "clauses": [
+    {
+      "clauseId": "FSL-73",
+      "heading": "食品广告不得涉及疾病功能",
+      "text": "食品广告的内容应当真实合法，不得含有虚假内容，不得涉及疾病预防、治疗功能。",
+      "certainty": "explicit"
+    },
+    {
+      "clauseId": "FSL-67",
+      "heading": "食品标签真实准确",
+      "text": "食品安全标准应当包括食品、食品添加剂的标签、标志和说明书的要求；食品标签和说明书应当真实，不得含有虚假内容。",
+      "certainty": "explicit"
+    }
+  ]
+}
+
