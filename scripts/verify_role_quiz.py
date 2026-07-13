@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 Q = ROOT / "outputs" / "role_quiz" / "岗位学习考核题库.json"
 REJECTED = ROOT / "outputs" / "role_quiz" / "rejected_rule_questions_20260713.json"
 REVIEW = ROOT / "outputs" / "role_quiz" / "existing_question_review_20260713.json"
+OPERATIONS_REPORT = ROOT / "outputs" / "role_quiz" / "运营题库导入报告_20260713.json"
 
 
 def main() -> None:
@@ -17,8 +18,17 @@ def main() -> None:
     generated = [q for q in questions if str(q.get("id", "")).startswith("RULE-")]
     if generated:
         errors.append(f"正式题库不允许包含RULE自动题：{len(generated)}")
-    if len(questions) != 156:
-        errors.append(f"清理后应保留原156题，当前为：{len(questions)}")
+    operations = [q for q in questions if str(q.get("id", "")).startswith("OPS-")]
+    expected_banks = {"运营-拼多多": 30, "运营-天猫/淘宝": 30, "运营-抖音电商": 30, "运营-京东": 20, "运营-视频号": 20}
+    actual_banks = {}
+    for question in operations:
+        actual_banks[question.get("bank")] = actual_banks.get(question.get("bank"), 0) + 1
+    if len(operations) != 130:
+        errors.append(f"运营题应为130道，当前为：{len(operations)}")
+    if actual_banks != expected_banks:
+        errors.append(f"运营平台题量不正确：{actual_banks}")
+    if not OPERATIONS_REPORT.exists():
+        errors.append("缺少运营题库导入报告")
     for question in questions:
         garbage = template_garbage_reasons(question)
         if garbage:
@@ -44,7 +54,8 @@ def main() -> None:
     report = {
         "ok": not errors,
         "totalQuestions": len(questions),
-        "legacyQuestions": len(questions),
+        "legacyQuestions": len(questions) - len(operations),
+        "operationsQuestions": len(operations),
         "rejectedRuleQuestions": len(json.loads(REJECTED.read_text(encoding="utf8"))) if REJECTED.exists() else 0,
         "semanticDuplicateGroups": len(duplicates),
         "formalSemanticDuplicateGroups": len(formal_duplicates),
