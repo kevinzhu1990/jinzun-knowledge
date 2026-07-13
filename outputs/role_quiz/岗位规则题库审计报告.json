@@ -1,0 +1,108 @@
+{
+  "generatedAt": "2026-07-13",
+  "existingQuestions": 156,
+  "newQuestions": 360,
+  "mergedQuestions": 516,
+  "byRole": {
+    "客服": 120,
+    "运营": 80,
+    "仓库/打单": 45,
+    "美工": 40,
+    "直播/短视频": 30,
+    "采购/跟单/品控": 25,
+    "财务/审单": 20
+  },
+  "byPlatform": {
+    "跨平台法律": 360
+  },
+  "redlineQuestions": 180,
+  "sourceLevelCounts": {
+    "A": 72,
+    "B": 288,
+    "C": 0,
+    "D": 0
+  },
+  "numericQuestions": 0,
+  "numericEvidence": [],
+  "unverifiedRules": [
+    {
+      "platform": "淘宝/天猫",
+      "topic": "商家后台导流、发货、售后、评价和赔付细则",
+      "reason": "当前环境无法取得商家后台规则正文",
+      "requiredAccess": "淘宝/天猫商家后台规则中心"
+    },
+    {
+      "platform": "拼多多",
+      "topic": "商家后台导流、发货、售后、评价和赔付细则",
+      "reason": "当前环境无法取得商家后台规则正文",
+      "requiredAccess": "拼多多商家后台规则中心"
+    }
+  ],
+  "internalTrainingDocumentsUnavailable": [
+    "《天猫规则与客服红线》新人篇.pptx",
+    "拼多多店铺规则.pptx",
+    "拼多多客服规则明细.docx",
+    "淘系新规则解读更新2025年7月(2).pptx",
+    "天猫规则--服务和其他违规行为.pptx",
+    "高压线.doc",
+    "各平台规则考核(1).doc",
+    "京东规则准则.doc",
+    "2025各渠道店铺指标解析(2025年7月更新).pptx",
+    "天猫新灯塔.pptx",
+    "月饼常见问题和参考答案和解析.docx",
+    "抖音发货时效.png"
+  ],
+  "retrievedSources": [
+    {
+      "sourceId": "PIPL-2021",
+      "title": "中华人民共和国个人信息保护法",
+      "url": "https://www.npc.gov.cn/npc/c2/c30834/202108/t20210820_313088.html",
+      "effectiveDate": "2021-11-01",
+      "sha256": "d2c8668448e4e4cda199cdee58244573284442c1b7fcc175c0dfe1ab62b775ae"
+    },
+    {
+      "sourceId": "ADLAW-2021",
+      "title": "中华人民共和国广告法",
+      "url": "https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/fgs/art/2023/art_5474cf75173c45d6a0379730fb4e8d97.html",
+      "effectiveDate": "2021-04-29",
+      "sha256": "f9d14ce3af6d3f57a9aca33e85e9c839a46cd3227fb62a4a8d742426a8d677d1"
+    },
+    {
+      "sourceId": "FOODLAW-2015",
+      "title": "中华人民共和国食品安全法",
+      "url": "https://www.nhc.gov.cn/fzs/c100048/201808/31b2202291464a5fb9e1f64bebc4d877.shtml",
+      "effectiveDate": "2015-10-01",
+      "sha256": "da4135cd923c739bfa0824af1896f165ab116beff32e260eeee226567ae8f8cf"
+    },
+    {
+      "sourceId": "ECOMLAW-2018",
+      "title": "中华人民共和国电子商务法",
+      "url": "https://fgk.chinatax.gov.cn/zcfgk/c100009/c5212256/content.html",
+      "effectiveDate": "2019-01-01",
+      "sha256": "088343099f9a0378e11eacc0030b930c5ad9bc047f1f71b0d55b5482aad73ccc"
+    },
+    {
+      "sourceId": "IAD-2023",
+      "title": "互联网广告管理办法",
+      "url": "https://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20234/W020230320579023662253.pdf?fileName=W020230320579023662253.pdf",
+      "effectiveDate": "2023-05-01",
+      "sha256": "b54be26d2a655cd199eb28a9fc89737738f12e64fd4b92beb183eabf7ba5a97b"
+    },
+    {
+      "sourceId": "TAOBAO-PUBLIC-AGREEMENT",
+      "title": "淘宝全球平台服务协议",
+      "url": "https://terms.alicdn.com/legal-agreement/terms/suit_bu1_tmall/suit_bu1_tmall201908300941_47093.html",
+      "effectiveDate": "2019-08-30",
+      "sha256": "676a4664bf627da0ee3453bf87c8e8bb6031f705e3bd58b38a60a5df6ff829e8"
+    },
+    {
+      "sourceId": "PDD-PUBLIC-AGREEMENT",
+      "title": "拼多多用户服务协议（V4.1）",
+      "url": "https://www.yangkeduo.com/pdd_user_services_agreement.pdf",
+      "effectiveDate": "2025-08-31",
+      "sha256": "c91f1c2b09f7926558262a4dee6f9bdaa1ac8a9cd6d7874e875dd1ecc780a914"
+    }
+  ],
+  "status": "partial-platform-rules-pending"
+}
+
