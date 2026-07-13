@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>金尊知识库学习考核</title>
-    <link rel="stylesheet" href="./styles.css?v=20260713-product-sync" />
+    <link rel="stylesheet" href="./styles.css?v=20260713-role-rules" />
   </head>
   <body>
     <section id="authView" class="auth-view">
@@ -220,6 +220,13 @@
             <span id="learnCount" class="pill">0 道题</span>
           </div>
           <div id="learnFilter" class="learn-filter"></div>
+          <div id="ruleFilters" class="rule-filters hidden" aria-label="岗位规则筛选">
+            <select id="ruleRoleFilter" class="select"><option value="">全部岗位</option></select>
+            <select id="rulePlatformFilter" class="select"><option value="">全部平台</option></select>
+            <select id="ruleRiskFilter" class="select"><option value="">普通题/红线题</option><option value="redline">红线题</option><option value="practice">实操题</option></select>
+            <select id="ruleModuleFilter" class="select"><option value="">全部模块</option></select>
+            <select id="ruleSourceFilter" class="select"><option value="">全部来源等级</option><option value="A">A级</option><option value="B">B级</option><option value="C">C级</option></select>
+          </div>
           <div id="learnList" class="learn-list"></div>
           <div id="learnPagination" class="learn-pagination"></div>
         </section>
@@ -259,6 +266,7 @@
                 <select id="examType" class="select quiz-size-select">
                   <option value="practice">练习模式：答后显示解析</option>
                   <option value="formal">正式模式：交卷后统一出成绩</option>
+                  <option value="redline">红线规则：错1题即未通过</option>
                 </select>
               </label>
               <label class="mode-label">
@@ -353,7 +361,7 @@
     </div>
 
     <script src="./mooncake-filter.js?v=af8d1d9"></script>
-    <script src="./app.js?v=20260713-product-sync" type="module"></script>
+    <script src="./app.js?v=20260713-role-rules" type="module"></script>
   </body>
 </html>
 
