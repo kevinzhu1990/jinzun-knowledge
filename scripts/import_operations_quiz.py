@@ -164,12 +164,13 @@ def main() -> None:
         BACKUP_JSON.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROLE_JSON, BACKUP_JSON)
     baseline = read_json(BACKUP_JSON)
-    retained = [question for question in baseline if question.get("role") != "运营" and not str(question.get("id", "")).startswith("RULE-")]
+    invalid_legacy = [question for question in baseline if question.get("role") != "运营" and not str(question.get("id", "")).startswith("RULE-") and not all(question.get(f"option{x}") or question.get(f"option{x}Image") for x in "ABCD")]
+    retained = [question for question in baseline if question.get("role") != "运营" and not str(question.get("id", "")).startswith("RULE-") and question not in invalid_legacy]
     old_operations = [question for question in baseline if question.get("role") == "运营"]
     write_json(REMOVED_JSON, [
         {"id": question.get("id"), "question": question.get("question"), "rejectionReason": "replaced_by_curated_operations_quiz"}
         for question in old_operations
-    ] + removed_duplicates)
+    ] + [{"id": question.get("id"), "question": question.get("question"), "rejectionReason": "missing_options"} for question in invalid_legacy] + removed_duplicates)
     write_json(ROLE_JSON, retained + imported)
 
     report = {
