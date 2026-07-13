@@ -103,6 +103,10 @@
       "sha256": "c91f1c2b09f7926558262a4dee6f9bdaa1ac8a9cd6d7874e875dd1ecc780a914"
     }
   ],
-  "status": "partial-platform-rules-pending"
+  "status": "partial-platform-rules-pending",
+  "semanticDuplicateGroups": 181,
+  "semanticDuplicateQuestionCount": 362,
+  "fixedDistractorRepeatCounts": {},
+  "formalExamQuestions": 0
 }
 
