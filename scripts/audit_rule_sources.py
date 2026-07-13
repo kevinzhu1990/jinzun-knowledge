@@ -144,7 +144,7 @@ def formal_exam_questions(questions: list[dict]) -> list[dict]:
         if q.get("verificationStatus") == "verified"
         and q.get("effectiveForFormalExam") is True
         and q.get("sourceConflict") is False
-        and q.get("semanticDuplicate") is False
+        and q.get("semanticDuplicate", False) is False
         and q.get("humanReviewStatus") == "approved"
     ]
 
