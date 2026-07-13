@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260713-operations-quiz4";
+const BUILD_VERSION = "20260713-operations-quiz5";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -532,7 +532,26 @@ async function loadQuestions() {
   if (!productRes.ok || !roleRes.ok) {
     throw new Error(`题库文件请求失败（产品 ${productRes.status} / 岗位 ${roleRes.status}）`);
   }
-  const [productQuestions, roleQuestions] = await Promise.all([productRes.json(), roleRes.json()]);
+  const parseQuizJson = async (response, label) => {
+    if (!response.ok) {
+      throw new Error(`${label}暂时无法加载，请刷新页面重试`);
+    }
+    const text = await response.text();
+    const start = Math.min(...[text.indexOf("["), text.indexOf("{")].filter((index) => index >= 0));
+    if (!Number.isFinite(start)) {
+      throw new Error(`${label}格式异常，请刷新页面重试`);
+    }
+    try {
+      return JSON.parse(text.slice(start));
+    } catch {
+      throw new Error(`${label}格式异常，请刷新页面重试`);
+    }
+  };
+
+  const [productQuestions, roleQuestions] = await Promise.all([
+    parseQuizJson(productRes, "产品题库"),
+    parseQuizJson(roleRes, "岗位题库")
+  ]);
   state.allQuestions = [...productQuestions, ...roleQuestions].map((question) => ({
     ...question,
     role: question.role || question.category || "",
