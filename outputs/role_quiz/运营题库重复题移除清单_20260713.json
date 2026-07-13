@@ -1,0 +1,453 @@
+[
+  {
+    "id": "R-0016",
+    "question": "天猫店铺中，商品上架前最先核对的是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0017",
+    "question": "天猫店铺中，做活动报名前，运营必须先评估什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0018",
+    "question": "天猫店铺中，商品标题优化的核心目标是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0019",
+    "question": "天猫店铺中，日常看店铺数据，最基础的一组指标是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0020",
+    "question": "天猫店铺中，发现转化率突然下降，第一步应该做什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0021",
+    "question": "天猫店铺中，客服反馈某产品被反复问同一个问题，运营应该怎么处理？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0022",
+    "question": "天猫店铺中，平台规则类问题，最可靠的依据是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0023",
+    "question": "天猫店铺中，新品测试阶段最适合关注什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0024",
+    "question": "天猫店铺中，库存较少但活动流量较大时，应该怎么做？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0025",
+    "question": "天猫店铺中，评价维护的正确做法是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0026",
+    "question": "天猫店铺中，直播/短视频带货前，商品卡信息应重点保证什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0027",
+    "question": "天猫店铺中，设置优惠券时，最容易出错的是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0028",
+    "question": "天猫店铺中，平台店铺诊断中，点击率低通常先看什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0029",
+    "question": "天猫店铺中，平台售后率升高，运营应联合哪个岗位排查？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0030",
+    "question": "天猫店铺中，竞品分析不应只看销量，还应看什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0031",
+    "question": "天猫店铺中，当平台要求整改商品信息时，应优先做什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0032",
+    "question": "天猫店铺中，运营排期表至少应包含什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0033",
+    "question": "天猫店铺中，复盘一场活动最重要的输出是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0034",
+    "question": "抖音店铺中，商品上架前最先核对的是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0035",
+    "question": "抖音店铺中，做活动报名前，运营必须先评估什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0036",
+    "question": "抖音店铺中，商品标题优化的核心目标是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0037",
+    "question": "抖音店铺中，日常看店铺数据，最基础的一组指标是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0038",
+    "question": "抖音店铺中，发现转化率突然下降，第一步应该做什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0039",
+    "question": "抖音店铺中，客服反馈某产品被反复问同一个问题，运营应该怎么处理？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0040",
+    "question": "抖音店铺中，平台规则类问题，最可靠的依据是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0041",
+    "question": "抖音店铺中，新品测试阶段最适合关注什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0042",
+    "question": "抖音店铺中，库存较少但活动流量较大时，应该怎么做？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0043",
+    "question": "抖音店铺中，评价维护的正确做法是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0044",
+    "question": "抖音店铺中，直播/短视频带货前，商品卡信息应重点保证什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0045",
+    "question": "抖音店铺中，设置优惠券时，最容易出错的是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0046",
+    "question": "抖音店铺中，平台店铺诊断中，点击率低通常先看什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0047",
+    "question": "抖音店铺中，平台售后率升高，运营应联合哪个岗位排查？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0048",
+    "question": "抖音店铺中，竞品分析不应只看销量，还应看什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0049",
+    "question": "抖音店铺中，当平台要求整改商品信息时，应优先做什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0050",
+    "question": "抖音店铺中，运营排期表至少应包含什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0051",
+    "question": "抖音店铺中，复盘一场活动最重要的输出是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0052",
+    "question": "视频号店铺中，商品上架前最先核对的是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0053",
+    "question": "视频号店铺中，做活动报名前，运营必须先评估什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0054",
+    "question": "视频号店铺中，商品标题优化的核心目标是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0055",
+    "question": "视频号店铺中，日常看店铺数据，最基础的一组指标是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0056",
+    "question": "视频号店铺中，发现转化率突然下降，第一步应该做什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0057",
+    "question": "视频号店铺中，客服反馈某产品被反复问同一个问题，运营应该怎么处理？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0058",
+    "question": "视频号店铺中，平台规则类问题，最可靠的依据是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0059",
+    "question": "视频号店铺中，新品测试阶段最适合关注什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0060",
+    "question": "视频号店铺中，库存较少但活动流量较大时，应该怎么做？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0061",
+    "question": "视频号店铺中，评价维护的正确做法是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0062",
+    "question": "视频号店铺中，直播/短视频带货前，商品卡信息应重点保证什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0063",
+    "question": "视频号店铺中，设置优惠券时，最容易出错的是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0064",
+    "question": "视频号店铺中，平台店铺诊断中，点击率低通常先看什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0065",
+    "question": "视频号店铺中，平台售后率升高，运营应联合哪个岗位排查？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0066",
+    "question": "视频号店铺中，竞品分析不应只看销量，还应看什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0067",
+    "question": "视频号店铺中，当平台要求整改商品信息时，应优先做什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0068",
+    "question": "视频号店铺中，运营排期表至少应包含什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0069",
+    "question": "视频号店铺中，复盘一场活动最重要的输出是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0070",
+    "question": "拼多多店铺中，商品上架前最先核对的是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0071",
+    "question": "拼多多店铺中，做活动报名前，运营必须先评估什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0072",
+    "question": "拼多多店铺中，商品标题优化的核心目标是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0073",
+    "question": "拼多多店铺中，日常看店铺数据，最基础的一组指标是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0074",
+    "question": "拼多多店铺中，发现转化率突然下降，第一步应该做什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0075",
+    "question": "拼多多店铺中，客服反馈某产品被反复问同一个问题，运营应该怎么处理？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0076",
+    "question": "拼多多店铺中，平台规则类问题，最可靠的依据是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0077",
+    "question": "拼多多店铺中，新品测试阶段最适合关注什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0078",
+    "question": "拼多多店铺中，库存较少但活动流量较大时，应该怎么做？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0079",
+    "question": "拼多多店铺中，评价维护的正确做法是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0080",
+    "question": "拼多多店铺中，直播/短视频带货前，商品卡信息应重点保证什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0081",
+    "question": "拼多多店铺中，设置优惠券时，最容易出错的是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0082",
+    "question": "拼多多店铺中，平台店铺诊断中，点击率低通常先看什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0083",
+    "question": "拼多多店铺中，平台售后率升高，运营应联合哪个岗位排查？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0084",
+    "question": "拼多多店铺中，竞品分析不应只看销量，还应看什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0085",
+    "question": "拼多多店铺中，当平台要求整改商品信息时，应优先做什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0086",
+    "question": "拼多多店铺中，运营排期表至少应包含什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0087",
+    "question": "拼多多店铺中，复盘一场活动最重要的输出是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0088",
+    "question": "京东店铺中，商品上架前最先核对的是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0089",
+    "question": "京东店铺中，做活动报名前，运营必须先评估什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0090",
+    "question": "京东店铺中，商品标题优化的核心目标是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0091",
+    "question": "京东店铺中，日常看店铺数据，最基础的一组指标是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0092",
+    "question": "京东店铺中，发现转化率突然下降，第一步应该做什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0093",
+    "question": "京东店铺中，客服反馈某产品被反复问同一个问题，运营应该怎么处理？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0094",
+    "question": "京东店铺中，平台规则类问题，最可靠的依据是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0095",
+    "question": "京东店铺中，新品测试阶段最适合关注什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0096",
+    "question": "京东店铺中，库存较少但活动流量较大时，应该怎么做？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0097",
+    "question": "京东店铺中，评价维护的正确做法是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0098",
+    "question": "京东店铺中，直播/短视频带货前，商品卡信息应重点保证什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0099",
+    "question": "京东店铺中，设置优惠券时，最容易出错的是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0100",
+    "question": "京东店铺中，平台店铺诊断中，点击率低通常先看什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0101",
+    "question": "京东店铺中，平台售后率升高，运营应联合哪个岗位排查？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0102",
+    "question": "京东店铺中，竞品分析不应只看销量，还应看什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0103",
+    "question": "京东店铺中，当平台要求整改商品信息时，应优先做什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0104",
+    "question": "京东店铺中，运营排期表至少应包含什么？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  },
+  {
+    "id": "R-0105",
+    "question": "京东店铺中，复盘一场活动最重要的输出是？",
+    "rejectionReason": "replaced_by_curated_operations_quiz"
+  }
+]
+
