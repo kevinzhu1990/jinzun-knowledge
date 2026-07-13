@@ -39,7 +39,7 @@ def main() -> None:
         if actual != q.get("answerText", ""):
             errors.append(f"{q.get('id')} 正确选项与答案内容不一致")
         options = [q.get(f"option{x}", "") for x in LETTERS if q.get(f"option{x}", "")]
-        if len(options) < 2 or len(options) != len(set(options)):
+        if len(options) < 4 or len(options) != len(set(options)):
             errors.append(f"{q.get('id')} 选项无效或重复")
         for field in ("questionImage", "optionAImage", "optionBImage", "optionCImage", "optionDImage"):
             image = q.get(field, "")
