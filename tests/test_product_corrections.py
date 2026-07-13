@@ -29,3 +29,8 @@ def test_2535_shelf_life_has_requested_distractors():
     assert question["answerText"] == "90天"
     assert {question[f"option{x}"] for x in "ABCD"} == {"90天", "60天", "6个月", "12个月"}
 
+
+def test_no_placeholder_options_remain():
+    for question in load_product_questions():
+        assert "暂无其他有效资料" not in json.dumps(question, ensure_ascii=False)
+
