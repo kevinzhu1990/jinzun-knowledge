@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260713-role-rules";
+const BUILD_VERSION = "20260713-role-rules4";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -780,7 +780,15 @@ function renderLearnList() {
   }
   els.learnList.innerHTML = items
     .map(
-      (question) => `
+      (question) => {
+        const statusTags = [];
+        if (question.humanReviewStatus === "approved" && question.verificationStatus === "verified") statusTags.push("已审核");
+        else if (question.humanReviewStatus === "pending" || question.verificationStatus === "pending") statusTags.push("待核验");
+        if (question.sourceId?.includes("PUBLIC-AGREEMENT")) statusTags.push("官方平台规则");
+        else if (question.sourceId) statusTags.push("国家法律");
+        else statusTags.push("内部SOP");
+        if (question.rejectionReason) statusTags.push("已废弃");
+        return `
         <article class="learn-item">
           <div>
             <div class="meta">
@@ -788,6 +796,7 @@ function renderLearnList() {
               <span>${escapeHtml(question.type)}</span>
               <span>${escapeHtml(question.difficulty)}</span>
               <span>${escapeHtml(question.knowledgePoint)}</span>
+              ${statusTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
             </div>
             <h4>${escapeHtml(question.question)}</h4>
             <p class="answer-line">答案：${escapeHtml(question.answer)}｜${escapeHtml(displayAnswerText(question))}</p>
@@ -796,7 +805,8 @@ function renderLearnList() {
           </div>
           ${renderQuestionImages(question)}
         </article>
-      `
+      `;
+      }
     )
     .join("");
   els.learnPagination.innerHTML = `
