@@ -31,6 +31,8 @@ def main() -> None:
         errors.append("题目ID存在重复")
 
     for q in all_questions:
+        if "暂无其他有效资料" in json.dumps(q, ensure_ascii=False):
+            errors.append(f"{q.get('id')}仍含占位符选项")
         answer = q.get("answer", "")
         if answer not in LETTERS:
             errors.append(f"{q.get('id')} 答案字母无效")
