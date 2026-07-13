@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260711-syncfix1";
+const BUILD_VERSION = "20260713-product-sync";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -1150,7 +1150,6 @@ async function finishQuiz() {
   ` : "";
   els.quizResult.innerHTML = `
     ${examSyncSuccess}
-
     <p class="eyebrow">Result · ${escapeHtml(examLabel())} · ${state.examType === "formal" ? "正式考试" : "练习模式"}</p>
     <h3>${percent} 分</h3>
     ${timerExpired ? `<p class="explain result-wrong">时间到，已自动交卷。</p>` : ""}
@@ -1848,4 +1847,5 @@ async function init() {
 }
 
 init();
+
 
