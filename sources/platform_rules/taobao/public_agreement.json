@@ -1,0 +1,32 @@
+{
+  "sourceId": "TAOBAO-PUBLIC-AGREEMENT",
+  "sourceLevel": "A",
+  "platform": "淘宝",
+  "ruleTitle": "淘宝全球平台服务协议",
+  "publisher": "淘宝/阿里巴巴",
+  "officialUrl": "https://terms.alicdn.com/legal-agreement/terms/suit_bu1_tmall/suit_bu1_tmall201908300941_47093.html",
+  "publishDate": "2019-08-30",
+  "effectiveDate": "2019-08-30",
+  "expiryDate": "",
+  "status": "current",
+  "applicableRoles": [
+    "客服",
+    "运营",
+    "直播/短视频"
+  ],
+  "applicableScenes": [
+    "评价",
+    "交易",
+    "平台服务"
+  ],
+  "sourceSha256": "676a4664bf627da0ee3453bf87c8e8bb6031f705e3bd58b38a60a5df6ff829e8",
+  "clauses": [
+    {
+      "clauseId": "TB-REVIEW-1",
+      "heading": "评价真实客观关联交易",
+      "text": "评价内容应当合法、客观、真实，与交易的商品或者服务具有关联性，不应以不正当方式帮助他人提升信用或利用评价权利实施威胁、敲诈勒索。",
+      "certainty": "explicit"
+    }
+  ]
+}
+
