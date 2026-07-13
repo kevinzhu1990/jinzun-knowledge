@@ -769,6 +769,14 @@ input:disabled {
   flex-shrink: 0;
 }
 
+.rule-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.rule-filters .select { min-width: 132px; }
+
 .learn-list {
   display: grid;
   gap: 12px;
