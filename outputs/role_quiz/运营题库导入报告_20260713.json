@@ -22,8 +22,8 @@
     "C": 32
   },
   "finalOperationsQuestions": 130,
-  "finalRoleQuestionCount": 196,
-  "finalQuestionCount": 196,
+  "finalRoleQuestionCount": 194,
+  "finalQuestionCount": 194,
   "validation": "passed",
   "note": "视频号题库按OPS-WX前缀修正；重复题干保留首次出现题目，其余写入移除清单。"
 }
