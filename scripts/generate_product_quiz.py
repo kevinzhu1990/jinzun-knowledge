@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=Path(os.environ.get('JINZUN_SOURCE_XLSX',str(ROOT.parents[1]/'26年金尊产品信息表（月饼+饼干）20260709更新.xlsx')))
-VERSION='20260713-product-sync'
+VERSION='20260714-product-sync'
 SOURCE_LABEL=SOURCE.stem
 OUT=ROOT/'outputs/product_quiz'
 PRODUCT_JSON=OUT/'金尊产品知识库题库.json'
@@ -86,7 +86,8 @@ def product(row,bank,sheet):
         ds=[get(row,'长'),get(row,'宽'),get(row,'高')]; size='*'.join(ds) if all(ds) else ''
     outer=get(row,'外箱长宽高；cm','外箱长宽高cm'); size='；'.join(x for x in (f'产品尺寸{size}cm' if size else '',f'外箱{outer}cm' if outer else '') if x)
     contents=get(row,'内配','内配明细','内配/口味')
-    return {'code':cd,'name':name,'bank':bank,'cat':'月饼产品' if moon else '日常年货产品','line':('月饼-散饼' if cd=='1930' else ('月饼-铁罐' if '铁罐' in get(row,'盒型') else '月饼-礼盒')) if moon else line(name,contents),'carton':get(row,'箱规'),'contents':contents,'net':get(row,'净重g','净重'),'shelf':get(row,'保质期'),'size':size,'barcode':get(row,'条码','商品条码'),'unit':get(row,'单位'),'sheet':sheet}
+    mooncake_line = '月饼-散饼' if sheet == '26年散饼' else ('月饼-铁罐' if '铁罐' in get(row,'盒型') else '月饼-礼盒')
+    return {'code':cd,'name':name,'bank':bank,'cat':'月饼产品' if moon else '日常年货产品','line':mooncake_line if moon else line(name,contents),'carton':get(row,'箱规'),'contents':contents,'net':get(row,'净重g','净重'),'shelf':get(row,'保质期'),'size':size,'barcode':get(row,'条码','商品条码'),'unit':get(row,'单位'),'sheet':sheet}
 def write_xlsx(path,qs):
     hs=list(qs[0]) if qs else ['id']
     def esc(v):return str(v).replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('\n',' ')
@@ -138,7 +139,6 @@ def main():
             qs.append(q('商家编码题库','电商资料','商家编码',merchant,combo,'商家编码',f'“{combo}”对应的商家编码是什么？',merchant,merchant_codes,'商家编码'))
     before={str(x.get('code')) for x in old if x.get('bank') in ('月饼题库','日常年货题库') and x.get('knowledgePoint')=='产品名称' and x.get('code')}; after=set(by); missing=[x['code'] for x in items if not (ROOT/'assets/product-images'/('mooncake' if x['bank']=='月饼题库' else 'daily')/f"{x['code']}.jpg").is_file()]
     baseline_questions=int(os.environ.get('JINZUN_BASELINE_QUESTIONS',len(old)))
-    report={'source':str(SOURCE),'sourceSha256':hashlib.sha256(SOURCE.read_bytes()).hexdigest(),'generatedAt':datetime.now(timezone.utc).isoformat(),'version':VERSION,'sheets':{k:len(v) for k,v in data.items()},'beforeProducts':len(before),'afterProducts':len(after),'beforeQuestions':baseline_questions,'afterQuestions':len(qs),'deletedOldQuestions':max(0,baseline_questions-len(qs)),'newProducts':sorted(after-before),'deletedProducts':sorted(before-after),'missingSourceFields':sorted({f for x in items for f in ('carton','contents','net','shelf','size') if not x[f]}),'imageWarnings':missing,'corrections':{'2576':'2608杏仁饼258g','2605':'按最新Excel生成','2621':'按最新Excel生成'}}
+    report={'source':str(SOURCE),'sourceSha256':hashlib.sha256(SOURCE.read_bytes()).hexdigest(),'generatedAt':datetime.now(timezone.utc).isoformat(),'version':VERSION,'sheets':{k:len(v) for k,v in data.items()},'beforeProducts':len(before),'afterProducts':len(after),'beforeQuestions':baseline_questions,'afterQuestions':len(qs),'deletedOldQuestions':max(0,baseline_questions-len(qs)),'newProducts':sorted(after-before),'deletedProducts':sorted(before-after),'missingSourceFields':sorted({f for x in items for f in ('carton','contents','net','shelf','size') if not x[f]}),'imageWarnings':missing,'corrections':{'2576':'2608杏仁饼258g','2605':'按最新Excel生成','2621':'按最新Excel生成','26年散饼':'工作表内全部货号归为月饼-散饼'}}
     PRODUCT_JSON.write_text(json.dumps(qs,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');write_xlsx(PRODUCT_XLSX,qs);AUDIT.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');DIFF_JSON.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');DIFF_MD.write_text('# Product Sync Diff 20260713\n\n'+json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');print(json.dumps({'activeProducts':len(after),'questions':len(qs),'imageWarnings':missing},ensure_ascii=False))
 if __name__=='__main__':main()
-
