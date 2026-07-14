@@ -75,3 +75,14 @@ def test_mooncake_bank_excludes_carton_dimensions_and_weight():
         assert question.get("knowledgePoint") not in forbidden_points, question.get("id")
         serialized = json.dumps(question, ensure_ascii=False)
         assert not any(term in serialized for term in forbidden_terms), question.get("id")
+
+
+def test_1658_flavor_answer_is_correct_and_options_are_unique():
+    questions = [q for q in load_product_questions() if str(q.get("code")) == "1658" and q.get("knowledgePoint") == "内配/口味"]
+    assert len(questions) == 1
+    question = questions[0]
+    expected = "双黄莲蓉月饼250克*2；鲍鱼莲蓉月饼80克*1；豆沙月饼100克*3；凤梨水果味月饼80克*2；莲蓉月饼80克*2；五仁月饼250克*1"
+    assert question["answerText"] == expected
+    assert question[f"option{question['answer']}"] == expected
+    normalized = [question[f"option{letter}"].replace(" ", "").replace("×", "*") for letter in "ABCD"]
+    assert len(set(normalized)) == 4
