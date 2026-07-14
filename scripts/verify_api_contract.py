@@ -16,6 +16,9 @@ required_app = (
     "FORMAL_AUTO_NEXT_DELAY_MS", "retryExamSubmitBtn",
     'localStorage.getItem("jz_auth_token")',
     "CLOUD_TIMEOUT_MS = 60000", "Authorization",
+    'const requestToken = accountAction ? ""',
+    "normalizeCloudError", "clearAuthenticationSession",
+    "登录状态已失效，请重新登录",
 )
 forbidden = ("navigator.sendBeacon", 'mode: "no-cors"', 'fallback: true', 'syncLater("exam"', '"/api/exam"')
 errors = [f"缺少API契约：{x}" for x in required_api if x not in API]
