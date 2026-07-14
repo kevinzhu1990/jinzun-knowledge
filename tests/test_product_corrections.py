@@ -16,10 +16,41 @@ def test_every_active_question_has_four_visible_options():
             assert all(question.get(f"option{letter}") or question.get(f"option{letter}Image") for letter in "ABCD"), question.get("id")
 
 
-def test_1930_is_mooncake_loose_piece():
-    questions = [q for q in load_product_questions() if str(q.get("code")) == "1930"]
-    assert questions
-    assert all(q.get("productLine") == "月饼-散饼" for q in questions)
+def test_all_loose_mooncake_codes_are_mooncake_loose_piece():
+    loose_codes = {"1391", "1392", "1393", "1930", "1937", "1940", "2175", "2176"}
+    all_questions = load_product_questions()
+    for code in loose_codes:
+        questions = [q for q in all_questions if str(q.get("code")) == code]
+        assert questions, code
+        assert all(q.get("productLine") == "月饼-散饼" for q in questions), code
+        line_questions = [q for q in questions if q.get("knowledgePoint") == "产品线"]
+        assert len(line_questions) == 1, code
+        assert line_questions[0].get("answerText") == "月饼-散饼", code
+
+
+def test_all_mooncake_box_types_match_latest_sheet():
+    gift_box_codes = {
+        "0206", "1133", "1658", "1753", "1956", "1966", "2318", "2319",
+        "2617", "2622", "2631", "2637",
+    }
+    tin_codes = {
+        "1122", "1761", "1972", "2067", "2212", "2277", "2307", "2397",
+        "2398", "2415", "2423", "2425", "2522", "2528", "2535", "2536",
+        "2538", "2545", "2547", "2552", "2557", "2602", "2605", "2607",
+        "2616", "2618", "2621",
+    }
+    all_questions = load_product_questions()
+    expected_lines = {
+        **{code: "月饼-礼盒" for code in gift_box_codes},
+        **{code: "月饼-铁罐" for code in tin_codes},
+    }
+    for code, expected_line in expected_lines.items():
+        questions = [q for q in all_questions if str(q.get("code")) == code]
+        assert questions, code
+        assert all(q.get("productLine") == expected_line for q in questions), code
+        line_questions = [q for q in questions if q.get("knowledgePoint") == "产品线"]
+        assert len(line_questions) == 1, code
+        assert line_questions[0].get("answerText") == expected_line, code
 
 
 def test_2535_shelf_life_has_requested_distractors():
@@ -33,4 +64,3 @@ def test_2535_shelf_life_has_requested_distractors():
 def test_no_placeholder_options_remain():
     for question in load_product_questions():
         assert "暂无其他有效资料" not in json.dumps(question, ensure_ascii=False)
-
