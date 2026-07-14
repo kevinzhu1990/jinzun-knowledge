@@ -67,7 +67,12 @@ def line(name,contents):
     return '糕点类'
 def sid(*x):return 'P-'+hashlib.sha1('|'.join(x).encode()).hexdigest()[:12].upper()
 def opts(correct,pool,seed):
-    vals=sorted({clean(x) for x in pool if clean(x) and clean(x)!=clean(correct)},key=lambda x:hashlib.sha1((seed+x).encode()).hexdigest())[:3]
+    option_key=lambda value:re.sub(r'\s+','',clean(value)).replace('×','*')
+    unique={}
+    for value in pool:
+        cleaned=clean(value); key=option_key(cleaned)
+        if cleaned and key!=option_key(correct):unique.setdefault(key,cleaned)
+    vals=sorted(unique.values(),key=lambda x:hashlib.sha1((seed+x).encode()).hexdigest())[:3]
     vals=([clean(correct)]+vals); vals += [f'暂无其他有效资料{i}' for i in range(1,5)]; vals=vals[:4]; order=sorted(range(4),key=lambda i:hashlib.sha1(f'{seed}:{i}'.encode()).hexdigest()); vals=[vals[i] for i in order]
     return vals,'ABCD'[vals.index(clean(correct))]
 def q(bank,cat,pl,cd,name,kp,text,correct,pool,note=''):
@@ -86,6 +91,7 @@ def product(row,bank,sheet):
         ds=[get(row,'长'),get(row,'宽'),get(row,'高')]; size='*'.join(ds) if all(ds) else ''
     outer=get(row,'外箱长宽高；cm','外箱长宽高cm'); size='；'.join(x for x in (f'产品尺寸{size}cm' if size else '',f'外箱{outer}cm' if outer else '') if x)
     contents=get(row,'内配','内配明细','内配/口味')
+    if cd=='1658':contents='双黄莲蓉月饼250克*2；鲍鱼莲蓉月饼80克*1；豆沙月饼100克*3；凤梨水果味月饼80克*2；莲蓉月饼80克*2；五仁月饼250克*1'
     mooncake_line = '月饼-散饼' if sheet == '26年散饼' else ('月饼-铁罐' if '铁罐' in get(row,'盒型') else '月饼-礼盒')
     return {'code':cd,'name':name,'bank':bank,'cat':'月饼产品' if moon else '日常年货产品','line':mooncake_line if moon else line(name,contents),'carton':get(row,'箱规'),'contents':contents,'net':get(row,'净重g','净重'),'shelf':get(row,'保质期'),'size':size,'barcode':get(row,'条码','商品条码'),'unit':get(row,'单位'),'sheet':sheet}
 def write_xlsx(path,qs):
