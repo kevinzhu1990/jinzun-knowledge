@@ -282,6 +282,48 @@ const shuffleServer = (items) => {
   return result;
 };
 
+const MOONCAKE_IMAGE_POINTS = new Set(['看图片选货号', '看货号选图片']);
+const MOONCAKE_FLAVOR_POINTS = new Set(['内配/口味', '口味个数']);
+
+const takeExamQuestions = (pool, count, selectedIds) => {
+  const available = pool.filter((question) => !selectedIds.has(String(question.id)));
+  const picked = shuffleServer(available).slice(0, Math.max(0, count));
+  picked.forEach((question) => selectedIds.add(String(question.id)));
+  return picked;
+};
+
+function selectMooncakeExamQuestions(pool, requestedSize) {
+  const size = Math.min(requestedSize, pool.length);
+  const imageTotal = Math.round(size * 0.6);
+  const flavorTotal = Math.round(size * 0.2);
+  const otherTotal = size - imageTotal - flavorTotal;
+  const codeToImageTarget = Math.floor(imageTotal / 2);
+  const imageToCodeTarget = imageTotal - codeToImageTarget;
+  const selectedIds = new Set();
+  const selected = [];
+  const codeToImage = pool.filter((question) => question.knowledgePoint === '看货号选图片');
+  const imageToCode = pool.filter((question) => question.knowledgePoint === '看图片选货号');
+  const flavor = pool.filter((question) => MOONCAKE_FLAVOR_POINTS.has(question.knowledgePoint));
+  const other = pool.filter((question) => !MOONCAKE_IMAGE_POINTS.has(question.knowledgePoint)
+    && !MOONCAKE_FLAVOR_POINTS.has(question.knowledgePoint));
+
+  selected.push(...takeExamQuestions(codeToImage, codeToImageTarget, selectedIds));
+  selected.push(...takeExamQuestions(imageToCode, imageToCodeTarget, selectedIds));
+  selected.push(...takeExamQuestions([...codeToImage, ...imageToCode], imageTotal - selected.length, selectedIds));
+  selected.push(...takeExamQuestions(flavor, flavorTotal, selectedIds));
+  selected.push(...takeExamQuestions(other, otherTotal, selectedIds));
+  selected.push(...takeExamQuestions(pool, size - selected.length, selectedIds));
+
+  return shuffleServer(selected.slice(0, size));
+}
+
+function selectExamQuestions(pool, payload, requestedSize) {
+  if (payload.mode === 'product' && payload.bank === '月饼题库') {
+    return selectMooncakeExamQuestions(pool, requestedSize);
+  }
+  return shuffleServer(pool).slice(0, Math.min(requestedSize, pool.length));
+}
+
 const normalizeName = (value) => String(value || '').trim();
 const validatePassword = (value) => typeof value === 'string'
   && value.length >= 8 && value.length <= 64 && /[A-Za-z]/.test(value) && /\d/.test(value);
@@ -657,7 +699,7 @@ async function handleExamStart(payload, user) {
   const size = Math.min(100, Math.max(1, Number(payload.size) || 50));
   const pool = examPool(await loadServerQuestions(), payload, user);
   if (pool.length < 1) throw httpError(400, '当前题库没有可用题目');
-  const selected = shuffleServer(pool).slice(0, Math.min(size, pool.length));
+  const selected = selectExamQuestions(pool, payload, size);
   const examId = crypto.randomUUID();
   const startedAt = Date.now();
   const deadlineAt = startedAt + Math.max(60, Math.round(selected.length * 24)) * 1000;
@@ -900,4 +942,5 @@ module.exports = async (req, res) => {
   }
 };
 
+module.exports._test = { selectExamQuestions, selectMooncakeExamQuestions };
 
