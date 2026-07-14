@@ -64,3 +64,14 @@ def test_2535_shelf_life_has_requested_distractors():
 def test_no_placeholder_options_remain():
     for question in load_product_questions():
         assert "暂无其他有效资料" not in json.dumps(question, ensure_ascii=False)
+
+
+def test_mooncake_bank_excludes_carton_dimensions_and_weight():
+    forbidden_points = {"尺寸/外箱", "整箱重量", "箱重", "毛重"}
+    forbidden_terms = ("整箱尺寸", "整箱重量", "箱重", "毛重")
+    mooncake_questions = [q for q in load_product_questions() if q.get("bank") == "月饼题库"]
+    assert mooncake_questions
+    for question in mooncake_questions:
+        assert question.get("knowledgePoint") not in forbidden_points, question.get("id")
+        serialized = json.dumps(question, ensure_ascii=False)
+        assert not any(term in serialized for term in forbidden_terms), question.get("id")
