@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260714-mooncake-exam-weights";
+const BUILD_VERSION = "20260714-mooncake-exam-70-10-20";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -391,8 +391,8 @@ const MOONCAKE_FLAVOR_POINTS = new Set(["内配/口味", "口味个数"]);
 
 function selectMooncakeQuizQuestions(pool, requestedSize) {
   const size = Math.min(requestedSize, pool.length);
-  const imageTotal = Math.round(size * 0.6);
-  const flavorTotal = Math.round(size * 0.2);
+  const imageTotal = Math.round(size * 0.7);
+  const flavorTotal = Math.round(size * 0.1);
   const otherTotal = size - imageTotal - flavorTotal;
   const selectedIds = new Set();
   const selected = [];
