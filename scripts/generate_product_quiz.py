@@ -137,6 +137,8 @@ def main():
         combo=get(r,'组合装名称'); merchant=get(r,'商家编码')
         if combo and merchant:
             qs.append(q('商家编码题库','电商资料','商家编码',merchant,combo,'商家编码',f'“{combo}”对应的商家编码是什么？',merchant,merchant_codes,'商家编码'))
+    excluded_mooncake_points={'尺寸/外箱','整箱重量','箱重','毛重'}
+    qs=[question for question in qs if not (question.get('bank')=='月饼题库' and question.get('knowledgePoint') in excluded_mooncake_points)]
     before={str(x.get('code')) for x in old if x.get('bank') in ('月饼题库','日常年货题库') and x.get('knowledgePoint')=='产品名称' and x.get('code')}; after=set(by); missing=[x['code'] for x in items if not (ROOT/'assets/product-images'/('mooncake' if x['bank']=='月饼题库' else 'daily')/f"{x['code']}.jpg").is_file()]
     baseline_questions=int(os.environ.get('JINZUN_BASELINE_QUESTIONS',len(old)))
     report={'source':str(SOURCE),'sourceSha256':hashlib.sha256(SOURCE.read_bytes()).hexdigest(),'generatedAt':datetime.now(timezone.utc).isoformat(),'version':VERSION,'sheets':{k:len(v) for k,v in data.items()},'beforeProducts':len(before),'afterProducts':len(after),'beforeQuestions':baseline_questions,'afterQuestions':len(qs),'deletedOldQuestions':max(0,baseline_questions-len(qs)),'newProducts':sorted(after-before),'deletedProducts':sorted(before-after),'missingSourceFields':sorted({f for x in items for f in ('carton','contents','net','shelf','size') if not x[f]}),'imageWarnings':missing,'corrections':{'2576':'2608杏仁饼258g','2605':'按最新Excel生成','2621':'按最新Excel生成','26年散饼':'工作表内全部货号归为月饼-散饼'}}
