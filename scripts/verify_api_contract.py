@@ -9,6 +9,7 @@ required_api = (
     "examSubmitLocks", "考试会话ID", "考试提交编号", "wrong_details",
     "requireActiveUser", "Authorization", "admin-add", "admin-delete",
     "admin-password", "session", "是否管理员",
+    "selectMooncakeExamQuestions", "MOONCAKE_IMAGE_POINTS", "MOONCAKE_FLAVOR_POINTS",
 )
 required_app = (
     "cloudRequest", 'cloudRequest("exam-start"', 'cloudRequest("exam-submit"',
@@ -19,6 +20,7 @@ required_app = (
     'const requestToken = accountAction ? ""',
     "normalizeCloudError", "clearAuthenticationSession",
     "登录状态已失效，请重新登录",
+    "selectMooncakeQuizQuestions", "MOONCAKE_IMAGE_POINTS", "MOONCAKE_FLAVOR_POINTS",
 )
 forbidden = ("navigator.sendBeacon", 'mode: "no-cors"', 'fallback: true', 'syncLater("exam"', '"/api/exam"')
 errors = [f"缺少API契约：{x}" for x in required_api if x not in API]
