@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260714-loose-mooncake-fix";
+const BUILD_VERSION = "20260714-login-fix1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -451,17 +451,29 @@ async function cloudRequest(action, payload) {
   const accountAction = ["login", "register", "reset"].includes(action);
   if (accountAction) showConnectionStatus();
   const token = localStorage.getItem("jz_auth_token") || "";
-  const body = JSON.stringify({ ...payload, token: payload.token || token, userAgent: navigator.userAgent, deviceId: payload.deviceId || getClientId(), clientId: payload.clientId || getClientId() });
+  const requestToken = accountAction ? "" : (payload.token || token);
+  const requestPayload = {
+    ...payload,
+    userAgent: navigator.userAgent,
+    deviceId: payload.deviceId || getClientId(),
+    clientId: payload.clientId || getClientId(),
+  };
+  if (requestToken) requestPayload.token = requestToken;
+  const body = JSON.stringify(requestPayload);
   let lastError = null;
   for (const base of API_BASES) {
     try {
       const res = await fetchWithTimeout(`${base}/api/${action}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { "Content-Type": "application/json", ...(requestToken ? { Authorization: `Bearer ${requestToken}` } : {}) },
         body,
       }, CLOUD_TIMEOUT_MS);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `云端同步失败：${res.status}`);
+      if (!res.ok) {
+        const error = new Error(normalizeCloudError(data.error, res.status, action));
+        error.status = res.status;
+        throw error;
+      }
       if (!data.ok) throw new Error(data.error || "云端同步失败");
       if (accountAction) hideConnectionStatus();
       return data;
@@ -471,6 +483,24 @@ async function cloudRequest(action, payload) {
   }
   if (accountAction) hideConnectionStatus();
   throw lastError || new Error("云端同步失败");
+}
+
+function normalizeCloudError(message, status, action) {
+  const raw = String(message || "").trim();
+  const normalized = raw.toLowerCase();
+  if (status === 401 && action === "login") {
+    return "账号或密码错误；如忘记密码，请使用公司口令 jiuding 重置";
+  }
+  if (status === 401 || normalized === "unauthorized") {
+    return "登录状态已失效，请重新登录";
+  }
+  if (normalized.includes("account service is not configured") || normalized.includes("cloud service disabled")) {
+    return "公司账号系统暂时不可用，请稍后重试";
+  }
+  if (normalized.includes("origin not allowed")) {
+    return "当前登录地址未获授权，请使用最新版登录网址";
+  }
+  return raw || `公司账号系统请求失败（${status}）`;
 }
 
 async function syncLater(action, payload) {
@@ -498,6 +528,7 @@ async function flushSyncQueue() {
     localStorage.removeItem("jz_sync_queue");
     return;
   }
+  if (!localStorage.getItem("jz_auth_token")) return;
   const queue = safeJsonArray("jz_sync_queue");
   if (!queue.length) return;
   const remain = [];
@@ -513,7 +544,7 @@ async function flushSyncQueue() {
 }
 
 async function loadCloudStats() {
-  if (!CLOUD_ENABLED) {
+  if (!CLOUD_ENABLED || !isAdminUser()) {
     state.cloudStats = null;
     return;
   }
@@ -521,6 +552,11 @@ async function loadCloudStats() {
     const token = localStorage.getItem("jz_auth_token") || "";
     const res = await fetchWithTimeout(`${API_BASE}/api/stats`, token ? { headers: { Authorization: `Bearer ${token}` } } : {}, CLOUD_TIMEOUT_MS);
     const data = await res.json();
+    if (res.status === 401) {
+      clearAuthenticationSession();
+      showAuth(true);
+      throw new Error("登录状态已失效，请重新登录");
+    }
     if (data.ok) state.cloudStats = data;
   } catch {
     state.cloudStats = null;
@@ -1657,6 +1693,13 @@ function loadCurrentUser() {
   state.currentUser = phone && users[phone] ? users[phone] : null;
 }
 
+function clearAuthenticationSession() {
+  localStorage.removeItem("jz_auth_token");
+  userStore.currentPhone = "";
+  state.currentUser = null;
+  applyAdminAccess();
+}
+
 function showAuth(visible) {
   els.authView.classList.toggle("hidden", !visible);
   document.body.classList.toggle("auth-locked", visible);
@@ -1714,6 +1757,7 @@ async function loginEmployee(event) {
   button.disabled = true;
   button.textContent = "正在登录...";
   try {
+    clearAuthenticationSession();
     const data = await cloudRequest("login", { account, password, clientId: getClientId() });
     if (!data.token || !data.user) throw new Error("账号或密码错误");
     saveAuthenticatedUser(data);
@@ -1805,10 +1849,7 @@ function logout() {
   state.examFinished = true;
   state.examSubmitting = false;
   setExamLocked(false);
-  userStore.currentPhone = "";
-  localStorage.removeItem("jz_auth_token");
-  state.currentUser = null;
-  applyAdminAccess();
+  clearAuthenticationSession();
   state.quiz = [];
   state.quizIndex = 0;
   state.score = 0;
@@ -1904,8 +1945,7 @@ async function init() {
         const session = await cloudRequest("session", {});
         if (session?.token && session?.user) saveAuthenticatedUser(session);
       } catch {
-        localStorage.removeItem("jz_auth_token");
-        state.currentUser = null;
+        clearAuthenticationSession();
       }
     }
     reconcileStoredQuestions();
