@@ -27,10 +27,10 @@ for (const size of [10, 20, 30, 50, 100]) {
   }, { codeToImage: 0, imageToCode: 0, flavor: 0, other: 0 });
 
   assert.equal(selected.length, size);
-  assert.equal(counts.codeToImage + counts.imageToCode, Math.round(size * 0.6));
+  assert.equal(counts.codeToImage + counts.imageToCode, Math.round(size * 0.7));
   assert.ok(Math.abs(counts.codeToImage - counts.imageToCode) <= 1);
-  assert.equal(counts.flavor, Math.round(size * 0.2));
-  assert.equal(counts.other, size - Math.round(size * 0.6) - Math.round(size * 0.2));
+  assert.equal(counts.flavor, Math.round(size * 0.1));
+  assert.equal(counts.other, size - Math.round(size * 0.7) - Math.round(size * 0.1));
   assert.equal(new Set(selected.map((question) => question.id)).size, size);
 }
 
@@ -44,8 +44,8 @@ for (const size of [10, 20, 30, 50, 100]) {
   const imageCount = selected.filter((question) => ['看货号选图片', '看图片选货号'].includes(question.knowledgePoint)).length;
   const flavorCount = selected.filter((question) => ['内配/口味', '口味个数'].includes(question.knowledgePoint)).length;
   assert.equal(selected.length, size);
-  assert.equal(imageCount, Math.round(size * 0.6));
-  assert.equal(flavorCount, Math.round(size * 0.2));
+  assert.equal(imageCount, Math.round(size * 0.7));
+  assert.equal(flavorCount, Math.round(size * 0.1));
 }
 
 console.log('Mooncake exam selection verification passed');
