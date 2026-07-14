@@ -294,8 +294,8 @@ const takeExamQuestions = (pool, count, selectedIds) => {
 
 function selectMooncakeExamQuestions(pool, requestedSize) {
   const size = Math.min(requestedSize, pool.length);
-  const imageTotal = Math.round(size * 0.6);
-  const flavorTotal = Math.round(size * 0.2);
+  const imageTotal = Math.round(size * 0.7);
+  const flavorTotal = Math.round(size * 0.1);
   const otherTotal = size - imageTotal - flavorTotal;
   const codeToImageTarget = Math.floor(imageTotal / 2);
   const imageToCodeTarget = imageTotal - codeToImageTarget;
