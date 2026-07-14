@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260714-login-fix1";
+const BUILD_VERSION = "20260714-mooncake-exam-weights";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -385,6 +385,37 @@ const shuffle = (items) => {
   }
   return arr;
 };
+
+const MOONCAKE_IMAGE_POINTS = new Set(["看图片选货号", "看货号选图片"]);
+const MOONCAKE_FLAVOR_POINTS = new Set(["内配/口味", "口味个数"]);
+
+function selectMooncakeQuizQuestions(pool, requestedSize) {
+  const size = Math.min(requestedSize, pool.length);
+  const imageTotal = Math.round(size * 0.6);
+  const flavorTotal = Math.round(size * 0.2);
+  const otherTotal = size - imageTotal - flavorTotal;
+  const selectedIds = new Set();
+  const selected = [];
+  const take = (questions, count) => {
+    const picked = shuffle(questions.filter((question) => !selectedIds.has(String(question.id))))
+      .slice(0, Math.max(0, count));
+    picked.forEach((question) => selectedIds.add(String(question.id)));
+    selected.push(...picked);
+  };
+  const codeToImage = pool.filter((question) => question.knowledgePoint === "看货号选图片");
+  const imageToCode = pool.filter((question) => question.knowledgePoint === "看图片选货号");
+  const flavor = pool.filter((question) => MOONCAKE_FLAVOR_POINTS.has(question.knowledgePoint));
+  const other = pool.filter((question) => !MOONCAKE_IMAGE_POINTS.has(question.knowledgePoint)
+    && !MOONCAKE_FLAVOR_POINTS.has(question.knowledgePoint));
+
+  take(codeToImage, Math.floor(imageTotal / 2));
+  take(imageToCode, imageTotal - selected.length);
+  take([...codeToImage, ...imageToCode], imageTotal - selected.length);
+  take(flavor, flavorTotal);
+  take(other, otherTotal);
+  take(pool, size - selected.length);
+  return shuffle(selected.slice(0, size));
+}
 
 const downloadText = (filename, content, type = "text/csv;charset=utf-8") => {
   const blob = new Blob([content], { type });
@@ -1015,7 +1046,9 @@ async function startQuiz() {
       pool = state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank));
       state.examLabelOverride = "综合产品题库";
     }
-    state.quiz = shuffle(pool).slice(0, Math.min(size, pool.length));
+    state.quiz = state.quizMode === "product" && els.productBankSelect.value === "月饼题库"
+      ? selectMooncakeQuizQuestions(pool, size)
+      : shuffle(pool).slice(0, Math.min(size, pool.length));
   }
   if (!state.quiz.length) {
     els.quizSetupStatus.textContent = "当前筛选没有可用于考核的题目，请调整搜索或题库筛选。";
