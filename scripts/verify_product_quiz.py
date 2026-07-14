@@ -3,9 +3,9 @@ import json, os, re, sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
-SOURCE=Path(os.environ.get('JINZUN_SOURCE_XLSX', str(ROOT.parents[2]/'26年金尊产品信息表（月饼+饼干）20260709更新.xlsx')))
+SOURCE=Path(os.environ.get('JINZUN_SOURCE_XLSX', str(ROOT.parents[1]/'26年金尊产品信息表（月饼+饼干）20260709更新.xlsx')))
 PRODUCT=ROOT/'outputs/product_quiz/金尊产品知识库题库.json'
-VERSION='20260713-product-sync'
+VERSION='20260714-product-sync'
 sys.path.insert(0,str(ROOT/'scripts'))
 import generate_product_quiz as generator
 
@@ -45,4 +45,3 @@ def main():
     print(json.dumps(result,ensure_ascii=False,indent=2))
     if errors: raise SystemExit(1)
 if __name__=='__main__': main()
-
