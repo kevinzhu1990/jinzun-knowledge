@@ -1,4 +1,15 @@
 {
+  "headers": [
+    {
+      "source": "/assets/product-images/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ],
   "functions": {
     "api/cloud.js": {
       "includeFiles": "outputs/**/*.json",

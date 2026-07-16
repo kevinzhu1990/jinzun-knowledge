@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260714-mooncake-exam-70-10-20";
+const BUILD_VERSION = "20260716-image-opt1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -360,7 +360,31 @@ const displayExplanation = (question) => {
   return `${question.code} 对应的产品名称是：${name}。`;
 };
 
-const imagePath = (src) => (src ? `./${src}` : "");
+const imagePath = (src) => {
+  if (!src) return "";
+  const separator = String(src).includes("?") ? "&" : "?";
+  return `./${src}${separator}v=${BUILD_VERSION}`;
+};
+
+const preloadedImages = new Set();
+
+function questionImagePaths(question) {
+  if (!question) return [];
+  return [question.questionImage, ...optionEntries(question).map(([, , image]) => image)].filter(Boolean);
+}
+
+function preloadQuizImages(startIndex = state.quizIndex + 1, count = 2) {
+  state.quiz.slice(startIndex, startIndex + count).forEach((question) => {
+    questionImagePaths(question).forEach((src) => {
+      const url = imagePath(src);
+      if (preloadedImages.has(url)) return;
+      preloadedImages.add(url);
+      const image = new Image();
+      image.decoding = "async";
+      image.src = url;
+    });
+  });
+}
 
 const optionEntries = (question) => [
   ["A", question.optionA, question.optionAImage, Number(question.optionAImageWidth) || 0],
@@ -787,7 +811,7 @@ function examTimeLabel(value) {
 
 function renderQuestionImages(question) {
   if (!question.questionImage) return "";
-  return `<img class="thumb" src="${imagePath(question.questionImage)}" alt="题目图片" loading="lazy" />`;
+  return `<img class="thumb" src="${imagePath(question.questionImage)}" alt="题目图片" loading="lazy" decoding="async" />`;
 }
 
 function renderOptionImages(question) {
@@ -799,7 +823,7 @@ function renderOptionImages(question) {
         .map(
           ([letter, text, img, imageWidth]) => `
             <figure>
-              <img src="${imagePath(img)}" alt="选项${letter}图片" loading="lazy" ${imageWidth ? `style="max-width:${imageWidth}px"` : ""} />
+              <img src="${imagePath(img)}" alt="选项${letter}图片" loading="lazy" decoding="async" ${imageWidth ? `style="max-width:${imageWidth}px"` : ""} />
               <figcaption>${letter} ${escapeHtml(text)}</figcaption>
             </figure>
           `
@@ -1130,7 +1154,7 @@ function renderQuizCard() {
     ${question.questionImage ? (() => {
       const sourceWidth = Math.max(120, Number(question.questionImageWidth) || 520);
       return `<div class="quiz-img-wrap" style="width:min(${sourceWidth}px, 100%)">
-        <img src="${imagePath(question.questionImage)}" alt="题目图片" />
+        <img src="${imagePath(question.questionImage)}" alt="题目图片" loading="eager" decoding="async" fetchpriority="high" />
       </div>`;
     })() : ""}
     <div class="options">
@@ -1141,7 +1165,7 @@ function renderQuizCard() {
               <strong>${letter}</strong>${escapeHtml(stripCodeFromOption(text, question))}
               ${img ? (() => {
                 return `<div class="quiz-opt-img" ${imageWidth ? `style="max-width:${Math.max(120, imageWidth)}px"` : ""}>
-                  <img src="${imagePath(img)}" alt="选项${letter}图片" />
+                  <img src="${imagePath(img)}" alt="选项${letter}图片" loading="eager" decoding="async" fetchpriority="high" />
                 </div>`;
               })() : ""}
             </button>
@@ -1154,6 +1178,7 @@ function renderQuizCard() {
   els.quizCard.querySelectorAll(".option-btn").forEach((button) => {
     button.addEventListener("click", () => chooseAnswer(button.dataset.letter));
   });
+  preloadQuizImages();
 }
 
 function chooseAnswer(letter) {
