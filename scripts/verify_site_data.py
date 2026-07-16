@@ -40,7 +40,8 @@ def main() -> None:
         actual = q.get(f"option{answer}Image", "") if q.get("knowledgePoint") == "看货号选图片" else q.get(f"option{answer}", "")
         if actual != q.get("answerText", ""):
             errors.append(f"{q.get('id')} 正确选项与答案内容不一致")
-        options = [q.get(f"option{x}", "") for x in LETTERS if q.get(f"option{x}", "")]
+        option_field = "option{}Image" if q.get("knowledgePoint") == "看货号选图片" else "option{}"
+        options = [q.get(option_field.format(x), "") for x in LETTERS if q.get(option_field.format(x), "")]
         if len(options) < 4 or len(options) != len(set(options)):
             errors.append(f"{q.get('id')} 选项无效或重复")
         for field in ("questionImage", "optionAImage", "optionBImage", "optionCImage", "optionDImage"):
@@ -115,4 +116,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

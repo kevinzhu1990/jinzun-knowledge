@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260716-image-opt1";
+const BUILD_VERSION = "20260716-image-source1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -353,8 +353,14 @@ const stripCodeFromOption = (text, question) => {
     .trim();
 };
 
-const displayAnswerText = (question) => stripCodeFromOption(question.answerText, question);
+const displayAnswerText = (question) => {
+  if (question.knowledgePoint === "看货号选图片") return `选项${question.answer}`;
+  return stripCodeFromOption(question.answerText, question);
+};
 const displayExplanation = (question) => {
+  if (question.knowledgePoint === "看货号选图片") {
+    return `${question.code} 对应的产品图片是选项 ${question.answer}。`;
+  }
   if (question.knowledgePoint !== "产品名称") return question.explanation;
   const name = displayAnswerText(question);
   return `${question.code} 对应的产品名称是：${name}。`;

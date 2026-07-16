@@ -86,3 +86,11 @@ def test_1658_flavor_answer_is_correct_and_options_are_unique():
     assert question[f"option{question['answer']}"] == expected
     normalized = [question[f"option{letter}"].replace(" ", "").replace("×", "*") for letter in "ABCD"]
     assert len(set(normalized)) == 4
+
+
+def test_image_choice_questions_only_show_answer_letters():
+    image_questions = [q for q in load_product_questions() if q.get("knowledgePoint") == "看货号选图片"]
+    assert image_questions
+    for question in image_questions:
+        assert all(not question.get(f"option{letter}") for letter in "ABCD")
+        assert all(question.get(f"option{letter}Image") for letter in "ABCD")

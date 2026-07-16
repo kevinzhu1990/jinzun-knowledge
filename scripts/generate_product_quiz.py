@@ -129,7 +129,7 @@ def main():
             if x['bank']=='月饼题库':
                 z=q(x['bank'],x['cat'],x['line'],x['code'],x['name'],'看货号选图片',f"{x['code']} 对应的产品图片是哪一张？",img.relative_to(ROOT).as_posix(),[f"assets/product-images/mooncake/{y['code']}.jpg" for y in same if (ROOT/'assets/product-images/mooncake'/f"{y['code']}.jpg").is_file()],x['sheet'])
                 for letter in 'ABCD':
-                    z[f'option{letter}Image']=z[f'option{letter}']; z[f'option{letter}']='图片'+letter
+                    z[f'option{letter}Image']=z[f'option{letter}']; z[f'option{letter}']=''
                 z['answerText']=z[f"option{z['answer']}Image"]; qs.append(z)
     brand_rows=data.get('品牌介绍',[])
     brand_values=[get(r,'统一共性卖点') for r in brand_rows if get(r,'统一共性卖点')]
