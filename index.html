@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>金尊知识库学习考核</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-merchant-1940-1392-fix1" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-practice-stats-separation1" />
   </head>
   <body>
     <section id="authView" class="auth-view">
@@ -327,7 +327,8 @@
               <h3>管理看板</h3>
             </div>
             <div class="section-actions">
-              <button id="exportRecordsBtn" class="primary-btn">导出考试记录</button>
+              <button id="exportRecordsBtn" class="primary-btn">导出正式考试</button>
+              <button id="exportPracticeRecordsBtn" class="secondary-btn">导出练习记录</button>
               <button id="exportMistakesBtn" class="secondary-btn">导出错题</button>
             </div>
           </div>
@@ -352,7 +353,7 @@
           <div id="adminMetrics" class="summary-grid"></div>
           <div class="admin-grid">
             <div class="admin-panel">
-              <h4>员工成绩概览</h4>
+              <h4>员工学习与考试概览</h4>
               <div id="adminUserTable" class="admin-table"></div>
             </div>
             <div class="admin-panel">
@@ -360,12 +361,16 @@
               <div id="adminWeakList" class="admin-table"></div>
             </div>
           </div>
+          <div class="admin-panel admin-practice-panel">
+            <h4>最近练习记录</h4>
+            <div id="adminPracticeList" class="admin-table"></div>
+          </div>
         </section>
       </main>
     </div>
 
     <script src="./mooncake-filter.js?v=af8d1d9"></script>
-    <script src="./app.js?v=20260718-merchant-1940-1392-fix1" type="module"></script>
+    <script src="./app.js?v=20260718-practice-stats-separation1" type="module"></script>
   </body>
 </html>
 

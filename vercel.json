@@ -16,6 +16,10 @@
     "api/cloud.js": {
       "includeFiles": "outputs/**/*.json",
       "maxDuration": 60
+    },
+    "api/practice-submit.js": {
+      "includeFiles": "outputs/**/*.json",
+      "maxDuration": 60
     }
   }
 }

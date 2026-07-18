@@ -6,6 +6,8 @@ APP = (ROOT / "app.js").read_text(encoding="utf-8")
 
 required_api = (
     "handleExamStart", "handleExamSubmit", "exam-start", "exam-submit",
+    "handlePracticeSubmit", "practice-submit", "LARK_PRACTICE_TABLE_ID",
+    "练习成绩记录", "练习提交编号", "practiceTableReady",
     "examSubmitLocks", "考试会话ID", "考试提交编号", "wrong_details",
     "requireActiveUser", "Authorization", "admin-add", "admin-delete",
     "admin-password", "session", "是否管理员",
@@ -13,6 +15,7 @@ required_api = (
 )
 required_app = (
     "cloudRequest", 'cloudRequest("exam-start"', 'cloudRequest("exam-submit"',
+    'syncLater("practice-submit"', "exportPracticeRecordsBtn", "adminPracticeList",
     'syncLater("mistakes"', "PRACTICE_AUTO_NEXT_DELAY_MS",
     "FORMAL_AUTO_NEXT_DELAY_MS", "retryExamSubmitBtn",
     'localStorage.getItem("jz_auth_token")',

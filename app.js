@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260718-merchant-1940-1392-fix1";
+const BUILD_VERSION = "20260718-practice-stats-separation1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -100,7 +100,9 @@ const els = {
   adminMetrics: document.querySelector("#adminMetrics"),
   adminUserTable: document.querySelector("#adminUserTable"),
   adminWeakList: document.querySelector("#adminWeakList"),
+  adminPracticeList: document.querySelector("#adminPracticeList"),
   exportRecordsBtn: document.querySelector("#exportRecordsBtn"),
+  exportPracticeRecordsBtn: document.querySelector("#exportPracticeRecordsBtn"),
   exportMistakesBtn: document.querySelector("#exportMistakesBtn"),
   authView: document.querySelector("#authView"),
   loginForm: document.querySelector("#loginForm"),
@@ -600,11 +602,11 @@ async function syncLater(action, payload) {
   if (!CLOUD_ENABLED) return { ok: true, skipped: true };
   try {
     const data = await cloudRequest(action, payload);
-    if (action === "exam" && !data.record_id) throw new Error("服务器未返回考试记录ID");
+    if (action === "practice-submit" && !data.record_id) throw new Error("服务器未返回练习记录ID");
     if (action === "mistakes" && payload.items?.length && (!Array.isArray(data.record_ids) || data.record_ids.length < payload.items.length)) {
       throw new Error("服务器未返回完整错题记录ID");
     }
-    if (action === "exam") setSyncStatus("正式考试已同步到飞书", "success");
+    if (action === "practice-submit") setSyncStatus("练习成绩已同步到飞书", "success");
     if (action === "mistakes" && payload.items?.length) setSyncStatus("错题已批量同步到飞书", "success");
     return data;
   } catch (error) {
@@ -626,7 +628,7 @@ async function flushSyncQueue() {
   if (!queue.length) return;
   const remain = [];
   for (const item of queue) {
-    if (!['mistakes'].includes(item.action)) continue;
+    if (!['mistakes', 'practice-submit'].includes(item.action)) continue;
     try {
       await cloudRequest(item.action, item.payload);
     } catch (error) {
@@ -1155,6 +1157,7 @@ async function startQuiz() {
     els.quizSetupStatus.textContent = "当前筛选没有可用于考核的题目，请调整搜索或题库筛选。";
     return;
   }
+  if (state.examType !== "formal") state.submissionId = crypto.randomUUID();
   els.quizSetupStatus.textContent = state.quiz.length < size
     ? `当前题库只有 ${state.quiz.length} 题，本次将全部使用。`
     : "";
@@ -1581,9 +1584,10 @@ async function submitFormalExam() {
 
 async function finishQuiz() {
   if (state.examFinished || !state.quiz.length) return;
-  if (state.examType === "formal" && state.examSubmitting) return;
+  if (state.examSubmitting) return;
   clearAutoNextTimer();
   stopTimer();
+  let practiceSyncSuccess = false;
   if (state.examType === "formal") {
     state.examSubmitting = true;
     document.body.classList.add("exam-submitting");
@@ -1602,17 +1606,37 @@ async function finishQuiz() {
       document.body.classList.remove("exam-submitting");
     }
   } else {
-    const unansweredQuestions = state.quiz.filter((question) => !state.answeredQuestionIds.has(question.id));
-    if (unansweredQuestions.length) {
-      storage.attempts += unansweredQuestions.length;
-      unansweredQuestions.forEach((question) => {
-        state.wrongDetails.push({ ...question, selected: "未作答", savedAt: new Date().toISOString() });
-        saveMistake(question, "未作答");
+    state.examSubmitting = true;
+    document.body.classList.add("exam-submitting");
+    if (els.examSubmitStatus) els.examSubmitStatus.textContent = "正在同步练习成绩，请勿关闭页面……";
+    try {
+      const unansweredQuestions = state.quiz.filter((question) => !state.answeredQuestionIds.has(question.id));
+      if (unansweredQuestions.length) {
+        storage.attempts += unansweredQuestions.length;
+        unansweredQuestions.forEach((question) => {
+          state.wrongDetails.push({ ...question, selected: "未作答", savedAt: new Date().toISOString() });
+          saveMistake(question, "未作答");
+        });
+        state.quizWrong += unansweredQuestions.length;
+      }
+      if (state.wrongDetails.length) {
+        await syncLater("mistakes", { user: state.currentUser, items: state.wrongDetails, submissionId: crypto.randomUUID() });
+      }
+      const practiceResult = await syncLater("practice-submit", {
+        submissionId: state.submissionId || crypto.randomUUID(),
+        practiceName: "金尊知识库练习",
+        practiceType: state.examType === "redline" ? "红线规则练习" : "练习模式",
+        bank: examLabel(),
+        total: state.quiz.length,
+        correct: state.score,
+        wrong: state.quizWrong,
+        duration: timerSeconds,
       });
-      state.quizWrong += unansweredQuestions.length;
-    }
-    if (state.wrongDetails.length) {
-      await syncLater("mistakes", { user: state.currentUser, items: state.wrongDetails, submissionId: crypto.randomUUID() });
+      practiceSyncSuccess = Boolean(practiceResult?.record_id);
+    } finally {
+      state.examSubmitting = false;
+      document.body.classList.remove("exam-submitting");
+      if (els.examSubmitStatus) els.examSubmitStatus.textContent = "";
     }
   }
   state.examFinished = true;
@@ -1625,7 +1649,9 @@ async function finishQuiz() {
   const timeStr = formatTime(state.serverDuration ?? timerSeconds);
   const examSyncSuccess = state.examType === "formal" && state.serverRecordId
     ? `<p class="exam-sync-success" role="status">正式考试已同步到飞书</p>`
-    : "";
+    : state.examType !== "formal" && practiceSyncSuccess
+      ? `<p class="exam-sync-success" role="status">练习成绩已同步到飞书练习表</p>`
+      : "";
   saveExamRecord(percent);
   els.quizRunner.classList.add("hidden");
   els.quizResult.classList.remove("hidden");
@@ -1842,10 +1868,12 @@ async function refreshAdminEmployees() {
     const data = await cloudRequest("admin-list", {});
     els.adminEmployeeList.innerHTML = (data.employees || []).map((employee) => `
       <div class="admin-employee-row">
-        <div><strong>${escapeHtml(employee.name)}</strong><small>${escapeHtml(employee.phone)} · ${escapeHtml(employee.role)} · ${escapeHtml(employee.status)}</small></div>
+        <div><strong>${escapeHtml(employee.name)}${employee.isAdmin ? " · 管理员" : ""}</strong><small>${escapeHtml(employee.phone)} · ${escapeHtml(employee.role)} · ${escapeHtml(employee.status)} · 最近登录 ${escapeHtml(employee.lastLoginAt || "暂无")}</small></div>
         <div class="admin-employee-actions">
           <button class="secondary-btn admin-password-btn" type="button" data-phone="${escapeHtml(employee.phone)}">修改密码</button>
-          <button class="danger-btn admin-delete-btn" type="button" data-phone="${escapeHtml(employee.phone)}">删除员工</button>
+          ${String(employee.phone) === String(state.currentUser?.phone)
+            ? '<button class="secondary-btn" type="button" disabled>当前账号</button>'
+            : `<button class="danger-btn admin-delete-btn" type="button" data-phone="${escapeHtml(employee.phone)}">删除员工</button>`}
         </div>
       </div>
     `).join("") || '<div class="empty">暂无员工账号。</div>';
@@ -1908,6 +1936,7 @@ function renderAdmin() {
     els.adminMetrics.innerHTML = `<div class="empty">无权限访问管理看板。</div>`;
     els.adminUserTable.innerHTML = "";
     els.adminWeakList.innerHTML = "";
+    if (els.adminPracticeList) els.adminPracticeList.innerHTML = "";
     return;
   }
   const cloud = state.cloudStats;
@@ -1919,47 +1948,68 @@ function renderAdmin() {
       : "";
   }
   const users = cloud?.employees?.length
-    ? cloud.employees.map((u) => ({ name: u["姓名"], phone: u["手机号"], role: u["岗位"] }))
+    ? cloud.employees.map((u) => ({ name: u["姓名"], phone: u["手机号"], role: u["岗位"], lastLoginAt: u["最后登录时间"] }))
     : Object.values(userStore.users);
   const rows = users.map((user) => {
-    const records = cloud?.exams?.length
+    const records = Array.isArray(cloud?.exams)
       ? cloud.exams.filter((r) => String(r["手机号"]) === String(user.phone) && String(r["考核类型"] || "") === "正式考试").map((r) => ({
           percent: Number(r["分数"] || 0), score: Number(r["答对数"] || 0), total: Number(r["总题数"] || 0),
           wrong: Number(r["答错数"] || 0), duration: Number(r["用时秒数"] || 0), bank: r["题库"], type: r["考核类型"], finishedAt: r["提交时间"],
         })).sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime())
       : getUserRecords(user.phone).filter((r) => r.type === "正式考试");
     records.sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime());
-    const mistakes = cloud?.mistakes?.length
+    const practices = Array.isArray(cloud?.practices)
+      ? cloud.practices.filter((r) => String(r["手机号"]) === String(user.phone)).map((r) => ({
+          percent: Number(r["分数"] || 0), score: Number(r["答对数"] || 0), total: Number(r["总题数"] || 0),
+          wrong: Number(r["答错数"] || 0), duration: Number(r["用时秒数"] || 0), bank: r["题库"], type: r["练习类型"], finishedAt: r["提交时间"],
+        })).sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime())
+      : getUserRecords(user.phone).filter((r) => r.type !== "正式考试");
+    practices.sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime());
+    const mistakes = Array.isArray(cloud?.mistakes)
       ? cloud.mistakes.filter((r) => String(r["手机号"]) === String(user.phone)).map((r) => ({ knowledgePoint: r["知识点"], bank: r["题库"] }))
       : getUserMistakes(user.phone);
     const best = records.reduce((acc, record) => (Number(record.percent) > Number(acc?.percent || -1) ? record : acc), null);
     const latest = records[0];
-    return { user, records, mistakes, best, latest };
+    const latestPractice = practices[0];
+    const practiceQuestions = practices.reduce((sum, record) => sum + Number(record.total || 0), 0);
+    const practiceAverage = practices.length
+      ? Math.round(practices.reduce((sum, record) => sum + Number(record.percent || 0), 0) / practices.length)
+      : 0;
+    return { user, records, practices, mistakes, best, latest, latestPractice, practiceQuestions, practiceAverage };
   });
   const allRecords = rows.flatMap((row) => row.records.map((record) => ({ ...record, user: row.user })));
-  const practiceCount = cloud?.exams?.length
-    ? cloud.exams.filter((r) => String(r["考核类型"] || "") === "练习模式").length
-    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone)).filter((r) => r.type === "练习模式").length;
+  const allPractices = rows.flatMap((row) => row.practices.map((record) => ({ ...record, user: row.user })));
   const avg = allRecords.length ? Math.round(allRecords.reduce((sum, r) => sum + Number(r.percent || 0), 0) / allRecords.length) : 0;
   const passed = allRecords.filter((r) => Number(r.percent) >= 80).length;
   const passRate = allRecords.length ? Math.round((passed / allRecords.length) * 100) : 0;
   const notExam = rows.filter((row) => !row.records.length).length;
+  const practicedEmployees = rows.filter((row) => row.practices.length).length;
+  const practiceQuestions = allPractices.reduce((sum, record) => sum + Number(record.total || 0), 0);
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const activePracticeEmployees = rows.filter((row) => row.practices.some((record) => new Date(record.finishedAt || 0).getTime() >= sevenDaysAgo)).length;
 
   els.adminMetrics.innerHTML = `
     <div class="summary-card"><span>员工数</span><strong>${users.length}</strong><small>${cloud?.employees?.length ? "飞书云端数据" : "本机已登录账号"}</small></div>
+    <div class="summary-card"><span>有练习员工</span><strong>${practicedEmployees}/${users.length}</strong><small>近7天活跃 ${activePracticeEmployees} 人</small></div>
+    <div class="summary-card"><span>练习总次数</span><strong>${allPractices.length}</strong><small>累计完成 ${practiceQuestions} 题</small></div>
     <div class="summary-card"><span>正式考试次数</span><strong>${allRecords.length}</strong><small>仅用于员工考核</small></div>
     <div class="summary-card"><span>正式考试平均分</span><strong>${avg}</strong><small>练习数据不计入</small></div>
-    <div class="summary-card"><span>正式考试通过率</span><strong>${passRate}%</strong><small>练习次数 ${practiceCount}，未考 ${notExam} 人</small></div>
+    <div class="summary-card"><span>正式考试通过率</span><strong>${passRate}%</strong><small>未参加正式考试 ${notExam} 人</small></div>
   `;
 
   els.adminUserTable.innerHTML = rows.length ? `
     <table>
-      <thead><tr><th>姓名</th><th>岗位</th><th>次数</th><th>最佳</th><th>最近</th><th>错题</th></tr></thead>
+      <thead><tr><th>姓名</th><th>岗位</th><th>最近登录</th><th>练习次数</th><th>练习题数</th><th>练习均分</th><th>最近练习</th><th>正式次数</th><th>正式最佳</th><th>最近考试</th><th>错题</th></tr></thead>
       <tbody>
-        ${rows.map(({ user, records, mistakes, best, latest }) => `
+        ${rows.map(({ user, records, practices, mistakes, best, latest, latestPractice, practiceQuestions: totalPracticeQuestions, practiceAverage }) => `
           <tr>
             <td>${escapeHtml(user.name)}</td>
             <td>${escapeHtml(user.role)}</td>
+            <td>${user.lastLoginAt ? escapeHtml(examTimeLabel(user.lastLoginAt)) : "--"}</td>
+            <td><strong>${practices.length}</strong></td>
+            <td>${totalPracticeQuestions}</td>
+            <td>${practices.length ? `${practiceAverage}分` : "--"}</td>
+            <td>${latestPractice ? `${latestPractice.percent}分 · ${examTimeLabel(latestPractice.finishedAt)}` : "从未练习"}</td>
             <td>${records.length}</td>
             <td>${best ? `${best.percent}分` : "未考"}</td>
             <td>${latest ? `${latest.percent}分 · ${examTimeLabel(latest.finishedAt)}` : "--"}</td>
@@ -1969,6 +2019,17 @@ function renderAdmin() {
       </tbody>
     </table>
   ` : `<div class="empty">暂无员工记录。</div>`;
+
+  if (els.adminPracticeList) {
+    const latestPractices = [...allPractices]
+      .sort((a, b) => new Date(b.finishedAt || 0).getTime() - new Date(a.finishedAt || 0).getTime())
+      .slice(0, 50);
+    els.adminPracticeList.innerHTML = latestPractices.length ? `
+      <table><thead><tr><th>员工</th><th>岗位</th><th>题库</th><th>分数</th><th>答题数</th><th>用时</th><th>练习时间</th></tr></thead><tbody>
+        ${latestPractices.map((record) => `<tr><td>${escapeHtml(record.user.name)}</td><td>${escapeHtml(record.user.role)}</td><td>${escapeHtml(record.bank || "综合题库")}</td><td><strong>${Number(record.percent || 0)}分</strong></td><td>${Number(record.total || 0)}题</td><td>${formatTime(Number(record.duration || 0))}</td><td>${escapeHtml(examTimeLabel(record.finishedAt))}</td></tr>`).join("")}
+      </tbody></table>
+    ` : `<div class="empty">暂无云端练习记录。员工完成练习后会自动记录在“练习成绩记录”表。</div>`;
+  }
 
   const allMistakes = rows.flatMap((row) => row.mistakes);
   const weak = allMistakes.reduce((acc, q) => {
@@ -1989,7 +2050,7 @@ function exportRecords() {
     ? state.cloudStats.exams.map((r) => ({
         姓名: r["姓名"], 手机号: r["手机号"], 岗位: r["岗位"], 考试名称: r["考试名称"], 考核类型: r["考核类型"], 题库: r["题库"], 分数: r["分数"], 答对数: r["答对数"], 总题数: r["总题数"], 答错数: r["答错数"], 是否通过: r["是否通过"], 用时秒数: r["用时秒数"], 提交时间: r["提交时间"], 考试会话ID: r["考试会话ID"],
       }))
-    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).map((record) => ({
+    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).filter((record) => record.type === "正式考试").map((record) => ({
         姓名: user.name,
         手机号: user.phone,
         岗位: user.role,
@@ -2005,6 +2066,24 @@ function exportRecords() {
         提交时间: record.finishedAt,
       })));
   downloadText(`金尊考试记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "考试名称", "考核类型", "题库", "分数", "答对数", "总题数", "答错数", "是否通过", "用时秒数", "提交时间", "考试会话ID"], rows));
+}
+
+function exportPracticeRecords() {
+  const rows = Array.isArray(state.cloudStats?.practices)
+    ? state.cloudStats.practices.map((record) => ({
+        姓名: record["姓名"], 手机号: record["手机号"], 岗位: record["岗位"], 练习名称: record["练习名称"],
+        练习类型: record["练习类型"], 题库: record["题库"], 分数: record["分数"], 答对数: record["答对数"],
+        总题数: record["总题数"], 答错数: record["答错数"], 是否达标: record["是否达标"],
+        用时秒数: record["用时秒数"], 提交时间: record["提交时间"], 练习提交编号: record["练习提交编号"],
+      }))
+    : Object.values(userStore.users).flatMap((user) => getUserRecords(user.phone).filter((record) => record.type !== "正式考试").map((record) => ({
+        姓名: user.name, 手机号: user.phone, 岗位: user.role, 练习名称: "金尊知识库练习", 练习类型: record.type || "练习模式",
+        题库: record.bank, 分数: record.percent, 答对数: record.score, 总题数: record.total,
+        答错数: record.wrong ?? Math.max(0, Number(record.total || 0) - Number(record.score || 0)),
+        是否达标: Number(record.percent) >= (record.type === "红线规则" ? 100 : 80) ? "达标" : "未达标",
+        用时秒数: record.duration, 提交时间: record.finishedAt, 练习提交编号: "本机记录",
+      })));
+  downloadText(`金尊练习记录_${todayKey()}.csv`, toCsv(["姓名", "手机号", "岗位", "练习名称", "练习类型", "题库", "分数", "答对数", "总题数", "答错数", "是否达标", "用时秒数", "提交时间", "练习提交编号"], rows));
 }
 
 function exportMistakes() {
@@ -2046,8 +2125,8 @@ function switchView(view) {
   if (view === "ranking") loadRanking();
   if (view === "mistakes") renderMistakes();
   if (view === "admin") {
-    loadCloudStats().then(renderAdmin);
     renderAdmin();
+    Promise.all([loadCloudStats(), refreshAdminEmployees()]).then(renderAdmin);
   }
 }
 
@@ -2270,6 +2349,7 @@ function bindEvents() {
   els.startQuizBtn.addEventListener("click", startQuiz);
   els.retryMistakesBtn.addEventListener("click", startMistakeQuiz);
   els.exportRecordsBtn.addEventListener("click", exportRecords);
+  els.exportPracticeRecordsBtn?.addEventListener("click", exportPracticeRecords);
   els.exportMistakesBtn.addEventListener("click", exportMistakes);
   document.querySelectorAll(".mode-tab").forEach((tab) => {
     tab.addEventListener("click", () => {

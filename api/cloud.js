@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const BASE_TOKEN = process.env.LARK_BASE_TOKEN || '';
 const EMPLOYEE_TABLE_ID = process.env.LARK_EMPLOYEE_TABLE_ID || '';
 const EXAM_TABLE_ID = process.env.LARK_EXAM_TABLE_ID || '';
+const PRACTICE_TABLE_ID = process.env.LARK_PRACTICE_TABLE_ID || '';
 const MISTAKE_TABLE_ID = process.env.LARK_MISTAKE_TABLE_ID || '';
 const LARK_APP_ID = process.env.LARK_APP_ID || '';
 const LARK_APP_SECRET = process.env.LARK_APP_SECRET || '';
@@ -76,6 +77,7 @@ let cachedTables = null;
 let cachedTablesExpireAt = 0;
 const rateLimitBuckets = new Map();
 const examSubmitLocks = new Map();
+const practiceSubmitLocks = new Map();
 
 class FeishuApiError extends Error {
   constructor(message, { code = '', status = 0 } = {}) {
@@ -168,12 +170,17 @@ const mistakeTableId = () => resolveTableId(MISTAKE_TABLE_ID, [
 
 const ACCOUNT_TEXT_FIELDS = [
   '员工ID', '密码哈希', '账号状态', '是否管理员', '注册时间',
-  '登录失败次数', '锁定截止时间', '密码更新时间', '客户端标识', '会话版本', '备注',
+  '最后登录时间', '登录失败次数', '锁定截止时间', '密码更新时间', '客户端标识', '会话版本', '备注',
 ];
 let accountFieldsReady = null;
 const EXAM_FIELD_NAMES = [
   '考试名称', '考核类型', '题库', '总题数', '答对数', '答错数', '分数',
   '是否通过', '用时秒数', '提交时间', '考试提交编号', '考试会话ID', '设备ID',
+];
+const PRACTICE_FIELD_NAMES = [
+  '练习名称', '练习类型', '题库', '总题数', '答对数', '答错数', '分数',
+  '是否达标', '用时秒数', '提交时间', '练习提交编号', '设备ID',
+  '姓名', '手机号', '岗位',
 ];
 const MISTAKE_FIELD_NAMES = [
   '记录时间', '错选', '正确答案', '解析', '题库', '知识点',
@@ -243,7 +250,46 @@ async function ensureTableFields(tableIdPromise, fieldNames) {
   return tableId;
 }
 
+let practiceTablePromise = null;
+
+async function practiceTableId() {
+  if (practiceTablePromise) return practiceTablePromise;
+  practiceTablePromise = (async () => {
+    try {
+      return await resolveTableId(PRACTICE_TABLE_ID, [
+        '练习成绩记录', '练习记录', '员工练习记录',
+      ]);
+    } catch (error) {
+      if (error?.code !== 'TABLE_NOT_FOUND') throw error;
+      const token = await getTenantToken();
+      const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          table: {
+            name: '练习成绩记录',
+            default_view_name: '练习记录',
+            fields: PRACTICE_FIELD_NAMES.map((fieldName) => ({ field_name: fieldName, type: 1 })),
+          },
+        }),
+      });
+      const tableId = data?.data?.table?.table_id || data?.data?.table_id;
+      if (!tableId) throw new FeishuApiError('练习成绩记录表创建失败', { code: 'PRACTICE_TABLE_CREATE_FAILED', status: 500 });
+      cachedTables = null;
+      cachedTablesExpireAt = 0;
+      return tableId;
+    }
+  })();
+  try {
+    return await practiceTablePromise;
+  } catch (error) {
+    practiceTablePromise = null;
+    throw error;
+  }
+}
+
 const examTableReady = () => ensureTableFields(examTableId(), EXAM_FIELD_NAMES);
+const practiceTableReady = () => ensureTableFields(practiceTableId(), PRACTICE_FIELD_NAMES);
 const mistakeTableReady = () => ensureTableFields(mistakeTableId(), MISTAKE_FIELD_NAMES);
 
 const allowedRoles = new Set([
@@ -578,7 +624,16 @@ async function requireAdmin(req, payload) {
   if (!user.isAdmin) throw httpError(403, '管理员权限不足');
   return user;
 }
-const adminEmployeeView = (record) => ({ record_id: record.record_id, name: record['姓名'] || '', phone: cleanPhone(record['手机号']), role: record['岗位'] || '', status: record['账号状态'] || '正常', isAdmin: isAdminValue(record['是否管理员']), registeredAt: record['注册时间'] || '' });
+const adminEmployeeView = (record) => ({
+  record_id: record.record_id,
+  name: record['姓名'] || '',
+  phone: cleanPhone(record['手机号']),
+  role: record['岗位'] || '',
+  status: record['账号状态'] || '正常',
+  isAdmin: isAdminValue(record['是否管理员']),
+  registeredAt: record['注册时间'] || '',
+  lastLoginAt: record['最后登录时间'] || '',
+});
 async function handleAdminList() {
   const tableId = await accountTableId();
   return { ok: true, employees: (await listRecords(tableId)).map(adminEmployeeView) };
@@ -843,18 +898,77 @@ async function handleExamSubmitOnce(payload, user) {
   };
 }
 
+async function handlePracticeSubmit(payload, user) {
+  const submissionId = String(payload.submissionId || '').trim();
+  if (!submissionId || submissionId.length > 100) throw httpError(400, '练习提交编号无效');
+  const lockKey = `${user.id}:${submissionId}`;
+  const previous = practiceSubmitLocks.get(lockKey) || Promise.resolve();
+  const current = previous.catch(() => undefined).then(() => handlePracticeSubmitOnce(payload, user));
+  practiceSubmitLocks.set(lockKey, current);
+  try {
+    return await current;
+  } finally {
+    if (practiceSubmitLocks.get(lockKey) === current) practiceSubmitLocks.delete(lockKey);
+  }
+}
+
+async function handlePracticeSubmitOnce(payload, user) {
+  const submissionId = String(payload.submissionId || '').trim();
+  const total = Math.round(num(payload.total, -1));
+  const correct = Math.round(num(payload.correct, -1));
+  const wrong = Math.round(num(payload.wrong, total - correct));
+  const duration = Math.round(num(payload.duration, 0));
+  if (total < 1 || total > 1000 || correct < 0 || correct > total || wrong < 0 || wrong !== total - correct) {
+    throw httpError(400, '练习成绩数据无效');
+  }
+  if (duration < 0 || duration > 24 * 60 * 60) throw httpError(400, '练习用时数据无效');
+  const tableId = await practiceTableReady();
+  const existing = await searchRecordsReliable(tableId, '练习提交编号', submissionId);
+  if (existing[0]?.record_id) {
+    const record = existing[0];
+    return {
+      ok: true,
+      duplicate: true,
+      record_id: record.record_id,
+      score: num(record['分数']),
+      correct: num(record['答对数']),
+      wrong: num(record['答错数']),
+      total: num(record['总题数']),
+      duration: num(record['用时秒数']),
+    };
+  }
+  const percent = Math.round((correct / total) * 100);
+  const practiceType = String(payload.practiceType || '') === '红线规则练习' ? '红线规则练习' : '练习模式';
+  const fields = {
+    '提交时间': dt(new Date()),
+    '姓名': user.name,
+    '手机号': cleanPhone(user.phone),
+    '岗位': user.role || '',
+    '练习名称': String(payload.practiceName || '金尊知识库练习').trim().slice(0, 200),
+    '练习类型': practiceType,
+    '题库': String(payload.bank || '').trim().slice(0, 200),
+    '总题数': total,
+    '答对数': correct,
+    '答错数': wrong,
+    '分数': percent,
+    '是否达标': percent >= (practiceType === '红线规则练习' ? 100 : 80) ? '达标' : '未达标',
+    '用时秒数': duration,
+    '练习提交编号': submissionId,
+    '设备ID': String(payload.deviceId || '').slice(0, 500),
+  };
+  const created = await createRecord(tableId, fields);
+  if (!created?.record_id) throw httpError(503, '练习记录未返回记录ID');
+  return { ok: true, record_id: created.record_id, score: percent, correct, wrong, total, duration };
+}
+
 async function handleStats() {
-  const [employeeId, examId, mistakeId] = await Promise.all([
-    employeeTableId(),
-    examTableId(),
-    mistakeTableId(),
-  ]);
   const entries = await Promise.allSettled([
-    listRecords(employeeId),
-    listRecords(examId),
-    listRecords(mistakeId),
+    employeeTableId().then((tableId) => listRecords(tableId)),
+    examTableId().then((tableId) => listRecords(tableId)),
+    practiceTableId().then((tableId) => listRecords(tableId)),
+    mistakeTableId().then((tableId) => listRecords(tableId)),
   ]);
-  const [employeeRecords, examRecords, mistakeRecords] = entries.map((entry) => entry.status === 'fulfilled' ? entry.value : []);
+  const [employeeRecords, examRecords, practiceRecords, mistakeRecords] = entries.map((entry) => entry.status === 'fulfilled' ? entry.value : []);
   const employees = employeeRecords.map((record) => ({
     record_id: record.record_id,
     姓名: record['姓名'] || '',
@@ -862,7 +976,7 @@ async function handleStats() {
     岗位: record['岗位'] || '',
     最后登录时间: record['最后登录时间'] || '',
   }));
-  const exams = examRecords.map((record) => ({
+  const exams = examRecords.filter((record) => String(record['考核类型'] || '') === '正式考试').map((record) => ({
     record_id: record.record_id,
     姓名: record['姓名'] || '',
     手机号: cleanPhone(record['手机号']),
@@ -880,6 +994,23 @@ async function handleStats() {
     考试提交编号: record['考试提交编号'] || '',
     考试会话ID: record['考试会话ID'] || '',
   }));
+  const practices = practiceRecords.map((record) => ({
+    record_id: record.record_id,
+    姓名: record['姓名'] || '',
+    手机号: cleanPhone(record['手机号']),
+    岗位: record['岗位'] || '',
+    练习名称: record['练习名称'] || '',
+    练习类型: record['练习类型'] || '练习模式',
+    题库: record['题库'] || '',
+    总题数: num(record['总题数']),
+    答对数: num(record['答对数']),
+    答错数: num(record['答错数']),
+    分数: num(record['分数']),
+    是否达标: record['是否达标'] || '',
+    用时秒数: num(record['用时秒数']),
+    提交时间: record['提交时间'] || '',
+    练习提交编号: record['练习提交编号'] || '',
+  }));
   const mistakes = mistakeRecords.map((record) => ({
     record_id: record.record_id,
     姓名: record['姓名'] || '',
@@ -896,13 +1027,13 @@ async function handleStats() {
   }));
   const errors = entries
     .map((entry, index) => entry.status === 'rejected' ? {
-      table: ['employees', 'exams', 'mistakes'][index],
+      table: ['employees', 'exams', 'practices', 'mistakes'][index],
       code: entry.reason?.code || '',
       status: entry.reason?.status || 0,
       message: entry.reason?.message || 'Feishu API error',
     } : null)
     .filter(Boolean);
-  return { ok: true, employees, exams, mistakes, ...(errors.length ? { errors } : {}) };
+  return { ok: true, employees, exams, practices, mistakes, ...(errors.length ? { errors } : {}) };
 }
 
 async function handleRanking(user) {
@@ -988,6 +1119,10 @@ module.exports = async (req, res) => {
       const user = await requireActiveUser(req, payload);
       return json(req, res, 200, await handleExamSubmit(payload, user));
     }
+    if (action === 'practice-submit') {
+      const user = await requireActiveUser(req, payload);
+      return json(req, res, 200, await handlePracticeSubmit(payload, user));
+    }
     if (action === 'mistakes') {
       const user = await requireActiveUser(req, payload);
       return json(req, res, 200, await handleMistakes(payload, user));
@@ -1004,5 +1139,5 @@ module.exports = async (req, res) => {
   }
 };
 
-module.exports._test = { selectExamQuestions, selectMooncakeExamQuestions, examPool, productQuestionAllowedForRole };
+module.exports._test = { selectExamQuestions, selectMooncakeExamQuestions, examPool, productQuestionAllowedForRole, handlePracticeSubmitOnce };
 

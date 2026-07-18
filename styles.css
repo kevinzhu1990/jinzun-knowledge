@@ -1150,7 +1150,7 @@ input:disabled {
 }
 
 .summary-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .task-card,
@@ -1763,6 +1763,7 @@ input:disabled {
 .exam-sync-success{margin:0 0 12px;padding:10px 12px;border:1px solid #a7f3d0;border-radius:10px;background:#ecfdf5;color:#047857;font-weight:700}
 
 .admin-account-tools { margin: 18px 0; }
+.admin-practice-panel { margin-top: 14px; }
 .admin-account-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 10px; align-items: center; }
 .admin-account-form .text-input, .admin-account-form .select { min-width: 0; }
 .admin-employee-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line, #d8e0e6); }
