@@ -1,0 +1,15 @@
+.git
+.github
+.vercel
+.pytest_cache
+node_modules
+desktop
+docs
+scripts
+sources
+tests
+*.xlsx
+*.xls
+*.pptx
+*.doc
+*.docx
