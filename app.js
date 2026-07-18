@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260718-practice-stats-separation1";
+const BUILD_VERSION = "20260718-practice-sync-fix1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -627,15 +627,19 @@ async function flushSyncQueue() {
   const queue = safeJsonArray("jz_sync_queue");
   if (!queue.length) return;
   const remain = [];
+  let restoredPracticeCount = 0;
   for (const item of queue) {
     if (!['mistakes', 'practice-submit'].includes(item.action)) continue;
     try {
-      await cloudRequest(item.action, item.payload);
+      const data = await cloudRequest(item.action, item.payload);
+      if (item.action === "practice-submit" && !data.record_id) throw new Error("服务器未返回练习记录ID");
+      if (item.action === "practice-submit") restoredPracticeCount += 1;
     } catch (error) {
       remain.push({ ...item, error: error.message });
     }
   }
   localStorage.setItem("jz_sync_queue", JSON.stringify(remain.slice(-300)));
+  if (restoredPracticeCount > 0) setSyncStatus(`已自动补传 ${restoredPracticeCount} 条练习成绩到飞书`, "success");
 }
 
 async function loadCloudStats() {
@@ -1588,6 +1592,7 @@ async function finishQuiz() {
   clearAutoNextTimer();
   stopTimer();
   let practiceSyncSuccess = false;
+  let practiceSyncError = "";
   if (state.examType === "formal") {
     state.examSubmitting = true;
     document.body.classList.add("exam-submitting");
@@ -1633,6 +1638,7 @@ async function finishQuiz() {
         duration: timerSeconds,
       });
       practiceSyncSuccess = Boolean(practiceResult?.record_id);
+      practiceSyncError = practiceResult?.error || "";
     } finally {
       state.examSubmitting = false;
       document.body.classList.remove("exam-submitting");
@@ -1651,7 +1657,9 @@ async function finishQuiz() {
     ? `<p class="exam-sync-success" role="status">正式考试已同步到飞书</p>`
     : state.examType !== "formal" && practiceSyncSuccess
       ? `<p class="exam-sync-success" role="status">练习成绩已同步到飞书练习表</p>`
-      : "";
+      : state.examType !== "formal" && practiceSyncError
+        ? `<p class="exam-sync-error" role="alert">练习成绩暂存在本机，页面刷新后会自动补传到飞书。</p>`
+        : "";
   saveExamRecord(percent);
   els.quizRunner.classList.add("hidden");
   els.quizResult.classList.remove("hidden");

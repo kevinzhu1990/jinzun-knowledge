@@ -1761,6 +1761,7 @@ input:disabled {
 }
 .cloud-sync-status{position:fixed;right:18px;bottom:18px;z-index:9999;max-width:360px;padding:12px 14px;border-radius:14px;font-size:13px;font-weight:700;box-shadow:0 16px 40px rgba(15,23,42,.18);background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}.cloud-sync-status.success{background:#ecfdf5;color:#047857;border-color:#a7f3d0}.cloud-sync-status.warn{background:#fffbeb;color:#b45309;border-color:#fde68a}.cloud-sync-status.error{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
 .exam-sync-success{margin:0 0 12px;padding:10px 12px;border:1px solid #a7f3d0;border-radius:10px;background:#ecfdf5;color:#047857;font-weight:700}
+.exam-sync-error{margin:0 0 12px;padding:10px 12px;border:1px solid #fcd34d;border-radius:10px;background:#fffbeb;color:#92400e;font-weight:700}
 
 .admin-account-tools { margin: 18px 0; }
 .admin-practice-panel { margin-top: 14px; }

@@ -40,6 +40,20 @@ def test_practice_submission_is_authenticated_deduplicated_and_retryable():
     assert 'state.submissionId = crypto.randomUUID()' not in next_question
 
 
+def test_practice_text_fields_receive_text_values():
+    practice = function_block(API, "async function handlePracticeSubmitOnce", "async function handleStats")
+    for field, value in (
+        ("总题数", "total"),
+        ("答对数", "correct"),
+        ("答错数", "wrong"),
+        ("分数", "percent"),
+        ("用时秒数", "duration"),
+    ):
+        assert f"'{field}': String({value})" in practice
+    assert 'item.action === "practice-submit" && !data.record_id' in APP
+    assert "已自动补传" in APP
+
+
 def test_admin_dashboard_shows_employee_practice_activity_and_account_actions():
     for marker in (
         "有练习员工", "练习总次数", "练习题数", "练习均分", "最近练习", "最近登录",
