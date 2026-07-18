@@ -1,6 +1,7 @@
 from __future__ import annotations
 import hashlib,json,os,re,zipfile,xml.etree.ElementTree as ET
 from datetime import datetime,timezone
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from balance_quiz_options import balance_questions
@@ -73,20 +74,35 @@ def line(name,contents):
     if any(x in t for x in ('礼盒','组合','四宝','金玉满堂','年年富贵')):return '糕点礼盒类'
     return '糕点类'
 def sid(*x):return 'P-'+hashlib.sha1('|'.join(x).encode()).hexdigest()[:12].upper()
+def similarity_key(correct,value,kp,seed):
+    left,right=clean(correct),clean(value)
+    left_nums=[float(x) for x in re.findall(r'\d+(?:\.\d+)?',left)]
+    right_nums=[float(x) for x in re.findall(r'\d+(?:\.\d+)?',right)]
+    number_distance=999999
+    if left_nums and right_nums:
+        number_distance=sum(abs(a-b) for a,b in zip(left_nums,right_nums))+1000*abs(len(left_nums)-len(right_nums))
+    text_similarity=SequenceMatcher(None,re.sub(r'\d+','',left),re.sub(r'\d+','',right)).ratio()
+    same_unit=int(any(unit in left and unit in right for unit in ('g','克','天','个月','*','×','盒','罐')))
+    if kp in {'箱规','克重/净重','保质期','尺寸/外箱','口味个数'}:
+        return (number_distance,-same_unit,-text_similarity,hashlib.sha1((seed+right).encode()).hexdigest())
+    return (-text_similarity,number_distance,-same_unit,hashlib.sha1((seed+right).encode()).hexdigest())
+def ranked_pool(correct,pool,kp,seed):
+    return sorted(pool,key=lambda value:similarity_key(correct,value,kp,seed))
 def opts(correct,pool,seed):
     option_key=lambda value:re.sub(r'\s+','',clean(value)).replace('×','*')
     unique={}
     for value in pool:
         cleaned=clean(value); key=option_key(cleaned)
         if cleaned and key!=option_key(correct):unique.setdefault(key,cleaned)
-    vals=sorted(unique.values(),key=lambda x:hashlib.sha1((seed+x).encode()).hexdigest())[:3]
+    vals=list(unique.values())[:3]
     vals=([clean(correct)]+vals); vals += [f'暂无其他有效资料{i}' for i in range(1,5)]; vals=vals[:4]; order=sorted(range(4),key=lambda i:hashlib.sha1(f'{seed}:{i}'.encode()).hexdigest()); vals=[vals[i] for i in order]
     return vals,'ABCD'[vals.index(clean(correct))]
 def q(bank,cat,pl,cd,name,kp,text,correct,pool,note=''):
     if bank=='月饼题库' and kp=='产品线':
         pool=['月饼-铁罐','月饼-礼盒','月饼-散饼','糕点类']
     if bank=='月饼题库' and kp=='保质期':
-        correct='90天'; pool=['60天','6个月','12个月']
+        pool=['60天','6个月','12个月'] if cd=='2535' else [*pool,'30天','45天','60天','90天','120天','6个月','9个月','12个月']
+    pool=ranked_pool(correct,pool,kp,cd+kp)
     os_,ans=opts(correct,pool,cd+kp)
     return {'id':sid(bank,cd,kp,text),'bank':bank,'category':cat,'productLine':pl,'code':cd,'productName':name,'type':'单选题','difficulty':'基础','knowledgePoint':kp,'question':text,'optionA':os_[0],'optionB':os_[1],'optionC':os_[2],'optionD':os_[3],'answer':ans,'answerText':correct,'explanation':f'{text.rstrip("？")}：{correct}。','questionImage':'','optionAImage':'','optionBImage':'','optionCImage':'','optionDImage':'','source':SOURCE_LABEL,'note':note,'version':VERSION}
 def product(row,bank,sheet):

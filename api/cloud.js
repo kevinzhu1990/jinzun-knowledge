@@ -684,7 +684,7 @@ function examPool(questions, payload, user) {
       && question.sourceConflict === false
       && question.semanticDuplicate === false
       && question.humanReviewStatus === 'approved');
-  if (mode === 'random') return questions.filter((question) => coreBanks.has(question.bank) && eligible(question));
+  if (mode === 'random') return questions.filter((question) => coreBanks.has(question.bank) && eligible(question) && productQuestionAllowedForRole(question, user.role));
   if (mode === 'role') {
     if (!bank || productBanks.has(bank)) throw httpError(400, '岗位考试题库不正确');
     return questions.filter((question) => question.bank === bank
@@ -692,13 +692,35 @@ function examPool(questions, payload, user) {
       && eligible(question));
   }
   if (!bank || !productBanks.has(bank)) throw httpError(400, '产品考试题库不正确');
-  return questions.filter((question) => question.bank === bank && eligible(question));
+  return questions.filter((question) => question.bank === bank && eligible(question) && productQuestionAllowedForRole(question, user.role));
+}
+
+function productQuestionAllowedForRole(question, role) {
+  if (!['月饼题库', '日常年货题库', '商家编码题库'].includes(question.bank)) return true;
+  const point = String(question.knowledgePoint || '');
+  const basic = new Set(['产品名称', '克重/净重', '内配/口味', '口味个数', '保质期']);
+  const logistics = new Set(['箱规', '单位', '条码']);
+  if (basic.has(point)) return true;
+  if (['看图片选货号', '看货号选图片'].includes(point)) return ['客服', '主播', '运营', '美工'].includes(role);
+  if (logistics.has(point)) return ['仓储', '采购', '审单', '运营'].includes(role);
+  if (point.includes('商家编码') || question.bank === '商家编码题库') return ['运营', '审单'].includes(role);
+  if (point.includes('包装') || point.includes('盒型') || point.includes('产品线')) return ['美工', '客服', '运营'].includes(role);
+  return ['客服', '主播', '运营'].includes(role);
 }
 
 async function handleExamStart(payload, user) {
   const size = Math.min(100, Math.max(1, Number(payload.size) || 50));
-  const pool = examPool(await loadServerQuestions(), payload, user);
-  if (pool.length < 1) throw httpError(400, '当前题库没有可用题目');
+  const questions = await loadServerQuestions();
+  const pool = examPool(questions, payload, user);
+  if (pool.length < 1) {
+    if (payload.mode === 'role') {
+      const matching = questions.filter((question) => question.bank === String(payload.bank || '').trim()
+        && (question.role === user.role || question.role === '全员'));
+      if (matching.length) throw httpError(409, '当前岗位题库尚未完成审核，仅支持练习模式');
+      throw httpError(400, '当前账号岗位没有该题库的可用题目，请重新选择岗位题库');
+    }
+    throw httpError(400, '当前岗位在该产品题库中没有可用题目，请重新选择题库');
+  }
   const selected = selectExamQuestions(pool, payload, size);
   const examId = crypto.randomUUID();
   const startedAt = Date.now();
@@ -883,6 +905,42 @@ async function handleStats() {
   return { ok: true, employees, exams, mistakes, ...(errors.length ? { errors } : {}) };
 }
 
+async function handleRanking(user) {
+  const records = await listRecords(await examTableId());
+  const formal = records.filter((record) => String(record['考核类型'] || '') === '正式考试').map((record) => ({
+    name: record['姓名'] || '',
+    phone: cleanPhone(record['手机号']),
+    role: record['岗位'] || '',
+    bank: record['题库'] || '',
+    total: num(record['总题数']),
+    percent: num(record['分数']),
+    duration: num(record['用时秒数']),
+    finishedAt: record['提交时间'] || '',
+  }));
+  const byPhone = new Map();
+  for (const record of formal) {
+    if (!record.phone) continue;
+    const current = byPhone.get(record.phone);
+    if (!current) {
+      byPhone.set(record.phone, { ...record, totalExams: 1 });
+      continue;
+    }
+    current.totalExams += 1;
+    if (record.percent > current.percent || (record.percent === current.percent && record.duration < current.duration)) {
+      const totalExams = current.totalExams;
+      byPhone.set(record.phone, { ...record, totalExams });
+    }
+  }
+  const ranking = [...byPhone.values()]
+    .sort((left, right) => right.percent - left.percent || left.duration - right.duration)
+    .map(({ phone, ...record }) => record);
+  const ownHistory = formal.filter((record) => record.phone === cleanPhone(user.phone))
+    .sort((left, right) => new Date(right.finishedAt || 0).getTime() - new Date(left.finishedAt || 0).getTime())
+    .slice(0, 50)
+    .map(({ phone, name, role, ...record }) => record);
+  return { ok: true, ranking, ownHistory };
+}
+
 module.exports = async (req, res) => {
   const origin = String(req.headers.origin || '');
   if (req.method === 'OPTIONS') {
@@ -922,6 +980,10 @@ module.exports = async (req, res) => {
       const user = await requireActiveUser(req, payload);
       return json(req, res, 200, await handleExamStart(payload, user));
     }
+    if (action === 'ranking') {
+      const user = await requireActiveUser(req, payload);
+      return json(req, res, 200, await handleRanking(user));
+    }
     if (action === 'exam-submit') {
       const user = await requireActiveUser(req, payload);
       return json(req, res, 200, await handleExamSubmit(payload, user));
@@ -942,5 +1004,5 @@ module.exports = async (req, res) => {
   }
 };
 
-module.exports._test = { selectExamQuestions, selectMooncakeExamQuestions };
+module.exports._test = { selectExamQuestions, selectMooncakeExamQuestions, examPool, productQuestionAllowedForRole };
 

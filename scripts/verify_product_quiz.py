@@ -13,11 +13,14 @@ def main():
     errors=[]
     if not SOURCE.is_file(): errors.append(f'缺少权威Excel：{SOURCE}')
     if errors: print('\n'.join(errors)); raise SystemExit(1)
-    data=generator.read_book(); active=set()
+    data=generator.read_book(); active=set(); source_shelf={}
     for sheet in ('26年月饼礼盒','26年散饼','26年糕点饼干'):
         for row in data.get(sheet,[]):
             c=generator.code(generator.get(row,'货号')); n=generator.get(row,'产品名称')
-            if c and n: active.add(c)
+            if c and n:
+                active.add(c)
+                shelf=generator.get(row,'保质期')
+                if shelf: source_shelf[c]=shelf
     qs=json.loads(PRODUCT.read_text(encoding='utf-8'))
     ids=[str(q.get('id','')) for q in qs]
     if len(ids)!=len(set(ids)): errors.append('产品题库ID重复')
@@ -30,6 +33,8 @@ def main():
             else: actual=q.get('option'+q['answer'],'')
             if actual!=q.get('answerText',''): errors.append(f"{q.get('id')}正确答案与answerText不一致")
         if q.get('code') and q.get('bank') in ('月饼题库','日常年货题库') and q.get('code') not in active: errors.append(f"{q.get('id')}使用源表外货号")
+        if q.get('knowledgePoint')=='保质期' and q.get('code') in source_shelf and q.get('answerText')!=source_shelf[q.get('code')]:
+            errors.append(f"{q.get('id')}保质期与源表不一致：题库{q.get('answerText')}源表{source_shelf[q.get('code')]}")
     product_codes={str(q.get('code')) for q in qs if q.get('bank') in ('月饼题库','日常年货题库') and q.get('knowledgePoint')=='产品名称'}
     image_codes={str(q.get('code')) for q in qs if q.get('bank') in ('月饼题库','日常年货题库') and q.get('knowledgePoint')=='看图片选货号'}
     moon={str(q.get('code')) for q in qs if q.get('bank')=='月饼题库'}

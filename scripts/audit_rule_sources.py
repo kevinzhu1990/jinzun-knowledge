@@ -34,6 +34,13 @@ ALLOWED_SOURCE_TOPIC_MAP = {
     "PDD-PUBLIC-AGREEMENT": ("拼多多", "商品信息", "平台", "真实", "交易"),
 }
 
+ALLOWED_INTERNAL_SOURCES = {
+    "INTERNAL-FEISHU-SOP-2026": "飞书与公司内部协作规范",
+    "INTERNAL-CS-SOP-2026": "客服内部服务规范与各平台售后规则",
+    "INTERNAL-DESIGN-SOP-2026": "电商视觉规范与内部设计流程",
+    "INTERNAL-ROLE-SOP-2026": "金尊岗位实操场景规范",
+}
+
 
 def normalize_question(text: str) -> str:
     value = str(text or "")
@@ -119,6 +126,12 @@ def repeated_template_options(questions: list[dict]) -> dict[str, int]:
 def validate_source_topic(question: dict, sources: dict[str, dict]) -> list[str]:
     errors = []
     source_id = question.get("sourceId")
+    if source_id in ALLOWED_INTERNAL_SOURCES:
+        if question.get("sourceType") != "internal_sop" or question.get("answerBasis") != "internal_sop":
+            return [f"{question.get('id')} invalid internal source metadata"]
+        if question.get("sourceTitle") != ALLOWED_INTERNAL_SOURCES[source_id]:
+            return [f"{question.get('id')} internal source title mismatch"]
+        return []
     source = sources.get(source_id)
     if not source:
         return [f"{question.get('id')} unknown source"]

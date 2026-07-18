@@ -1,5 +1,11 @@
 import json
+import os
 from pathlib import Path
+
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import generate_product_quiz as generator
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -72,6 +78,26 @@ def test_2535_shelf_life_has_requested_distractors():
     question = questions[0]
     assert question["answerText"] == "90天"
     assert {question[f"option{x}"] for x in "ABCD"} == {"90天", "60天", "6个月", "12个月"}
+
+
+def test_every_shelf_life_answer_matches_latest_excel():
+    source = generator.read_book()
+    expected = {}
+    for sheet in ("26年月饼礼盒", "26年散饼", "26年糕点饼干"):
+        for row in source.get(sheet, []):
+            code = generator.code(generator.get(row, "货号"))
+            shelf = generator.get(row, "保质期")
+            if code and shelf:
+                expected[code] = shelf
+    questions = [question for question in load_product_questions() if question.get("knowledgePoint") == "保质期"]
+    assert questions
+    for question in questions:
+        assert question["answerText"] == expected[str(question["code"])]
+
+
+def test_generator_does_not_force_all_mooncake_shelf_life_to_90_days():
+    source = (ROOT / "scripts" / "generate_product_quiz.py").read_text(encoding="utf-8")
+    assert "correct='90天'" not in source
 
 
 def test_no_placeholder_options_remain():

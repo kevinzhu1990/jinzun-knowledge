@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260718-product-2608-fix1";
+const BUILD_VERSION = "20260718-role-product-learning-fix1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -37,6 +37,10 @@ const state = {
   serverDuration: null,
   examSubmitting: false,
   answers: new Map(),
+  companyRanking: [],
+  ownFormalHistory: [],
+  rankingLoading: false,
+  rankingError: "",
 };
 
 const els = {
@@ -418,6 +422,24 @@ const shuffle = (items) => {
 
 const MOONCAKE_IMAGE_POINTS = new Set(["看图片选货号", "看货号选图片"]);
 const MOONCAKE_FLAVOR_POINTS = new Set(["内配/口味", "口味个数"]);
+const PRODUCT_BASIC_POINTS = new Set(["产品名称", "克重/净重", "内配/口味", "口味个数", "保质期"]);
+const PRODUCT_LOGISTICS_POINTS = new Set(["箱规", "单位", "条码"]);
+
+function productQuestionAllowedForRole(question, role = state.currentUser?.role) {
+  if (!question || !["月饼题库", "日常年货题库", "商家编码题库"].includes(question.bank)) return true;
+  const point = String(question.knowledgePoint || "");
+  if (PRODUCT_BASIC_POINTS.has(point)) return true;
+  if (MOONCAKE_IMAGE_POINTS.has(point)) return ["客服", "主播", "运营", "美工"].includes(role);
+  if (PRODUCT_LOGISTICS_POINTS.has(point)) return ["仓储", "采购", "审单", "运营"].includes(role);
+  if (point.includes("商家编码") || question.bank === "商家编码题库") return ["运营", "审单"].includes(role);
+  if (point.includes("包装") || point.includes("盒型") || point.includes("产品线")) return ["美工", "客服", "运营"].includes(role);
+  return ["客服", "主播", "运营"].includes(role);
+}
+
+function suitableRolesForProduct(questions) {
+  const roles = ["客服", "主播", "运营", "美工", "仓储", "采购", "审单"];
+  return roles.filter((role) => questions.some((question) => productQuestionAllowedForRole(question, role)));
+}
 
 function selectMooncakeQuizQuestions(pool, requestedSize) {
   const size = Math.min(requestedSize, pool.length);
@@ -884,6 +906,10 @@ function renderLearnFilter() {
 }
 
 function renderLearnList() {
+  if (["月饼题库", "日常年货题库"].includes(state.currentBank)) {
+    renderProductKnowledgeCards();
+    return;
+  }
   const totalPages = Math.max(1, Math.ceil(state.filtered.length / state.learnPageSize));
   state.learnPage = Math.min(state.learnPage, totalPages);
   const start = (state.learnPage - 1) * state.learnPageSize;
@@ -1004,11 +1030,14 @@ function setExamLocked(locked) {
 }
 
 function renderQuizSetup() {
+  const previousRoleBank = els.roleBankSelect.value;
   const productBanks = PRODUCT_BANKS.filter((bank) =>
     state.allQuestions.some((q) => q.bank === bank)
   );
   const roleBanks = banks().filter(
     (bank) => bank !== "全部题库" && !PRODUCT_BANKS.includes(bank)
+      && state.allQuestions.some((question) => question.bank === bank
+        && (question.role === state.currentUser?.role || question.role === "全员"))
   );
 
   els.productBankSelect.innerHTML = productBanks
@@ -1020,10 +1049,41 @@ function renderQuizSetup() {
 
   els.roleBankSelect.innerHTML = roleBanks
     .map((bank) => {
-      const count = state.allQuestions.filter((q) => q.bank === bank).length;
-      return `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}（${count} 题）</option>`;
+      const matching = state.allQuestions.filter((question) => question.bank === bank
+        && (question.role === state.currentUser?.role || question.role === "全员"));
+      const formalCount = matching.filter(isFormalRoleQuestion).length;
+      const count = els.examType?.value === "formal" ? formalCount : matching.length;
+      return `<option value="${escapeHtml(bank)}" ${els.examType?.value === "formal" && !formalCount ? "disabled" : ""}>${escapeHtml(bank)}（${els.examType?.value === "formal" ? "正式可用 " : ""}${count} 题）</option>`;
     })
     .join("");
+  if (roleBanks.includes(previousRoleBank)) els.roleBankSelect.value = previousRoleBank;
+  if (!els.roleBankSelect.value) {
+    const firstEnabled = [...els.roleBankSelect.options].find((option) => !option.disabled);
+    if (firstEnabled) els.roleBankSelect.value = firstEnabled.value;
+  }
+  updateQuizSetupAvailability();
+}
+
+function isFormalRoleQuestion(question) {
+  return question.verificationStatus === "verified"
+    && question.effectiveForFormalExam === true
+    && question.sourceConflict === false
+    && question.semanticDuplicate === false
+    && question.humanReviewStatus === "approved";
+}
+
+function updateQuizSetupAvailability() {
+  if (!els.startQuizBtn) return;
+  const isFormalRole = state.quizMode === "role" && els.examType?.value === "formal";
+  const bank = els.roleBankSelect.value;
+  const count = state.allQuestions.filter((question) => question.bank === bank
+    && (question.role === state.currentUser?.role || question.role === "全员")
+    && isFormalRoleQuestion(question)).length;
+  const unavailable = isFormalRole && count < 1;
+  els.startQuizBtn.disabled = unavailable;
+  els.quizSetupStatus.textContent = unavailable
+    ? "当前岗位题库尚未完成审核，仅支持练习模式。"
+    : "";
 }
 
 async function startQuiz() {
@@ -1066,7 +1126,7 @@ async function startQuiz() {
       state.examLabelOverride = "岗位红线规则题库";
     } else if (state.quizMode === "product") {
       const bank = els.productBankSelect.value;
-      pool = state.allQuestions.filter((q) => q.bank === bank);
+      pool = state.allQuestions.filter((q) => q.bank === bank && productQuestionAllowedForRole(q));
       state.examLabelOverride = bank;
     } else if (state.quizMode === "role") {
       const bank = els.roleBankSelect.value;
@@ -1127,6 +1187,71 @@ function goToNextQuestion() {
       state.ruleFilters[key] = element.value;
       state.learnPage = 1;
       renderAll();
+    });
+  });
+}
+
+function productKnowledgeValue(questions, point) {
+  return questions.find((question) => question.knowledgePoint === point)?.answerText || "--";
+}
+
+function renderProductKnowledgeCards() {
+  const matchedCodes = new Set(state.filtered.map((question) => String(question.code || "")).filter(Boolean));
+  const allBankQuestions = state.allQuestions.filter((question) => question.bank === state.currentBank && matchedCodes.has(String(question.code || "")));
+  const grouped = new Map();
+  allBankQuestions.forEach((question) => {
+    const code = String(question.code || "");
+    if (!grouped.has(code)) grouped.set(code, []);
+    grouped.get(code).push(question);
+  });
+  const cards = [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right, "zh-CN", { numeric: true }));
+  const pageSize = 24;
+  const totalPages = Math.max(1, Math.ceil(cards.length / pageSize));
+  state.learnPage = Math.min(state.learnPage, totalPages);
+  const pageCards = cards.slice((state.learnPage - 1) * pageSize, state.learnPage * pageSize);
+  els.learnCount.textContent = `${cards.length} 个产品`;
+  if (!pageCards.length) {
+    els.learnList.innerHTML = `<div class="empty">没有找到匹配的产品。</div>`;
+    els.learnPagination.innerHTML = "";
+    return;
+  }
+  els.learnList.innerHTML = `<div class="product-knowledge-grid">${pageCards.map(([code, questions]) => {
+    const name = questions[0]?.productName || productKnowledgeValue(questions, "产品名称");
+    const image = questions.find((question) => question.questionImage)?.questionImage
+      || questions.find((question) => question.knowledgePoint === "看货号选图片")?.[`option${questions.find((q) => q.knowledgePoint === "看货号选图片")?.answer}Image`]
+      || "";
+    const peers = cards
+      .filter(([peerCode, peerQuestions]) => peerCode !== code && peerQuestions[0]?.productLine === questions[0]?.productLine)
+      .sort(([left], [right]) => Math.abs(Number(left) - Number(code)) - Math.abs(Number(right) - Number(code)))
+      .slice(0, 3)
+      .map(([peerCode]) => peerCode);
+    const roles = suitableRolesForProduct(questions);
+    return `<article class="product-knowledge-card">
+      ${image ? `<img src="${imagePath(image)}" alt="${escapeHtml(code)} ${escapeHtml(name)}" loading="lazy" decoding="async" />` : `<div class="product-image-empty">暂无产品图</div>`}
+      <div class="product-card-body">
+        <div class="meta"><span>${escapeHtml(questions[0]?.productLine || state.currentBank)}</span><span>${escapeHtml(code)}</span></div>
+        <h4>${escapeHtml(name)}</h4>
+        <dl>
+          <div><dt>净重</dt><dd>${escapeHtml(productKnowledgeValue(questions, "克重/净重"))}</dd></div>
+          <div><dt>箱规</dt><dd>${escapeHtml(productKnowledgeValue(questions, "箱规"))}</dd></div>
+          <div><dt>内配/口味</dt><dd>${escapeHtml(productKnowledgeValue(questions, "内配/口味"))}</dd></div>
+          <div><dt>保质期</dt><dd>${escapeHtml(productKnowledgeValue(questions, "保质期"))}</dd></div>
+          <div><dt>定位</dt><dd>${escapeHtml(questions[0]?.productLine || "--")}</dd></div>
+          <div><dt>易混货号</dt><dd>${escapeHtml(peers.join("、") || "--")}</dd></div>
+          <div><dt>适用岗位</dt><dd>${escapeHtml(roles.join("、") || "全员基础学习")}</dd></div>
+        </dl>
+      </div>
+    </article>`;
+  }).join("")}</div>`;
+  els.learnPagination.innerHTML = `
+    <button class="secondary-btn" data-page="prev" ${state.learnPage <= 1 ? "disabled" : ""}>上一页</button>
+    <span>第 ${state.learnPage} / ${totalPages} 页</span>
+    <button class="secondary-btn" data-page="next" ${state.learnPage >= totalPages ? "disabled" : ""}>下一页</button>`;
+  els.learnPagination.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.learnPage += button.dataset.page === "next" ? 1 : -1;
+      renderProductKnowledgeCards();
+      document.querySelector("#learnView")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
 }
@@ -1445,60 +1570,60 @@ function startMistakeQuiz() {
 
 let rankSortMode = "score";
 
+async function loadRanking() {
+  if (!state.currentUser || state.rankingLoading) return;
+  state.rankingLoading = true;
+  state.rankingError = "";
+  renderRanking();
+  try {
+    const data = await cloudRequest("ranking", {});
+    state.companyRanking = Array.isArray(data.ranking) ? data.ranking : [];
+    state.ownFormalHistory = Array.isArray(data.ownHistory) ? data.ownHistory : [];
+  } catch (error) {
+    state.rankingError = error.message || "公司正式考试记录暂时无法读取";
+  } finally {
+    state.rankingLoading = false;
+    renderRanking();
+  }
+}
+
 function renderRanking() {
   const listEl = document.querySelector("#rankingList");
   if (!listEl) return;
-
-  const allUsers = userStore.users;
-  const rows = Object.values(allUsers).map((user) => {
-    const records = JSON.parse(
-      localStorage.getItem(`jz_${user.phone}_exam_records`) || "[]"
-    );
-    if (!records.length) return null;
-    const best = records.reduce((a, b) => {
-      if (b.percent > a.percent) return b;
-      if (b.percent === a.percent && (b.duration ?? 99999) < (a.duration ?? 99999)) return b;
-      return a;
-    });
-    return { user, best, totalExams: records.length };
-  }).filter(Boolean);
-
-  if (rankSortMode === "time") {
-    rows.sort((a, b) => {
-      const ta = a.best.duration ?? 99999;
-      const tb = b.best.duration ?? 99999;
-      if (ta !== tb) return ta - tb;
-      return b.best.percent - a.best.percent;
-    });
-  } else {
-    rows.sort((a, b) => {
-      if (b.best.percent !== a.best.percent) return b.best.percent - a.best.percent;
-      return (a.best.duration ?? 99999) - (b.best.duration ?? 99999);
-    });
-  }
-
-  if (!rows.length) {
-    listEl.innerHTML = `<div class="empty">还没有考核记录，完成一次考核后即可上榜。</div>`;
-    return;
-  }
-
-  const medalClass = (i) => (i === 0 ? " rank-gold" : i === 1 ? " rank-silver" : i === 2 ? " rank-bronze" : "");
-  const medalLabel = (i) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : String(i + 1));
-
-  listEl.innerHTML = rows.map(({ user, best, totalExams }, i) => `
+  const rows = [...state.companyRanking];
+  rows.sort((a, b) => rankSortMode === "time"
+    ? (Number(a.duration ?? 99999) - Number(b.duration ?? 99999)) || (Number(b.percent) - Number(a.percent))
+    : (Number(b.percent) - Number(a.percent)) || (Number(a.duration ?? 99999) - Number(b.duration ?? 99999)));
+  const localPractice = storage.examRecords.filter((record) => record.type !== "正式考试");
+  const rankingRows = state.rankingLoading
+    ? `<div class="empty">正在读取公司正式考试记录...</div>`
+    : state.rankingError
+      ? `<div class="empty">${escapeHtml(state.rankingError)}</div>`
+      : rows.length ? rows.map((row, i) => `
     <div class="rank-row${i < 3 ? " rank-top" : ""}">
-      <div class="rank-num${medalClass(i)}">${medalLabel(i)}</div>
+      <div class="rank-num${i === 0 ? " rank-gold" : i === 1 ? " rank-silver" : i === 2 ? " rank-bronze" : ""}">${i + 1}</div>
       <div class="rank-info">
-        <strong>${escapeHtml(user.name)}</strong>
-        <span>${escapeHtml(user.role)} · 考核 ${totalExams} 次</span>
+        <strong>${escapeHtml(row.name)}</strong>
+        <span>${escapeHtml(row.role)} · 正式考试 ${Number(row.totalExams || 0)} 次</span>
       </div>
       <div class="rank-mid">
-        <span class="rank-bank">${escapeHtml(best.bank || "")}</span>
-        <span class="rank-detail-time">${best.duration != null ? "⏱ " + formatTime(best.duration) : ""}</span>
+        <span class="rank-bank">${escapeHtml(row.bank || "")}</span>
+        <span class="rank-detail-time">${row.duration != null ? formatTime(Number(row.duration)) : ""}</span>
       </div>
-      <div class="rank-score${best.percent >= 90 ? " rank-score-high" : ""}">${best.percent}<small>分</small></div>
+      <div class="rank-score${Number(row.percent) >= 90 ? " rank-score-high" : ""}">${Number(row.percent || 0)}<small>分</small></div>
     </div>
-  `).join("");
+  `).join("") : `<div class="empty">还没有公司正式考试记录。</div>`;
+  const historyRows = state.ownFormalHistory.length
+    ? state.ownFormalHistory.map((record) => `<div class="history-row"><strong>${Number(record.percent || 0)}分</strong><span>${escapeHtml(record.bank || "正式考试")}</span><span>${Number(record.total || 0)}题 · ${formatTime(Number(record.duration || 0))}</span><time>${escapeHtml(record.finishedAt || "")}</time></div>`).join("")
+    : `<div class="empty">你还没有正式考试记录。</div>`;
+  const practiceRows = localPractice.length
+    ? localPractice.slice(0, 30).map((record) => `<div class="history-row"><strong>${Number(record.percent || 0)}分</strong><span>${escapeHtml(record.bank || "练习模式")}</span><span>${Number(record.total || 0)}题 · ${formatTime(Number(record.duration || 0))}</span><time>${escapeHtml(examTimeLabel(record.finishedAt))}</time></div>`).join("")
+    : `<div class="empty">当前设备还没有练习记录。</div>`;
+
+  listEl.innerHTML = `
+    <section class="ranking-section"><div class="ranking-section-head"><div><h4>公司正式考试排行榜</h4><p>来自公司账号系统，仅统计正式考试。</p></div><div class="rank-sort-btns"><button class="rank-sort-btn" data-sort="score">按分数</button><button class="rank-sort-btn" data-sort="time">按用时</button></div></div>${rankingRows}</section>
+    <section class="ranking-section"><div class="ranking-section-head"><div><h4>我的正式考试历史</h4><p>来自公司账号系统，换设备后仍可查看。</p></div></div><div class="history-list">${historyRows}</div></section>
+    <section class="ranking-section"><div class="ranking-section-head"><div><h4>本机练习记录</h4><p>仅保存在当前设备浏览器，不计入公司排名。</p></div></div><div class="history-list">${practiceRows}</div></section>`;
 
   document.querySelectorAll(".rank-sort-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.sort === rankSortMode);
@@ -1716,6 +1841,7 @@ function switchView(view) {
     els.quizResult.classList.add("hidden");
   }
   if (view === "ranking") renderRanking();
+  if (view === "ranking") loadRanking();
   if (view === "mistakes") renderMistakes();
   if (view === "admin") {
     loadCloudStats().then(renderAdmin);
@@ -1730,6 +1856,7 @@ function renderAll() {
   renderLearnList();
   renderMistakes();
   renderAdmin();
+  if (state.currentView === "ranking") renderRanking();
 }
 
 function renderUser() {
@@ -1799,6 +1926,7 @@ function saveAuthenticatedUser(data) {
   state.currentUser = user;
   reconcileStoredQuestions();
   applyAdminAccess();
+  renderQuizSetup();
 }
 
 const passwordError = (password) => {
@@ -1951,8 +2079,11 @@ function bindEvents() {
       els.modeRandom.classList.toggle("hidden", state.quizMode !== "random");
       els.modeProduct.classList.toggle("hidden", state.quizMode !== "product");
       els.modeRole.classList.toggle("hidden", state.quizMode !== "role");
+      renderQuizSetup();
     });
   });
+  els.examType?.addEventListener("change", renderQuizSetup);
+  els.roleBankSelect?.addEventListener("change", updateQuizSetupAvailability);
   els.clearMistakesBtn.addEventListener("click", () => {
     if (!window.confirm("确定清空当前账号的全部错题吗？此操作不能撤销。")) return;
     storage.mistakes = [];
