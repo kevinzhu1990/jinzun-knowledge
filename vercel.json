@@ -24,14 +24,6 @@
     "api/internal-practice-setup.js": {
       "includeFiles": "outputs/**/*.json",
       "maxDuration": 60
-    },
-    "api/questions.js": {
-      "includeFiles": "outputs/**/*.json",
-      "maxDuration": 60
-    },
-    "api/admin-questions.js": {
-      "includeFiles": "outputs/**/*.json",
-      "maxDuration": 60
     }
   }
 }

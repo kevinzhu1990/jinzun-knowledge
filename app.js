@@ -650,10 +650,12 @@ async function cloudRequest(action, payload) {
   };
   if (requestToken) requestPayload.token = requestToken;
   const body = JSON.stringify(requestPayload);
+  const directApiActions = new Set(["login", "register", "reset", "exam-start", "exam-submit", "mistakes", "practice-submit"]);
+  const endpoint = directApiActions.has(action) ? action : `cloud?action=${encodeURIComponent(action)}`;
   let lastError = null;
   for (const base of API_BASES) {
     try {
-      const res = await fetchWithTimeout(`${base}/api/${action}`, {
+      const res = await fetchWithTimeout(`${base}/api/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(requestToken ? { Authorization: `Bearer ${requestToken}` } : {}) },
         body,
