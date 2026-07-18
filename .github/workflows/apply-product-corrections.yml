@@ -3,6 +3,7 @@ name: Apply product corrections
 on:
   push:
     branches:
+      - main
       - fix/product-2608-correction
 
 permissions:
@@ -10,12 +11,13 @@ permissions:
 
 jobs:
   correct-product-data:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          ref: fix/product-2608-correction
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -38,11 +40,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add outputs/product_quiz assets/product-images/daily/2608.jpg package.json scripts/apply_product_corrections.js tests/test_product_data_corrections.js
+          git add outputs/product_quiz assets/product-images/daily/2608.jpg
           git rm --ignore-unmatch assets/product-images/daily/2576.jpg
           if git diff --cached --quiet; then
             echo "No generated corrections to commit."
             exit 0
           fi
           git commit -m "fix: publish corrected product data"
-          git push origin HEAD:fix/product-2608-correction
+          git push origin HEAD:${{ github.ref_name }}
