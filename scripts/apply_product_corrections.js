@@ -45,9 +45,26 @@ function normalize0206Question(question) {
   return normalized;
 }
 
+function merchantCodeReferences(value) {
+  return [...String(value || '').matchAll(/(?<!\d)(\d{4})(?!\d)/g)].map((match) => match[1]);
+}
+
+function merchantNameReferences(value) {
+  return [...String(value || '').matchAll(/(?:^|\D)(\d{4})(?!\d)(?!\s*(?:g|克|cm|年|款))/gi)].map((match) => match[1]);
+}
+
 function correctProductQuestions(questions) {
   if (!Array.isArray(questions)) throw new TypeError('Product questions must be an array');
-  return questions.map((question) => normalize0206Question(normalize2608Question(question)));
+  const normalized = questions.map((question) => normalize0206Question(normalize2608Question(question)));
+  const activeCodes = new Set(normalized
+    .filter((question) => ['月饼题库', '日常年货题库'].includes(question.bank) && question.knowledgePoint === '产品名称')
+    .map((question) => String(question.code || '')));
+  return normalized.filter((question) => {
+    if (question.bank !== '商家编码题库') return true;
+    const codeReferences = merchantCodeReferences(question.answerText);
+    const references = [...new Set([...codeReferences, ...merchantNameReferences(question.productName)])];
+    return codeReferences.length > 0 && references.every((code) => activeCodes.has(code));
+  });
 }
 
 function findProductQuizFile(root) {
@@ -92,4 +109,4 @@ if (require.main === module) {
   console.log(JSON.stringify(result));
 }
 
-module.exports = { correctProductQuestions, applyProductCorrections };
+module.exports = { correctProductQuestions, applyProductCorrections, merchantCodeReferences, merchantNameReferences };

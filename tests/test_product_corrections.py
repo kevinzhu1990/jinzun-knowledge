@@ -133,3 +133,23 @@ def test_image_choice_questions_only_show_answer_letters():
     for question in image_questions:
         assert all(not question.get(f"option{letter}") for letter in "ABCD")
         assert all(question.get(f"option{letter}Image") for letter in "ABCD")
+
+
+def test_merchant_codes_only_reference_active_products():
+    questions = load_product_questions()
+    active_codes = {
+        str(question["code"])
+        for question in questions
+        if question.get("bank") in {"月饼题库", "日常年货题库"}
+        and question.get("knowledgePoint") == "产品名称"
+    }
+    merchant_questions = [question for question in questions if question.get("bank") == "商家编码题库"]
+    assert merchant_questions
+    assert len(merchant_questions) < 715
+    for question in merchant_questions:
+        name_references = generator.merchant_name_references(question.get("productName", ""))
+        assert name_references <= active_codes, (question.get("id"), "productName", name_references - active_codes)
+        for field in ("answerText", "optionA", "optionB", "optionC", "optionD"):
+            references = generator.merchant_code_references(question.get(field, ""))
+            assert references, (question.get("id"), field)
+            assert references <= active_codes, (question.get("id"), field, references - active_codes)

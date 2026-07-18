@@ -59,6 +59,51 @@ const fixture = [
     answerText: '2545在售产品',
     explanation: '2545为在售产品。',
   },
+  {
+    id: 'P-MERCHANT-2576',
+    bank: '商家编码题库',
+    code: 'JZ-2576*2+2545',
+    productName: '2576杏仁饼两盒+2545在售产品',
+    knowledgePoint: '商家编码',
+    question: '组合对应的商家编码是什么？',
+    optionA: 'JZ-2576*2+2545',
+    optionB: 'JZ-2576+2545*2',
+    optionC: 'JZ-2576*4',
+    optionD: 'JZ-2545*4',
+    answer: 'A',
+    answerText: 'JZ-2576*2+2545',
+    explanation: '组合编码为JZ-2576*2+2545。',
+  },
+  {
+    id: 'P-MERCHANT-INACTIVE',
+    bank: '商家编码题库',
+    code: 'JZ-9999*2',
+    productName: '停售产品两盒',
+    knowledgePoint: '商家编码',
+    question: '停售组合对应的商家编码是什么？',
+    optionA: 'JZ-9999*2',
+    optionB: 'JZ-9999*4',
+    optionC: 'JZ-2545*2',
+    optionD: 'JZ-2608*2',
+    answer: 'A',
+    answerText: 'JZ-9999*2',
+    explanation: '停售编码。',
+  },
+  {
+    id: 'P-MERCHANT-INACTIVE-NAME',
+    bank: '商家编码题库',
+    code: 'JZ-2608*2+LD',
+    productName: '2608杏仁饼两盒+2490礼袋',
+    knowledgePoint: '商家编码',
+    question: '含停售礼袋货号的组合编码是什么？',
+    optionA: 'JZ-2608*2+LD',
+    optionB: 'JZ-2608*4',
+    optionC: 'JZ-2545*2',
+    optionD: 'JZ-2608+2545',
+    answer: 'A',
+    answerText: 'JZ-2608*2+LD',
+    explanation: '组合名称包含停售货号。',
+  },
 ];
 
 const corrected = correctProductQuestions(fixture);
@@ -70,6 +115,11 @@ assert.equal(almond.answerText, '杏仁饼258g');
 assert.equal(almond.questionImage, 'assets/product-images/daily/2608.jpg');
 assert.equal(JSON.stringify(corrected).includes('2576'), false, '题库不得残留2576');
 assert.equal(corrected.some((question) => question.code === '2545'), true, '2545必须保留在售');
+const merchant2608 = corrected.find((question) => question.id === 'P-MERCHANT-2608');
+assert.ok(merchant2608, '含2576的组合编码必须更新为2608后保留');
+assert.equal(merchant2608.answerText, 'JZ-2608*2+2545');
+assert.equal(corrected.some((question) => question.id === 'P-MERCHANT-INACTIVE'), false, '停售货号商家编码必须删除');
+assert.equal(corrected.some((question) => question.id === 'P-MERCHANT-INACTIVE-NAME'), false, '组合名称含停售货号也必须删除');
 
 const mooncake = corrected.find((question) => question.id === 'P-0206-NET');
 assert.equal(mooncake.answerText, '800g');

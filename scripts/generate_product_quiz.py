@@ -4,7 +4,7 @@ from datetime import datetime,timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from balance_quiz_options import balance_questions
+from balance_quiz_options import balance_questions,rebalance_total
 
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=Path(os.environ.get('JINZUN_SOURCE_XLSX',str(ROOT.parent/'26年金尊产品信息表（月饼+饼干）20260709更新.xlsx')))
@@ -34,6 +34,14 @@ def k(v): return re.sub(r'[\s：:；;（）()/\\_\-]+','',clean(v)).lower()
 def code(v):
     s=clean(v); s=s[:-2] if re.fullmatch(r'\d+\.0',s) else s
     return s.zfill(4) if s.isdigit() and len(s)<4 else s
+def merchant_code_references(value):
+    return set(re.findall(r'(?<!\d)(\d{4})(?!\d)',clean(value)))
+def merchant_name_references(value):
+    return set(re.findall(r'(?<!\d)(\d{4})(?!\d)(?!\s*(?:g|克|cm|年|款))',clean(value),re.I))
+def active_merchant_code(value,active_codes,name=''):
+    code_references=merchant_code_references(value)
+    all_references=code_references|merchant_name_references(name)
+    return bool(code_references) and all_references<=set(active_codes)
 def strings(z):
     if 'xl/sharedStrings.xml' not in z.namelist(): return []
     r=ET.fromstring(z.read('xl/sharedStrings.xml'))
@@ -160,7 +168,9 @@ def main():
         module=get(r,'模块'); value=get(r,'统一共性卖点')
         if module and value:
             qs.append(q('品牌题库','品牌资料','品牌介绍',module,'金尊品牌','品牌口径',f'品牌资料“{module}”的统一口径是什么？',value,brand_values,'品牌介绍'))
-    merchant_rows=data.get('商家编码',[])
+    merchant_source_rows=data.get('商家编码',[])
+    active_codes=set(by)
+    merchant_rows=[r for r in merchant_source_rows if active_merchant_code(get(r,'商家编码'),active_codes,get(r,'组合装名称'))]
     merchant_codes=[get(r,'商家编码') for r in merchant_rows if get(r,'商家编码')]
     for r in merchant_rows:
         combo=get(r,'组合装名称'); merchant=get(r,'商家编码')
@@ -174,7 +184,9 @@ def main():
     if len({question['id'] for question in qs}) != len(qs):
         raise ValueError('Product question IDs are not unique after code normalization')
     qs=balance_questions(qs,seed='20260718-product-answers',group_by_bank=False)
+    role_file=ROOT/'outputs/role_quiz/岗位学习考核题库.json'
+    if role_file.is_file():rebalance_total(qs,json.loads(role_file.read_text(encoding='utf-8')))
     baseline_questions=int(os.environ.get('JINZUN_BASELINE_QUESTIONS',len(old)))
-    report={'source':str(SOURCE),'sourceSha256':hashlib.sha256(SOURCE.read_bytes()).hexdigest(),'generatedAt':datetime.now(timezone.utc).isoformat(),'version':VERSION,'sheets':{k:len(v) for k,v in data.items()},'beforeProducts':len(before),'afterProducts':len(after),'beforeQuestions':baseline_questions,'afterQuestions':len(qs),'deletedOldQuestions':max(0,baseline_questions-len(qs)),'newProducts':sorted(after-before),'deletedProducts':sorted(before-after),'missingSourceFields':sorted({f for x in items for f in ('carton','contents','net','shelf','size') if not x[f]}),'imageWarnings':missing,'corrections':{'2576':'2608杏仁饼258g','2605':'按最新Excel生成','2621':'按最新Excel生成','26年散饼':'工作表内全部货号归为月饼-散饼'}}
+    report={'source':str(SOURCE),'sourceSha256':hashlib.sha256(SOURCE.read_bytes()).hexdigest(),'generatedAt':datetime.now(timezone.utc).isoformat(),'version':VERSION,'sheets':{k:len(v) for k,v in data.items()},'beforeProducts':len(before),'afterProducts':len(after),'beforeQuestions':baseline_questions,'afterQuestions':len(qs),'deletedOldQuestions':max(0,baseline_questions-len(qs)),'newProducts':sorted(after-before),'deletedProducts':sorted(before-after),'missingSourceFields':sorted({f for x in items for f in ('carton','contents','net','shelf','size') if not x[f]}),'imageWarnings':missing,'merchantCodes':{'sourceRows':len(merchant_source_rows),'activeRows':len(merchant_rows),'deletedInactiveRows':len(merchant_source_rows)-len(merchant_rows)},'corrections':{'2576':'2608杏仁饼258g','2605':'按最新Excel生成','2621':'按最新Excel生成','26年散饼':'工作表内全部货号归为月饼-散饼','商家编码':'仅保留当前在售货号及全部由在售货号组成的组合编码'}}
     PRODUCT_JSON.write_text(json.dumps(qs,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');write_xlsx(PRODUCT_XLSX,qs);AUDIT.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');DIFF_JSON.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');DIFF_MD.write_text('# Product Sync Diff 20260713\n\n'+json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');print(json.dumps({'activeProducts':len(after),'questions':len(qs),'imageWarnings':missing},ensure_ascii=False))
 if __name__=='__main__':main()

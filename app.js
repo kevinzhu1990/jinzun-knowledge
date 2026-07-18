@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260718-memory-learning-center-b1";
+const BUILD_VERSION = "20260718-merchant-active-cards1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -1368,26 +1368,37 @@ function renderProductLearning() {
 
 function merchantLearningEntities() {
   const productNames = new Map(state.allQuestions.filter((q) => q.knowledgePoint === "产品名称" && q.code).map((q) => [String(q.code), q.productName || q.answerText]));
+  const matchedQuestionIds = new Set(state.filtered.map((question) => question.id));
   const groups = new Map();
-  state.filtered.forEach((question) => {
-    const match = String(question.answerText || "").match(/^JZ-(\d{4})/);
-    const code = match?.[1] || String(question.code || "其他");
+  state.allQuestions.filter((question) => question.bank === state.currentBank).forEach((question) => {
+    const code = String(question.answerText || "").match(/\d{4}/)?.[0] || "其他";
     if (!groups.has(code)) groups.set(code, []);
     groups.get(code).push(question);
   });
-  return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right, "zh-CN", { numeric: true })).map(([code, questions]) => ({
-    id: `merchant|${code}`,
-    code,
-    name: productNames.get(code) || questions[0]?.productName || `货号 ${code}`,
-    single: questions.find((q) => !String(q.answerText).includes("+") && !String(q.answerText).includes("*")),
-    multi: questions.find((q) => !String(q.answerText).includes("+") && String(q.answerText).includes("*")),
-    combo: questions.find((q) => String(q.answerText).includes("+")),
-    questions,
-  }));
+  return [...groups.entries()]
+    .filter(([, questions]) => questions.some((question) => matchedQuestionIds.has(question.id)))
+    .sort(([left], [right]) => left.localeCompare(right, "zh-CN", { numeric: true })).map(([code, questions]) => {
+    const singles = questions.filter((q) => !String(q.answerText).includes("+") && !String(q.answerText).includes("*"));
+    return {
+      id: `merchant|${code}`,
+      code,
+      singleCode: singles[0]?.answerText || code,
+      name: productNames.get(code) || questions[0]?.productName || `货号 ${code}`,
+      singles,
+      multiples: questions.filter((q) => !String(q.answerText).includes("+") && String(q.answerText).includes("*")),
+      combos: questions.filter((q) => String(q.answerText).includes("+")),
+      questions,
+    };
+  });
 }
 
 function merchantExample(question) {
-  return question ? `<div><span>${escapeHtml(question.productName || "组合")}</span><strong>${escapeHtml(question.answerText)}</strong></div>` : "";
+  return `<div class="merchant-example-row"><span>${escapeHtml(question.productName || "组合")}</span><strong>${escapeHtml(question.answerText)}</strong></div>`;
+}
+
+function merchantExampleGroup(title, questions) {
+  if (!questions.length) return "";
+  return `<section class="merchant-example-group"><h5>${title}<small>${questions.length} 个</small></h5><div class="merchant-example-list">${questions.map(merchantExample).join("")}</div></section>`;
 }
 
 function renderMerchantLearning() {
@@ -1400,13 +1411,13 @@ function renderMerchantLearning() {
     els.learnList.innerHTML = `<div class="empty">${state.learnMode === "review" ? "当前没有待复习的商家编码。" : "没有找到匹配的编码资料。"}</div>`;
     return;
   }
-  const ruleStrip = `<div class="encoding-rule-strip"><div><span>单品</span><strong>JZ-货号</strong></div><div><span>多盒</span><strong>JZ-货号*数量</strong></div><div><span>组合</span><strong>JZ-货号*数量+其他货号</strong></div></div>`;
+  const ruleStrip = `<div class="encoding-rule-strip"><div><span>单品</span><strong>年份N-JZ-货号</strong></div><div><span>多盒</span><strong>JZ-货号*数量</strong></div><div><span>组合</span><strong>JZ-货号*数量+其他货号</strong></div></div>`;
   if (state.learnMode === "compare") {
-    els.learnList.innerHTML = `${ruleStrip}<div class="learning-table-wrap"><table class="learning-compare-table"><thead><tr><th>基础货号</th><th>产品</th><th>单品</th><th>多盒装</th><th>组合装示例</th></tr></thead><tbody>${pageItems.map((item) => `<tr><td><strong>${escapeHtml(item.code)}</strong></td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.single?.answerText || `JZ-${item.code}`)}</td><td>${escapeHtml(item.multi?.answerText || "--")}</td><td>${escapeHtml(item.combo?.answerText || "--")}</td></tr>`).join("")}</tbody></table></div>`;
+    els.learnList.innerHTML = `${ruleStrip}<div class="learning-table-wrap"><table class="learning-compare-table"><thead><tr><th>货号</th><th>产品</th><th>单品编码</th><th>多盒编码</th><th>组合编码</th></tr></thead><tbody>${pageItems.map((item) => `<tr><td><strong>${escapeHtml(item.code)}</strong></td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.singles.map((q) => q.answerText).join("；") || "--")}</td><td>${escapeHtml(item.multiples.map((q) => q.answerText).join("；") || "--")}</td><td>${escapeHtml(item.combos.map((q) => q.answerText).join("；") || "--")}</td></tr>`).join("")}</tbody></table></div>`;
   } else if (state.learnMode === "flash") {
-    els.learnList.innerHTML = `${ruleStrip}<div class="memory-flash-grid">${pageItems.map((item) => `<article class="memory-flash-card"><div class="flash-front"><span>基础货号</span><strong>${escapeHtml(item.code)}</strong><h4>${escapeHtml(item.name)}</h4></div><div class="flash-back"><div class="merchant-examples">${merchantExample(item.single)}${merchantExample(item.multi)}${merchantExample(item.combo)}</div>${learningActionButtons(item.id)}</div><button type="button" class="flash-reveal-btn" data-reveal-card>查看要点</button></article>`).join("")}</div>`;
+    els.learnList.innerHTML = `${ruleStrip}<div class="memory-flash-grid">${pageItems.map((item) => `<article class="memory-flash-card"><div class="flash-front"><span>在售货号</span><strong>${escapeHtml(item.code)}</strong><h4>${escapeHtml(item.name)}</h4></div><div class="flash-back"><div class="merchant-examples">${merchantExampleGroup("单品编码", item.singles)}${merchantExampleGroup("多盒编码", item.multiples)}${merchantExampleGroup("组合编码", item.combos)}</div>${learningActionButtons(item.id)}</div><button type="button" class="flash-reveal-btn" data-reveal-card>查看全部编码</button></article>`).join("")}</div>`;
   } else {
-    els.learnList.innerHTML = `${ruleStrip}<div class="merchant-learning-grid">${pageItems.map((item) => `<article class="merchant-knowledge-card"><div class="merchant-card-head"><div><span>基础货号</span><strong>${escapeHtml(item.code)}</strong></div><h4>${escapeHtml(item.name)}</h4></div><div class="merchant-examples">${merchantExample(item.single)}${merchantExample(item.multi)}${merchantExample(item.combo)}</div>${learningActionButtons(item.id)}</article>`).join("")}</div>`;
+    els.learnList.innerHTML = `${ruleStrip}<div class="merchant-learning-grid">${pageItems.map((item) => `<article class="merchant-knowledge-card"><div class="merchant-card-head"><div><span>商品编码</span><strong>${escapeHtml(item.singleCode)}</strong></div><h4><small>货号 ${escapeHtml(item.code)}</small>${escapeHtml(item.name)}</h4></div><div class="merchant-examples">${merchantExampleGroup("单品编码", item.singles)}${merchantExampleGroup("多盒编码", item.multiples)}${merchantExampleGroup("组合编码", item.combos)}</div>${learningActionButtons(item.id)}</article>`).join("")}</div>`;
   }
   bindLearningInteractions();
 }

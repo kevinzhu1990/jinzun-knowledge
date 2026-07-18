@@ -35,6 +35,13 @@ def main():
         if q.get('code') and q.get('bank') in ('月饼题库','日常年货题库') and q.get('code') not in active: errors.append(f"{q.get('id')}使用源表外货号")
         if q.get('knowledgePoint')=='保质期' and q.get('code') in source_shelf and q.get('answerText')!=source_shelf[q.get('code')]:
             errors.append(f"{q.get('id')}保质期与源表不一致：题库{q.get('answerText')}源表{source_shelf[q.get('code')]}")
+        if q.get('bank')=='商家编码题库':
+            name_references=generator.merchant_name_references(q.get('productName',''))
+            if not name_references<=active:errors.append(f"{q.get('id')} 组合名称包含停售货号：{sorted(name_references-active)}")
+            for field in ('answerText','optionA','optionB','optionC','optionD'):
+                references=generator.merchant_code_references(q.get(field,''))
+                if not references:errors.append(f"{q.get('id')} {field}没有可识别的在售货号")
+                elif not references<=active:errors.append(f"{q.get('id')} {field}包含停售货号：{sorted(references-active)}")
     product_codes={str(q.get('code')) for q in qs if q.get('bank') in ('月饼题库','日常年货题库') and q.get('knowledgePoint')=='产品名称'}
     image_codes={str(q.get('code')) for q in qs if q.get('bank') in ('月饼题库','日常年货题库') and q.get('knowledgePoint')=='看图片选货号'}
     moon={str(q.get('code')) for q in qs if q.get('bank')=='月饼题库'}
@@ -47,7 +54,8 @@ def main():
     for forbidden in (chr(0x76ee)+chr(0x997c),'150g'+chr(0x514b),'2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+chr(0x5c0f)+chr(0x76d2)+chr(0x88c5)+'258g','2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g'):
         if forbidden in text: errors.append(f'存在禁用旧文字：{forbidden}')
     if '"code": "2608"' not in text or '杏仁饼258g' not in text: errors.append('2608杏仁饼资料未正确生成')
-    result={'ok':not errors,'source':str(SOURCE),'activeProducts':len(active),'productQuestions':len(qs),'productCodes':len(product_codes),'mooncakeCodes':len(moon),'errors':errors}
+    merchant_questions=sum(q.get('bank')=='商家编码题库' for q in qs)
+    result={'ok':not errors,'source':str(SOURCE),'activeProducts':len(active),'productQuestions':len(qs),'merchantQuestions':merchant_questions,'productCodes':len(product_codes),'mooncakeCodes':len(moon),'errors':errors}
     print(json.dumps(result,ensure_ascii=False,indent=2))
     if errors: raise SystemExit(1)
 if __name__=='__main__': main()

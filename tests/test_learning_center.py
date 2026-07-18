@@ -53,6 +53,13 @@ def test_learning_center_supports_memory_actions_and_review_queue():
 
 def test_merchant_code_learning_includes_three_core_rules():
     app = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert "JZ-货号</strong>" in app
+    assert "年份N-JZ-货号</strong>" in app
     assert "JZ-货号*数量</strong>" in app
     assert "JZ-货号*数量+其他货号</strong>" in app
+    assert "const singles = questions.filter" in app
+    assert "multiples: questions.filter" in app
+    assert "combos: questions.filter" in app
+    assert "singleCode: singles[0]?.answerText || code" in app
+    assert "merchantExampleGroup(\"多盒编码\", item.multiples)" in app
+    assert "merchantExampleGroup(\"组合编码\", item.combos)" in app
+    assert "matchedQuestionIds.has(question.id)" in app
