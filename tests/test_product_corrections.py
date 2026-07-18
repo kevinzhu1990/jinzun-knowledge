@@ -5,14 +5,27 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_product_questions():
-    path = next(ROOT.joinpath("outputs", "product_quiz").glob("*.json"))
-    return json.loads(path.read_text(encoding="utf-8"))
+    for path in ROOT.joinpath("outputs", "product_quiz").glob("*.json"):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            return data
+    raise AssertionError("product question JSON not found")
+
+
+def test_retired_2576_is_fully_replaced_by_2608():
+    questions = load_product_questions()
+    serialized = json.dumps(questions, ensure_ascii=False)
+    assert "2576" not in serialized
+    current = [q for q in questions if str(q.get("code")) == "2608"]
+    assert current
+    assert all(q.get("productName") == "杏仁饼258g" for q in current)
 
 
 def test_every_active_question_has_four_visible_options():
-    files = [next(ROOT.joinpath("outputs", "product_quiz").glob("*.json")), next(ROOT.joinpath("outputs", "role_quiz").glob("岗位学习考核题库.json"))]
-    for path in files:
-        for question in json.loads(path.read_text(encoding="utf-8")):
+    role_path = next(ROOT.joinpath("outputs", "role_quiz").glob("岗位学习考核题库.json"))
+    banks = [load_product_questions(), json.loads(role_path.read_text(encoding="utf-8"))]
+    for questions in banks:
+        for question in questions:
             assert all(question.get(f"option{letter}") or question.get(f"option{letter}Image") for letter in "ABCD"), question.get("id")
 
 

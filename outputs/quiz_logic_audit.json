@@ -1,7 +1,7 @@
 {
   "source": "D:\\360MoveData\\Users\\PC\\Desktop\\26年金尊产品信息表（月饼+饼干）20260709更新.xlsx",
   "sourceSha256": "5c19b4f92ce6ec4c20e50857c9b8411070fa388bdc800aaa00695310adf0e86f",
-  "generatedAt": "2026-07-14T00:36:52.066892+00:00",
+  "generatedAt": "2026-07-18T04:09:17.754019+00:00",
   "version": "20260714-product-sync",
   "sheets": {
     "26年月饼礼盒": 39,
@@ -12,8 +12,8 @@
   },
   "beforeProducts": 73,
   "afterProducts": 73,
-  "beforeQuestions": 1419,
-  "afterQuestions": 1419,
+  "beforeQuestions": 1372,
+  "afterQuestions": 1372,
   "deletedOldQuestions": 0,
   "newProducts": [],
   "deletedProducts": [],

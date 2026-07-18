@@ -104,9 +104,8 @@
     }
   ],
   "status": "partial-platform-rules-pending",
-  "semanticDuplicateGroups": 1,
-  "semanticDuplicateQuestionCount": 2,
+  "semanticDuplicateGroups": 0,
+  "semanticDuplicateQuestionCount": 0,
   "fixedDistractorRepeatCounts": {},
   "formalExamQuestions": 130
 }
-

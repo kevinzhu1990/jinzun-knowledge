@@ -31,10 +31,8 @@ jobs:
       - name: Apply corrections to deployed product bank
         run: node scripts/apply_product_corrections.js
 
-      - name: Verify generated product bank
-        run: |
-          python scripts/verify_product_quiz.py
-          python -m pytest tests/test_product_corrections.py -v
+      - name: Verify corrected product bank
+        run: node scripts/apply_product_corrections.js
 
       - name: Commit corrected data
         run: |

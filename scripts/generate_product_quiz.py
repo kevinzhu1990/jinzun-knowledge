@@ -3,8 +3,10 @@ import hashlib,json,os,re,zipfile,xml.etree.ElementTree as ET
 from datetime import datetime,timezone
 from pathlib import Path
 
+from balance_quiz_options import balance_questions
+
 ROOT=Path(__file__).resolve().parents[1]
-SOURCE=Path(os.environ.get('JINZUN_SOURCE_XLSX',str(ROOT.parents[1]/'26年金尊产品信息表（月饼+饼干）20260709更新.xlsx')))
+SOURCE=Path(os.environ.get('JINZUN_SOURCE_XLSX',str(ROOT.parent/'26年金尊产品信息表（月饼+饼干）20260709更新.xlsx')))
 VERSION='20260714-product-sync'
 SOURCE_LABEL=SOURCE.stem
 OUT=ROOT/'outputs/product_quiz'
@@ -14,13 +16,18 @@ AUDIT=ROOT/'outputs/quiz_logic_audit.json'
 DIFF_JSON=OUT/'product_sync_diff_20260713.json'
 DIFF_MD=OUT/'product_sync_diff_20260713.md'
 NS={'a':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+RETIRED_CODE='2576'
+CANONICAL_CODE='2608'
+CANONICAL_NAME='\u674f\u4ec1\u997c258g'
+CANONICAL_LABEL=CANONICAL_CODE+CANONICAL_NAME
 
 def clean(v):
     s='' if v is None else str(v); s=re.sub(r'\r?\n+','；',s); s=re.sub(r'\s+',' ',s).strip()
     s=s.replace(chr(0x76ee)+chr(0x997c),chr(0x6708)+chr(0x997c)); s=re.sub(r'(\d+)g'+chr(0x514b),r'\1g',s)
-    s=s.replace('2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+chr(0x5c0f)+chr(0x76d2)+chr(0x88c5)+'258g','2576：2608'+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g')
-    s=s.replace('2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g','2576：2608'+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g')
-    s=re.sub('2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+r'(?:小盒装)?258(?:g)?(?:\*?\d+|[一二三四五六]盒)?','2576：2608'+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g',s)
+    s=s.replace(RETIRED_CODE,CANONICAL_CODE)
+    s=re.sub(CANONICAL_CODE+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+r'(?:小盒装)?258g?',CANONICAL_LABEL,s)
+    s=s.replace(CANONICAL_CODE+'：'+CANONICAL_LABEL,CANONICAL_LABEL)
+    s=s.replace(CANONICAL_CODE+':'+CANONICAL_LABEL,CANONICAL_LABEL)
     return '' if s.lower() in {'none','nan'} else s.strip('； ')
 def k(v): return re.sub(r'[\s：:；;（）()/\\_\-]+','',clean(v)).lower()
 def code(v):
@@ -85,7 +92,7 @@ def q(bank,cat,pl,cd,name,kp,text,correct,pool,note=''):
 def product(row,bank,sheet):
     cd=code(get(row,'货号')); name=get(row,'产品名称')
     if not cd or not name:return None
-    if cd=='2576':name='2608杏仁饼258g'
+    if cd==CANONICAL_CODE:name=CANONICAL_NAME
     moon=bank=='月饼题库'; size=get(row,'产品尺寸长宽高CM','产品尺寸；长宽高cm','产品尺寸长宽高cm')
     if sheet=='26年散饼' and not size:
         ds=[get(row,'长'),get(row,'宽'),get(row,'高')]; size='*'.join(ds) if all(ds) else ''
@@ -146,6 +153,11 @@ def main():
     excluded_mooncake_points={'尺寸/外箱','整箱重量','箱重','毛重'}
     qs=[question for question in qs if not (question.get('bank')=='月饼题库' and question.get('knowledgePoint') in excluded_mooncake_points)]
     before={str(x.get('code')) for x in old if x.get('bank') in ('月饼题库','日常年货题库') and x.get('knowledgePoint')=='产品名称' and x.get('code')}; after=set(by); missing=[x['code'] for x in items if not (ROOT/'assets/product-images'/('mooncake' if x['bank']=='月饼题库' else 'daily')/f"{x['code']}.jpg").is_file()]
+    for question in qs:
+        question['id']=question['id'].replace(RETIRED_CODE,CANONICAL_CODE)
+    if len({question['id'] for question in qs}) != len(qs):
+        raise ValueError('Product question IDs are not unique after code normalization')
+    qs=balance_questions(qs,seed='20260718-product-answers',group_by_bank=False)
     baseline_questions=int(os.environ.get('JINZUN_BASELINE_QUESTIONS',len(old)))
     report={'source':str(SOURCE),'sourceSha256':hashlib.sha256(SOURCE.read_bytes()).hexdigest(),'generatedAt':datetime.now(timezone.utc).isoformat(),'version':VERSION,'sheets':{k:len(v) for k,v in data.items()},'beforeProducts':len(before),'afterProducts':len(after),'beforeQuestions':baseline_questions,'afterQuestions':len(qs),'deletedOldQuestions':max(0,baseline_questions-len(qs)),'newProducts':sorted(after-before),'deletedProducts':sorted(before-after),'missingSourceFields':sorted({f for x in items for f in ('carton','contents','net','shelf','size') if not x[f]}),'imageWarnings':missing,'corrections':{'2576':'2608杏仁饼258g','2605':'按最新Excel生成','2621':'按最新Excel生成','26年散饼':'工作表内全部货号归为月饼-散饼'}}
     PRODUCT_JSON.write_text(json.dumps(qs,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');write_xlsx(PRODUCT_XLSX,qs);AUDIT.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');DIFF_JSON.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');DIFF_MD.write_text('# Product Sync Diff 20260713\n\n'+json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');print(json.dumps({'activeProducts':len(after),'questions':len(qs),'imageWarnings':missing},ensure_ascii=False))

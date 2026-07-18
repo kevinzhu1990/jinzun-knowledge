@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import random
 from collections import defaultdict
@@ -118,13 +119,31 @@ def _write(path: Path, questions: list[dict]) -> None:
     path.write_text(json.dumps(questions, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def balance_role_questions(role: list[dict]) -> list[dict]:
+    operations = [question for question in role if str(question.get("id", "")).startswith("OPS-")]
+    other = [question for question in role if not str(question.get("id", "")).startswith("OPS-")]
+    balanced = {
+        question["id"]: question
+        for question in (
+            balance_questions(operations, seed="20260718-operations-answers", group_by_bank=False)
+            + balance_questions(other, seed="20260718-role-answers", group_by_bank=False)
+        )
+    }
+    return [balanced[question["id"]] for question in role]
+
+
 def main() -> None:
-    product = json.loads(PRODUCT_JSON.read_text(encoding="utf-8"))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--role-only", action="store_true")
+    args = parser.parse_args()
+
     role = json.loads(ROLE_JSON.read_text(encoding="utf-8"))
-    product = balance_questions(product, seed="20260713-product-answers", group_by_bank=False)
-    role = balance_questions(role, seed="20260713-role-answers", group_by_bank=False)
-    rebalance_total(product, role)
-    _write(PRODUCT_JSON, product)
+    role = balance_role_questions(role)
+    if not args.role_only:
+        product = json.loads(PRODUCT_JSON.read_text(encoding="utf-8"))
+        product = balance_questions(product, seed="20260718-product-answers", group_by_bank=False)
+        rebalance_total(product, role)
+        _write(PRODUCT_JSON, product)
     _write(ROLE_JSON, role)
     print("已完成产品题和岗位题的选项均衡打散")
 

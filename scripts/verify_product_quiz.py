@@ -3,7 +3,7 @@ import json, os, re, sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
-SOURCE=Path(os.environ.get('JINZUN_SOURCE_XLSX', str(ROOT.parents[1]/'26年金尊产品信息表（月饼+饼干）20260709更新.xlsx')))
+SOURCE=Path(os.environ.get('JINZUN_SOURCE_XLSX', str(ROOT.parent/'26年金尊产品信息表（月饼+饼干）20260709更新.xlsx')))
 PRODUCT=ROOT/'outputs/product_quiz/金尊产品知识库题库.json'
 VERSION='20260714-product-sync'
 sys.path.insert(0,str(ROOT/'scripts'))
@@ -38,9 +38,10 @@ def main():
     if product_codes!=image_codes: errors.append('产品货号没有完整图片识别题')
     if moon!=moon_image: errors.append('月饼货号没有完整货号选图片题')
     text=PRODUCT.read_text(encoding='utf-8')
+    if '2576' in text: errors.append('产品题库仍包含已停用货号2576')
     for forbidden in (chr(0x76ee)+chr(0x997c),'150g'+chr(0x514b),'2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+chr(0x5c0f)+chr(0x76d2)+chr(0x88c5)+'258g','2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g'):
         if forbidden in text: errors.append(f'存在禁用旧文字：{forbidden}')
-    if '2608杏仁饼258g' not in text: errors.append('2576正式名称未更新')
+    if '"code": "2608"' not in text or '杏仁饼258g' not in text: errors.append('2608杏仁饼资料未正确生成')
     result={'ok':not errors,'source':str(SOURCE),'activeProducts':len(active),'productQuestions':len(qs),'productCodes':len(product_codes),'mooncakeCodes':len(moon),'errors':errors}
     print(json.dumps(result,ensure_ascii=False,indent=2))
     if errors: raise SystemExit(1)

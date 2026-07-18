@@ -7,12 +7,18 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
-QUIZ_PATH = next((ROOT / "outputs" / "product_quiz").glob("*.json"))
+
+
+def load_product_questions():
+    for path in (ROOT / "outputs" / "product_quiz").glob("*.json"):
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+        if isinstance(payload, list):
+            return payload
+    raise RuntimeError("product question JSON not found")
 
 
 def main() -> None:
-    payload = json.loads(QUIZ_PATH.read_text(encoding="utf-8-sig"))
-    questions = payload if isinstance(payload, list) else payload["questions"]
+    questions = load_product_questions()
     image_paths = sorted(
         {
             value
