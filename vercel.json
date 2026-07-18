@@ -1,4 +1,6 @@
 {
+  "buildCommand": "node scripts/apply_product_corrections.js",
+  "outputDirectory": ".",
   "headers": [
     {
       "source": "/assets/product-images/(.*)",
