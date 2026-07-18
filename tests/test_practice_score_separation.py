@@ -32,6 +32,8 @@ def test_practice_submission_is_authenticated_deduplicated_and_retryable():
     assert 'syncLater("practice-submit"' in APP
     assert "['mistakes', 'practice-submit']" in APP
     assert "练习成绩已同步到飞书练习表" in APP
+    assert "action === 'internal-practice-setup'" in API
+    assert "if (!authorized(req))" in API
     start_quiz = function_block(APP, "async function startQuiz", "function goToNextQuestion")
     next_question = function_block(APP, "function goToNextQuestion", "function productKnowledgeValue")
     assert 'state.submissionId = crypto.randomUUID()' in start_quiz

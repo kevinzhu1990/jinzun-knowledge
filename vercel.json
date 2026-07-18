@@ -20,6 +20,10 @@
     "api/practice-submit.js": {
       "includeFiles": "outputs/**/*.json",
       "maxDuration": 60
+    },
+    "api/internal-practice-setup.js": {
+      "includeFiles": "outputs/**/*.json",
+      "maxDuration": 60
     }
   }
 }

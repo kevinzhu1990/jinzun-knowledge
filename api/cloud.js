@@ -1091,6 +1091,11 @@ module.exports = async (req, res) => {
     if (!writeAuthorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
     const payload = await readBody(req);
     enforceRateLimit(req, action);
+    if (action === 'internal-practice-setup') {
+      if (!authorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
+      const tableId = await practiceTableReady();
+      return json(req, res, 200, { ok: true, table_id: tableId, table_name: '练习成绩记录' });
+    }
     if (action === 'session') {
       const user = await requireActiveUser(req, payload);
       return json(req, res, 200, { ok: true, token: authTokenFor(user), user });
