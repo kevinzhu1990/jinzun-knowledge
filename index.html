@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>金尊知识库学习考核</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-role-product-learning-fix1" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-memory-learning-center-b1" />
   </head>
   <body>
     <section id="authView" class="auth-view">
@@ -211,7 +211,8 @@
           <div class="section-head">
             <div>
               <p class="eyebrow">Learn</p>
-              <h3>学习题库</h3>
+              <h3>学习中心</h3>
+              <p class="section-note">先理解和记忆知识，再进入考核检验掌握情况。</p>
             </div>
             <span id="learnCount" class="pill">0 道题</span>
           </div>
@@ -223,6 +224,13 @@
             <select id="ruleModuleFilter" class="select"><option value="">全部模块</option></select>
             <select id="ruleSourceFilter" class="select"><option value="">全部来源等级</option><option value="A">A级</option><option value="B">B级</option><option value="C">C级</option></select>
           </div>
+          <div id="learnModeTabs" class="learn-mode-tabs" aria-label="学习方式">
+            <button class="learn-mode-tab active" data-learn-mode="knowledge">知识卡</button>
+            <button class="learn-mode-tab" data-learn-mode="compare">易混对比</button>
+            <button class="learn-mode-tab" data-learn-mode="flash">翻卡记忆</button>
+            <button class="learn-mode-tab" data-learn-mode="review">待复习</button>
+          </div>
+          <div id="learnSummary" class="learn-summary"></div>
           <div id="learnList" class="learn-list"></div>
           <div id="learnPagination" class="learn-pagination"></div>
         </section>
@@ -357,7 +365,7 @@
     </div>
 
     <script src="./mooncake-filter.js?v=af8d1d9"></script>
-    <script src="./app.js?v=20260718-role-product-learning-fix1" type="module"></script>
+    <script src="./app.js?v=20260718-memory-learning-center-b1" type="module"></script>
   </body>
 </html>
 
