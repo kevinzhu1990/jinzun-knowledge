@@ -1,0 +1,52 @@
+{
+  "name": "jinzun-knowledge-desktop",
+  "version": "1.0.0",
+  "description": "金尊员工知识库 Windows 桌面应用",
+  "main": "main.js",
+  "author": "Jinzun",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "39.2.7",
+    "electron-builder": "26.0.12"
+  },
+  "build": {
+    "appId": "com.jinzun.knowledge",
+    "productName": "金尊知识库",
+    "copyright": "Copyright © 2026 Jinzun",
+    "asar": true,
+    "files": [
+      "main.js",
+      "offline.html",
+      "build/icon.ico"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "金尊知识库安装包-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "金尊知识库",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}
