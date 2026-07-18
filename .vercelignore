@@ -5,7 +5,6 @@
 node_modules
 desktop
 docs
-scripts
 sources
 tests
 *.xlsx
