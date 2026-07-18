@@ -1242,8 +1242,14 @@ module.exports = async (req, res) => {
     enforceRateLimit(req, action);
     if (action === 'internal-practice-setup') {
       if (!authorized(req)) return json(req, res, 401, { ok: false, error: 'Unauthorized' });
-      const tableId = await practiceTableReady();
-      return json(req, res, 200, { ok: true, table_id: tableId, table_name: '练习成绩记录' });
+      const [tableId, questionTableId] = await Promise.all([practiceTableReady(), questionChangeTableReady()]);
+      return json(req, res, 200, {
+        ok: true,
+        table_id: tableId,
+        table_name: '练习成绩记录',
+        question_table_id: questionTableId,
+        question_table_name: '题库修改记录',
+      });
     }
     if (action === 'session') {
       const user = await requireActiveUser(req, payload);
