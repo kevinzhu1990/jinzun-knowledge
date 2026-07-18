@@ -1773,6 +1773,10 @@ input:disabled {
 .danger-btn { border: 1px solid #c95757; background: #fff5f5; color: #a72c2c; border-radius: 6px; padding: 9px 12px; cursor: pointer; }
 .install-app-btn { width:100%; margin:0 0 12px; border:1px solid #20b8c5; background:#0b5365; color:#fff; border-radius:6px; padding:10px 12px; font-weight:700; cursor:pointer; }
 .install-app-btn:hover { background:#087080; }
+.check-update-btn { width:100%; margin:0; border:1px solid rgba(255,255,255,.22); background:transparent; color:#dbeaf0; border-radius:6px; padding:9px 12px; font-weight:700; cursor:pointer; }
+.check-update-btn:hover { border-color:#23bdc8; color:#fff; }
+.check-update-btn:disabled { opacity:.55; cursor:wait; }
+.app-version-text { display:block; margin:7px 2px 12px; color:#91a8b5; font-size:11px; line-height:1.4; overflow-wrap:anywhere; }
 .admin-question-panel { margin: 18px 0; }
 .admin-question-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:14px; }
 .admin-question-head h4 { margin-bottom:4px; }

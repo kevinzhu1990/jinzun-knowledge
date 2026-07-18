@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260718-question-admin1";
+const BUILD_VERSION = "20260718-version-check1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -138,6 +138,8 @@ const els = {
   userMeta: document.querySelector("#userMeta"),
   logoutBtn: document.querySelector("#logoutBtn"),
   installAppBtn: document.querySelector("#installAppBtn"),
+  checkAppUpdateBtn: document.querySelector("#checkAppUpdateBtn"),
+  appVersionText: document.querySelector("#appVersionText"),
   quizSetupStatus: document.querySelector("#quizSetupStatus"),
   examSubmitStatus: document.querySelector("#examSubmitStatus"),
   retryExamSubmitBtn: document.querySelector("#retryExamSubmitBtn"),
@@ -245,6 +247,43 @@ async function registerInstallableApp() {
     await registration.update();
   } catch (error) {
     console.warn("应用安装服务注册失败", error);
+  }
+}
+
+async function checkLatestVersion({ silent = false } = {}) {
+  if (els.appVersionText) els.appVersionText.textContent = `当前版本 ${BUILD_VERSION}`;
+  if (els.checkAppUpdateBtn) {
+    els.checkAppUpdateBtn.disabled = true;
+    if (!silent) els.checkAppUpdateBtn.textContent = "正在检查...";
+  }
+  try {
+    const response = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const latestVersion = String(data.buildVersion || "").trim();
+    if (!latestVersion) throw new Error("服务器未返回版本号");
+    if (latestVersion === BUILD_VERSION) {
+      if (!silent) setSyncStatus(`当前已是最新版本 ${latestVersion}`, "success");
+      return;
+    }
+    if (!state.examFinished && state.examType === "formal") {
+      setSyncStatus(`发现新版本 ${latestVersion}，请交卷后再更新`, "warn");
+      if (els.checkAppUpdateBtn) els.checkAppUpdateBtn.textContent = "交卷后更新";
+      return;
+    }
+    setSyncStatus(`发现新版本 ${latestVersion}，正在更新...`, "success");
+    const registration = await navigator.serviceWorker?.getRegistration();
+    await registration?.update();
+    window.setTimeout(() => {
+      window.location.replace(`./?v=${encodeURIComponent(latestVersion)}&updated=${Date.now()}`);
+    }, 500);
+  } catch (error) {
+    if (!silent) setSyncStatus(`版本检查失败：${error.message}`, "error");
+  } finally {
+    if (els.checkAppUpdateBtn) {
+      els.checkAppUpdateBtn.disabled = false;
+      if (els.checkAppUpdateBtn.textContent === "正在检查...") els.checkAppUpdateBtn.textContent = "检查最新版本";
+    }
   }
 }
 
@@ -2716,6 +2755,7 @@ function bindEvents() {
   });
   els.logoutBtn.addEventListener("click", logout);
   els.installAppBtn?.addEventListener("click", handleAppInstallOrUpdate);
+  els.checkAppUpdateBtn?.addEventListener("click", () => checkLatestVersion());
   els.mobileSidebarToggle?.addEventListener("click", () => {
     const open = !els.sidebarTools.classList.contains("mobile-open");
     els.sidebarTools.classList.toggle("mobile-open", open);
@@ -2759,6 +2799,8 @@ async function init() {
     renderAll();
     showAuth(!state.currentUser);
     await registerInstallableApp();
+    await checkLatestVersion({ silent: true });
+    window.setInterval(() => checkLatestVersion({ silent: true }), 10 * 60 * 1000);
   } catch (error) {
     document.body.innerHTML = `<div class="empty">题库加载失败：${escapeHtml(error.message)}</div>`;
     throw error;

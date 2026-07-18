@@ -81,6 +81,7 @@ def main() -> None:
         "adminEmployeeForm", "adminEmployeeList", "adminPracticeList",
         "exportPracticeRecordsBtn", "adminQuestionList", "adminQuestionForm",
         "adminQuestionSearch", "adminQuestionDialog", "installAppBtn",
+        "checkAppUpdateBtn", "appVersionText",
     }
     missing = sorted(required_ids - parser.ids)
     if missing:
@@ -98,10 +99,20 @@ def main() -> None:
         "practice-submit", "adminPracticeList", "exportPracticeRecordsBtn",
         "admin-questions", "adminQuestionList", "adminQuestionForm",
         "service-worker.js", "manifest.webmanifest", "beforeinstallprompt",
+        "version.json", "checkLatestVersion",
     )
     for needle in required:
         if needle not in app_text and needle not in index_text:
             errors.append(f"缺少必要标记：{needle}")
+
+    version_info = json.loads((ROOT / "version.json").read_text(encoding="utf-8"))
+    if version_info.get("buildVersion") != app_version:
+        errors.append("version.json与BUILD_VERSION不一致")
+    service_worker = (ROOT / "service-worker.js").read_text(encoding="utf-8")
+    if app_version not in service_worker:
+        errors.append("service-worker.js缓存版本与BUILD_VERSION不一致")
+    if "url.pathname.endsWith('/version.json')" not in service_worker or "cache: 'no-store'" not in service_worker:
+        errors.append("service-worker.js必须绕过缓存读取version.json")
 
     result = {
         "ok": not errors,
