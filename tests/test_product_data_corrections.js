@@ -60,6 +60,36 @@ const fixture = [
     explanation: '2545为在售产品。',
   },
   {
+    id: 'P-1940-NAME',
+    bank: '月饼题库',
+    code: '1940',
+    productName: '1940金尊陈皮豆沙月饼100g 散饼',
+    knowledgePoint: '产品名称',
+    question: '1940 对应的产品名称是什么？',
+    optionA: '1940金尊陈皮豆沙月饼100g 散饼',
+    optionB: 'A',
+    optionC: 'B',
+    optionD: 'C',
+    answer: 'A',
+    answerText: '1940金尊陈皮豆沙月饼100g 散饼',
+    explanation: '1940为在售产品。',
+  },
+  {
+    id: 'P-1392-NAME',
+    bank: '月饼题库',
+    code: '1392',
+    productName: '1392金尊黄油椰蓉月饼100g 散饼',
+    knowledgePoint: '产品名称',
+    question: '1392 对应的产品名称是什么？',
+    optionA: '1392金尊黄油椰蓉月饼100g 散饼',
+    optionB: 'A',
+    optionC: 'B',
+    optionD: 'C',
+    answer: 'A',
+    answerText: '1392金尊黄油椰蓉月饼100g 散饼',
+    explanation: '1392为在售产品。',
+  },
+  {
     id: 'P-MERCHANT-2576',
     bank: '商家编码题库',
     code: 'JZ-2576*2+2545',
@@ -104,6 +134,21 @@ const fixture = [
     answerText: 'JZ-2608*2+LD',
     explanation: '组合名称包含停售货号。',
   },
+  {
+    id: 'P-MERCHANT-1940-1392',
+    bank: '商家编码题库',
+    code: 'JZ-1940*5+1392*5',
+    productName: '1940金尊陈皮豆沙月饼100g 散饼 2个装+1393黑豆沙月饼100g散饼5个+1392 5个',
+    knowledgePoint: '商家编码',
+    question: '错误组合名称对应的商家编码是什么？',
+    optionA: 'JZ-1940*5+1392*5',
+    optionB: 'JZ-1940*2+1393*5+1392*5',
+    optionC: 'JZ-1940*5+1393*5',
+    optionD: 'JZ-1392*10',
+    answer: 'A',
+    answerText: 'JZ-1940*5+1392*5',
+    explanation: '原组合名称错误。',
+  },
 ];
 
 const corrected = correctProductQuestions(fixture);
@@ -120,6 +165,15 @@ assert.ok(merchant2608, '含2576的组合编码必须更新为2608后保留');
 assert.equal(merchant2608.answerText, 'JZ-2608*2+2545');
 assert.equal(corrected.some((question) => question.id === 'P-MERCHANT-INACTIVE'), false, '停售货号商家编码必须删除');
 assert.equal(corrected.some((question) => question.id === 'P-MERCHANT-INACTIVE-NAME'), false, '组合名称含停售货号也必须删除');
+const merchant1940And1392 = corrected.find((question) => question.id === 'P-MERCHANT-1940-1392');
+assert.ok(merchant1940And1392, '1940和1392在售组合必须保留');
+assert.equal(
+  merchant1940And1392.productName,
+  '1940金尊陈皮豆沙月饼100g 散饼5个+1392金尊黄油椰蓉月饼100g 散饼5个',
+);
+assert.equal(merchant1940And1392.productName.includes('1393'), false, '组合名称不得混入1393');
+assert.match(merchant1940And1392.question, /1940金尊陈皮豆沙月饼100g 散饼5个/);
+assert.match(merchant1940And1392.question, /1392金尊黄油椰蓉月饼100g 散饼5个/);
 
 const mooncake = corrected.find((question) => question.id === 'P-0206-NET');
 assert.equal(mooncake.answerText, '800g');

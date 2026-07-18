@@ -4,6 +4,7 @@ const path = require('node:path');
 const CANONICAL_CODE = '2608';
 const RETIRED_CODE = '2576';
 const CANONICAL_NAME = '杏仁饼258g';
+const MERCHANT_1940_1392 = '1940金尊陈皮豆沙月饼100g 散饼5个+1392金尊黄油椰蓉月饼100g 散饼5个';
 
 function replaceLegacyText(value) {
   if (typeof value !== 'string') return value;
@@ -45,6 +46,17 @@ function normalize0206Question(question) {
   return normalized;
 }
 
+function normalizeMerchantQuestion(question) {
+  if (question.answerText !== 'JZ-1940*5+1392*5') return question;
+  const text = `“${MERCHANT_1940_1392}”对应的商家编码是什么？`;
+  return {
+    ...question,
+    productName: MERCHANT_1940_1392,
+    question: text,
+    explanation: `${text.slice(0, -1)}：JZ-1940*5+1392*5。`,
+  };
+}
+
 function merchantCodeReferences(value) {
   return [...String(value || '').matchAll(/(?<!\d)(\d{4})(?!\d)/g)].map((match) => match[1]);
 }
@@ -55,7 +67,7 @@ function merchantNameReferences(value) {
 
 function correctProductQuestions(questions) {
   if (!Array.isArray(questions)) throw new TypeError('Product questions must be an array');
-  const normalized = questions.map((question) => normalize0206Question(normalize2608Question(question)));
+  const normalized = questions.map((question) => normalizeMerchantQuestion(normalize0206Question(normalize2608Question(question))));
   const activeCodes = new Set(normalized
     .filter((question) => ['月饼题库', '日常年货题库'].includes(question.bank) && question.knowledgePoint === '产品名称')
     .map((question) => String(question.code || '')));

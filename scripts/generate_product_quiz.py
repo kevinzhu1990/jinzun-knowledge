@@ -172,8 +172,12 @@ def main():
     active_codes=set(by)
     merchant_rows=[r for r in merchant_source_rows if active_merchant_code(get(r,'商家编码'),active_codes,get(r,'组合装名称'))]
     merchant_codes=[get(r,'商家编码') for r in merchant_rows if get(r,'商家编码')]
+    merchant_combo_corrections={
+        'JZ-1940*5+1392*5':f"{by['1940']['name']}5个+{by['1392']['name']}5个",
+    }
     for r in merchant_rows:
         combo=get(r,'组合装名称'); merchant=get(r,'商家编码')
+        combo=merchant_combo_corrections.get(merchant,combo)
         if combo and merchant:
             qs.append(q('商家编码题库','电商资料','商家编码',merchant,combo,'商家编码',f'“{combo}”对应的商家编码是什么？',merchant,merchant_codes,'商家编码'))
     excluded_mooncake_points={'尺寸/外箱','整箱重量','箱重','毛重'}
@@ -187,6 +191,6 @@ def main():
     role_file=ROOT/'outputs/role_quiz/岗位学习考核题库.json'
     if role_file.is_file():rebalance_total(qs,json.loads(role_file.read_text(encoding='utf-8')))
     baseline_questions=int(os.environ.get('JINZUN_BASELINE_QUESTIONS',len(old)))
-    report={'source':str(SOURCE),'sourceSha256':hashlib.sha256(SOURCE.read_bytes()).hexdigest(),'generatedAt':datetime.now(timezone.utc).isoformat(),'version':VERSION,'sheets':{k:len(v) for k,v in data.items()},'beforeProducts':len(before),'afterProducts':len(after),'beforeQuestions':baseline_questions,'afterQuestions':len(qs),'deletedOldQuestions':max(0,baseline_questions-len(qs)),'newProducts':sorted(after-before),'deletedProducts':sorted(before-after),'missingSourceFields':sorted({f for x in items for f in ('carton','contents','net','shelf','size') if not x[f]}),'imageWarnings':missing,'merchantCodes':{'sourceRows':len(merchant_source_rows),'activeRows':len(merchant_rows),'deletedInactiveRows':len(merchant_source_rows)-len(merchant_rows)},'corrections':{'2576':'2608杏仁饼258g','2605':'按最新Excel生成','2621':'按最新Excel生成','26年散饼':'工作表内全部货号归为月饼-散饼','商家编码':'仅保留当前在售货号及全部由在售货号组成的组合编码'}}
+    report={'source':str(SOURCE),'sourceSha256':hashlib.sha256(SOURCE.read_bytes()).hexdigest(),'generatedAt':datetime.now(timezone.utc).isoformat(),'version':VERSION,'sheets':{k:len(v) for k,v in data.items()},'beforeProducts':len(before),'afterProducts':len(after),'beforeQuestions':baseline_questions,'afterQuestions':len(qs),'deletedOldQuestions':max(0,baseline_questions-len(qs)),'newProducts':sorted(after-before),'deletedProducts':sorted(before-after),'missingSourceFields':sorted({f for x in items for f in ('carton','contents','net','shelf','size') if not x[f]}),'imageWarnings':missing,'merchantCodes':{'sourceRows':len(merchant_source_rows),'activeRows':len(merchant_rows),'deletedInactiveRows':len(merchant_source_rows)-len(merchant_rows)},'corrections':{'2576':'2608杏仁饼258g','2605':'按最新Excel生成','2621':'按最新Excel生成','26年散饼':'工作表内全部货号归为月饼-散饼','商家编码':'仅保留当前在售货号及全部由在售货号组成的组合编码','JZ-1940*5+1392*5':'1940陈皮豆沙月饼5个+1392黄油椰蓉月饼5个'}}
     PRODUCT_JSON.write_text(json.dumps(qs,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');write_xlsx(PRODUCT_XLSX,qs);AUDIT.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');DIFF_JSON.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');DIFF_MD.write_text('# Product Sync Diff 20260713\n\n'+json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');print(json.dumps({'activeProducts':len(after),'questions':len(qs),'imageWarnings':missing},ensure_ascii=False))
 if __name__=='__main__':main()

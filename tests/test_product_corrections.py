@@ -153,3 +153,16 @@ def test_merchant_codes_only_reference_active_products():
             references = generator.merchant_code_references(question.get(field, ""))
             assert references, (question.get("id"), field)
             assert references <= active_codes, (question.get("id"), field, references - active_codes)
+
+
+def test_1940_1392_combo_name_matches_merchant_code():
+    matches = [
+        question for question in load_product_questions()
+        if question.get("answerText") == "JZ-1940*5+1392*5"
+    ]
+    assert len(matches) == 1
+    question = matches[0]
+    assert question["productName"] == "1940金尊陈皮豆沙月饼100g 散饼5个+1392金尊黄油椰蓉月饼100g 散饼5个"
+    assert "1393" not in question["productName"]
+    assert "1940金尊陈皮豆沙月饼100g 散饼5个" in question["question"]
+    assert "1392金尊黄油椰蓉月饼100g 散饼5个" in question["question"]
