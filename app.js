@@ -1,7 +1,9 @@
-const BUILD_VERSION = "20260718-practice-sync-fix1";
+const BUILD_VERSION = "20260718-question-admin1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
+let deferredInstallPrompt = null;
+let waitingServiceWorker = null;
 const productUrl = `./outputs/product_quiz/金尊产品知识库题库.json?v=${BUILD_VERSION}`;
 const roleUrl = `./outputs/role_quiz/岗位学习考核题库.json?v=${BUILD_VERSION}`;
 const API_BASE = "https://jinzun-knowledge.vercel.app";
@@ -9,6 +11,8 @@ const API_BASES = [API_BASE];
 const CLOUD_ENABLED = true;
 const CLOUD_TIMEOUT_MS = 60000;
 const state = {
+  baseQuestions: [],
+  questionChanges: [],
   allQuestions: [],
   filtered: [],
   currentBank: "全部题库",
@@ -43,6 +47,7 @@ const state = {
   ownFormalHistory: [],
   rankingLoading: false,
   rankingError: "",
+  adminQuestionPage: 1,
 };
 
 const els = {
@@ -132,6 +137,7 @@ const els = {
   userName: document.querySelector("#userName"),
   userMeta: document.querySelector("#userMeta"),
   logoutBtn: document.querySelector("#logoutBtn"),
+  installAppBtn: document.querySelector("#installAppBtn"),
   quizSetupStatus: document.querySelector("#quizSetupStatus"),
   examSubmitStatus: document.querySelector("#examSubmitStatus"),
   retryExamSubmitBtn: document.querySelector("#retryExamSubmitBtn"),
@@ -143,6 +149,28 @@ const els = {
   adminEmployeePassword: document.querySelector("#adminEmployeePassword"),
   adminEmployeeList: document.querySelector("#adminEmployeeList"),
   adminAccountStatus: document.querySelector("#adminAccountStatus"),
+  adminQuestionSearch: document.querySelector("#adminQuestionSearch"),
+  adminQuestionBank: document.querySelector("#adminQuestionBank"),
+  adminQuestionStatus: document.querySelector("#adminQuestionStatus"),
+  adminQuestionCount: document.querySelector("#adminQuestionCount"),
+  adminQuestionMessage: document.querySelector("#adminQuestionMessage"),
+  adminQuestionList: document.querySelector("#adminQuestionList"),
+  adminQuestionPagination: document.querySelector("#adminQuestionPagination"),
+  adminQuestionDialog: document.querySelector("#adminQuestionDialog"),
+  adminQuestionForm: document.querySelector("#adminQuestionForm"),
+  adminQuestionDialogClose: document.querySelector("#adminQuestionDialogClose"),
+  adminQuestionCancel: document.querySelector("#adminQuestionCancel"),
+  adminQuestionId: document.querySelector("#adminQuestionId"),
+  adminEditBank: document.querySelector("#adminEditBank"),
+  adminEditCode: document.querySelector("#adminEditCode"),
+  adminEditKnowledgePoint: document.querySelector("#adminEditKnowledgePoint"),
+  adminEditAnswer: document.querySelector("#adminEditAnswer"),
+  adminEditQuestion: document.querySelector("#adminEditQuestion"),
+  adminEditOptionA: document.querySelector("#adminEditOptionA"),
+  adminEditOptionB: document.querySelector("#adminEditOptionB"),
+  adminEditOptionC: document.querySelector("#adminEditOptionC"),
+  adminEditOptionD: document.querySelector("#adminEditOptionD"),
+  adminEditExplanation: document.querySelector("#adminEditExplanation"),
   mobileSidebarToggle: document.querySelector("#mobileSidebarToggle"),
   sidebarTools: document.querySelector("#sidebarTools"),
 };
@@ -173,6 +201,73 @@ function clearAutoNextTimer() {
     autoNextTimer = null;
   }
 }
+
+function showAppInstallButton(label, mode = "install") {
+  if (!els.installAppBtn) return;
+  els.installAppBtn.textContent = label;
+  els.installAppBtn.dataset.mode = mode;
+  els.installAppBtn.classList.remove("hidden");
+}
+
+async function handleAppInstallOrUpdate() {
+  if (els.installAppBtn?.dataset.mode === "update") {
+    if (!state.examFinished && state.examType === "formal") {
+      setSyncStatus("正式考试进行中，请交卷后再更新应用", "warn");
+      return;
+    }
+    waitingServiceWorker?.postMessage({ type: "SKIP_WAITING" });
+    return;
+  }
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  els.installAppBtn.classList.add("hidden");
+}
+
+async function registerInstallableApp() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.register(`./service-worker.js?v=${BUILD_VERSION}`);
+    if (registration.waiting) {
+      waitingServiceWorker = registration.waiting;
+      showAppInstallButton("更新到最新版本", "update");
+    }
+    registration.addEventListener("updatefound", () => {
+      const worker = registration.installing;
+      worker?.addEventListener("statechange", () => {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          waitingServiceWorker = worker;
+          showAppInstallButton("更新到最新版本", "update");
+        }
+      });
+    });
+    await registration.update();
+  } catch (error) {
+    console.warn("应用安装服务注册失败", error);
+  }
+}
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  showAppInstallButton("安装到电脑", "install");
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  els.installAppBtn?.classList.add("hidden");
+  setSyncStatus("金尊知识库已安装到电脑", "success");
+});
+
+navigator.serviceWorker?.addEventListener("controllerchange", () => {
+  if (!waitingServiceWorker) return;
+  if (!state.examFinished && state.examType === "formal") {
+    showAppInstallButton("交卷后重启更新", "update");
+    return;
+  }
+  window.location.reload();
+});
 
 const safeJsonArray = (key) => {
   const value = safeJson(key, []);
@@ -687,13 +782,44 @@ async function loadQuestions() {
     parseQuizJson(productRes, "产品题库"),
     parseQuizJson(roleRes, "岗位题库")
   ]);
-  state.allQuestions = [...productQuestions, ...roleQuestions].map((question) => ({
+  state.baseQuestions = [...productQuestions, ...roleQuestions].map((question) => ({
     ...question,
     role: question.role || question.category || "",
     module: question.module || question.productLine || "",
     source: question.source || "产品知识库",
     note: question.note || "",
   }));
+  applyQuestionChanges();
+}
+
+function applyQuestionChanges() {
+  const byId = new Map(state.questionChanges.map((change) => [String(change.id), change]));
+  state.allQuestions = state.baseQuestions.flatMap((question) => {
+    const change = byId.get(String(question.id));
+    if (!change) return [{ ...question, _changeStatus: "original" }];
+    if (change.status === "deleted") return [];
+    return [{ ...question, ...(change.patch || {}), _changeStatus: "active", _updatedAt: change.updatedAt || "", _updatedBy: change.updatedBy || "" }];
+  });
+}
+
+function allManagedQuestions() {
+  const byId = new Map(state.questionChanges.map((change) => [String(change.id), change]));
+  return state.baseQuestions.map((question) => {
+    const change = byId.get(String(question.id));
+    if (!change) return { ...question, _changeStatus: "original" };
+    return { ...question, ...(change.patch || {}), _changeStatus: change.status, _updatedAt: change.updatedAt || "", _updatedBy: change.updatedBy || "" };
+  });
+}
+
+async function loadQuestionChanges() {
+  if (!state.currentUser) {
+    state.questionChanges = [];
+    applyQuestionChanges();
+    return;
+  }
+  const data = await cloudRequest("questions", {});
+  state.questionChanges = Array.isArray(data.changes) ? data.changes : [];
+  applyQuestionChanges();
 }
 
 const questionIdentity = (question) => [
@@ -1938,6 +2064,137 @@ async function handleAdminEmployeeAction(event) {
   }
 }
 
+function renderAdminQuestions() {
+  if (!isAdminUser() || !els.adminQuestionList) return;
+  const questions = allManagedQuestions();
+  const banks = [...new Set(questions.map((question) => question.bank).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+  const selectedBank = els.adminQuestionBank.value;
+  els.adminQuestionBank.innerHTML = `<option value="">全部题库</option>${banks.map((bank) => `<option value="${escapeHtml(bank)}">${escapeHtml(bank)}</option>`).join("")}`;
+  if (banks.includes(selectedBank)) els.adminQuestionBank.value = selectedBank;
+  const keyword = String(els.adminQuestionSearch.value || "").trim().toLowerCase();
+  const status = els.adminQuestionStatus.value || "active";
+  const filtered = questions.filter((question) => {
+    if (els.adminQuestionBank.value && question.bank !== els.adminQuestionBank.value) return false;
+    if (status === "active" && question._changeStatus === "deleted") return false;
+    if (status === "changed" && question._changeStatus !== "active") return false;
+    if (status === "deleted" && question._changeStatus !== "deleted") return false;
+    if (keyword) {
+      const haystack = [question.id, question.bank, question.code, question.knowledgePoint, question.question,
+        question.optionA, question.optionB, question.optionC, question.optionD].join(" ").toLowerCase();
+      if (!haystack.includes(keyword)) return false;
+    }
+    return true;
+  });
+  const pageSize = 40;
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  state.adminQuestionPage = Math.min(Math.max(1, state.adminQuestionPage), pages);
+  const rows = filtered.slice((state.adminQuestionPage - 1) * pageSize, state.adminQuestionPage * pageSize);
+  els.adminQuestionCount.textContent = `${filtered.length} 题`;
+  els.adminQuestionList.innerHTML = rows.length ? `
+    <table><thead><tr><th>ID / 货号</th><th>题库 / 知识点</th><th>题目</th><th>答案</th><th>状态</th><th>操作</th></tr></thead><tbody>
+      ${rows.map((question) => `<tr class="${question._changeStatus === "deleted" ? "question-deleted" : ""}">
+        <td><strong>${escapeHtml(question.id)}</strong><small>${escapeHtml(question.code || "--")}</small></td>
+        <td>${escapeHtml(question.bank || "--")}<small>${escapeHtml(question.knowledgePoint || "--")}</small></td>
+        <td class="admin-question-text">${escapeHtml(question.question)}</td>
+        <td><strong>${escapeHtml(question.answer)}</strong><small>${escapeHtml(question[`option${question.answer}`] || "")}</small></td>
+        <td>${question._changeStatus === "deleted" ? '<span class="status-badge deleted">已删除</span>' : question._changeStatus === "active" ? '<span class="status-badge changed">已修改</span>' : '<span class="status-badge">原始</span>'}</td>
+        <td><div class="admin-question-actions">${question._changeStatus === "deleted"
+          ? `<button class="secondary-btn admin-question-restore" type="button" data-question-id="${escapeHtml(question.id)}">恢复</button>`
+          : `<button class="secondary-btn admin-question-edit" type="button" data-question-id="${escapeHtml(question.id)}">修改</button><button class="danger-btn admin-question-delete" type="button" data-question-id="${escapeHtml(question.id)}">删除</button>`}</div></td>
+      </tr>`).join("")}
+    </tbody></table>` : `<div class="empty">没有符合条件的题目。</div>`;
+  els.adminQuestionPagination.innerHTML = pages > 1 ? `
+    <button type="button" data-question-page="${state.adminQuestionPage - 1}" ${state.adminQuestionPage <= 1 ? "disabled" : ""}>上一页</button>
+    <span>第 ${state.adminQuestionPage} / ${pages} 页</span>
+    <button type="button" data-question-page="${state.adminQuestionPage + 1}" ${state.adminQuestionPage >= pages ? "disabled" : ""}>下一页</button>` : "";
+}
+
+function openAdminQuestionEditor(id) {
+  const question = allManagedQuestions().find((item) => String(item.id) === String(id));
+  if (!question || question._changeStatus === "deleted") return;
+  els.adminQuestionId.value = question.id;
+  els.adminEditBank.value = question.bank || "";
+  els.adminEditCode.value = question.code || "";
+  els.adminEditKnowledgePoint.value = question.knowledgePoint || "";
+  els.adminEditQuestion.value = question.question || "";
+  els.adminEditOptionA.value = question.optionA || "";
+  els.adminEditOptionB.value = question.optionB || "";
+  els.adminEditOptionC.value = question.optionC || "";
+  els.adminEditOptionD.value = question.optionD || "";
+  els.adminEditAnswer.value = question.answer || "A";
+  els.adminEditExplanation.value = question.explanation || "";
+  if (typeof els.adminQuestionDialog.showModal === "function") els.adminQuestionDialog.showModal();
+  else els.adminQuestionDialog.setAttribute("open", "");
+}
+
+function closeAdminQuestionEditor() {
+  if (typeof els.adminQuestionDialog.close === "function") els.adminQuestionDialog.close();
+  else els.adminQuestionDialog.removeAttribute("open");
+}
+
+async function refreshQuestionsAfterAdminChange(message) {
+  await loadQuestionChanges();
+  reconcileStoredQuestions();
+  renderBankSelect();
+  renderQuizSetup();
+  els.adminQuestionMessage.textContent = message;
+  renderAll();
+}
+
+async function saveAdminQuestion(event) {
+  event.preventDefault();
+  const button = els.adminQuestionForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  els.adminQuestionMessage.textContent = "";
+  try {
+    await cloudRequest("admin-questions", {
+      operation: "update",
+      id: els.adminQuestionId.value,
+      question: {
+        bank: els.adminEditBank.value,
+        code: els.adminEditCode.value,
+        knowledgePoint: els.adminEditKnowledgePoint.value,
+        question: els.adminEditQuestion.value,
+        optionA: els.adminEditOptionA.value,
+        optionB: els.adminEditOptionB.value,
+        optionC: els.adminEditOptionC.value,
+        optionD: els.adminEditOptionD.value,
+        answer: els.adminEditAnswer.value,
+        explanation: els.adminEditExplanation.value,
+      },
+    });
+    closeAdminQuestionEditor();
+    await refreshQuestionsAfterAdminChange("题目已修改，学习、练习和正式考试已同步更新。");
+  } catch (error) {
+    els.adminQuestionMessage.textContent = error.message || "题目修改失败";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function handleAdminQuestionAction(event) {
+  const pageButton = event.target.closest("[data-question-page]");
+  if (pageButton && !pageButton.disabled) {
+    state.adminQuestionPage = Number(pageButton.dataset.questionPage) || 1;
+    renderAdminQuestions();
+    return;
+  }
+  const button = event.target.closest("[data-question-id]");
+  if (!button) return;
+  const id = button.dataset.questionId;
+  if (button.classList.contains("admin-question-edit")) return openAdminQuestionEditor(id);
+  const restore = button.classList.contains("admin-question-restore");
+  if (!restore && !window.confirm("确定删除这道题吗？删除后不再出现在学习、练习和正式考试中。")) return;
+  button.disabled = true;
+  try {
+    await cloudRequest("admin-questions", { operation: restore ? "restore" : "delete", id });
+    await refreshQuestionsAfterAdminChange(restore ? "题目已恢复。" : "题目已删除。");
+  } catch (error) {
+    els.adminQuestionMessage.textContent = error.message || (restore ? "恢复失败" : "删除失败");
+    button.disabled = false;
+  }
+}
+
 function renderAdmin() {
   if (!isAdminUser()) {
     els.adminDataWarning?.classList.add("hidden");
@@ -1945,8 +2202,10 @@ function renderAdmin() {
     els.adminUserTable.innerHTML = "";
     els.adminWeakList.innerHTML = "";
     if (els.adminPracticeList) els.adminPracticeList.innerHTML = "";
+    if (els.adminQuestionList) els.adminQuestionList.innerHTML = "";
     return;
   }
+  renderAdminQuestions();
   const cloud = state.cloudStats;
   const errors = Array.isArray(cloud?.errors) ? cloud.errors : [];
   if (els.adminDataWarning) {
@@ -2134,7 +2393,13 @@ function switchView(view) {
   if (view === "mistakes") renderMistakes();
   if (view === "admin") {
     renderAdmin();
-    Promise.all([loadCloudStats(), refreshAdminEmployees()]).then(renderAdmin);
+    Promise.all([loadCloudStats(), refreshAdminEmployees(), loadQuestionChanges()]).then(() => {
+      renderBankSelect();
+      renderQuizSetup();
+      renderAdmin();
+    }).catch((error) => {
+      if (els.adminQuestionMessage) els.adminQuestionMessage.textContent = error.message || "题库明细读取失败";
+    });
   }
 }
 
@@ -2218,6 +2483,17 @@ function saveAuthenticatedUser(data) {
   renderQuizSetup();
 }
 
+async function refreshAuthenticatedQuestions() {
+  try {
+    await loadQuestionChanges();
+    reconcileStoredQuestions();
+    renderBankSelect();
+    renderQuizSetup();
+  } catch (error) {
+    setSyncStatus(`题库云端修改暂时无法读取：${error.message}`, "error");
+  }
+}
+
 const passwordError = (password) => {
   if (password.length < 8) return "密码不能少于8位";
   if (!/[A-Za-z]/.test(password)) return "密码必须包含字母";
@@ -2242,6 +2518,7 @@ async function loginEmployee(event) {
     const data = await cloudRequest("login", { account, password, clientId: getClientId() });
     if (!data.token || !data.user) throw new Error("账号或密码错误");
     saveAuthenticatedUser(data);
+    await refreshAuthenticatedQuestions();
     els.loginPassword.value = "";
     showAuth(false);
     renderAll();
@@ -2276,6 +2553,7 @@ async function registerEmployee(event) {
     const data = await cloudRequest("register", { name, phone, role, password, registerCode, clientId: getClientId() });
     if (!data.token || !data.user) throw new Error("注册失败");
     saveAuthenticatedUser(data);
+    await refreshAuthenticatedQuestions();
     els.registerForm.reset();
     showAuth(false);
     renderAll();
@@ -2313,6 +2591,7 @@ async function resetPassword(event) {
     const data = await cloudRequest("reset", { name, phone, role, password, registerCode, clientId: getClientId() });
     if (!data.token || !data.user) throw new Error("密码重置失败");
     saveAuthenticatedUser(data);
+    await refreshAuthenticatedQuestions();
     els.resetForm.reset();
     showAuth(false);
     renderAll();
@@ -2413,6 +2692,17 @@ function bindEvents() {
   els.retryExamSubmitBtn?.addEventListener("click", finishQuiz);
   els.adminEmployeeForm?.addEventListener("submit", addAdminEmployee);
   els.adminEmployeeList?.addEventListener("click", handleAdminEmployeeAction);
+  els.adminQuestionForm?.addEventListener("submit", saveAdminQuestion);
+  els.adminQuestionList?.addEventListener("click", handleAdminQuestionAction);
+  els.adminQuestionPagination?.addEventListener("click", handleAdminQuestionAction);
+  [els.adminQuestionSearch, els.adminQuestionBank, els.adminQuestionStatus].forEach((control) => {
+    control?.addEventListener(control === els.adminQuestionSearch ? "input" : "change", () => {
+      state.adminQuestionPage = 1;
+      renderAdminQuestions();
+    });
+  });
+  els.adminQuestionDialogClose?.addEventListener("click", closeAdminQuestionEditor);
+  els.adminQuestionCancel?.addEventListener("click", closeAdminQuestionEditor);
   document.querySelectorAll(".password-toggle").forEach((button) => {
     button.addEventListener("click", () => {
       const input = document.getElementById(button.dataset.target);
@@ -2423,6 +2713,7 @@ function bindEvents() {
     });
   });
   els.logoutBtn.addEventListener("click", logout);
+  els.installAppBtn?.addEventListener("click", handleAppInstallOrUpdate);
   els.mobileSidebarToggle?.addEventListener("click", () => {
     const open = !els.sidebarTools.classList.contains("mobile-open");
     els.sidebarTools.classList.toggle("mobile-open", open);
@@ -2443,7 +2734,14 @@ async function init() {
     if (state.currentUser) {
       try {
         const session = await cloudRequest("session", {});
-        if (session?.token && session?.user) saveAuthenticatedUser(session);
+        if (session?.token && session?.user) {
+          saveAuthenticatedUser(session);
+          try {
+            await loadQuestionChanges();
+          } catch (error) {
+            setSyncStatus(`题库云端修改暂时无法读取：${error.message}`, "error");
+          }
+        }
       } catch {
         clearAuthenticationSession();
       }
@@ -2458,6 +2756,7 @@ async function init() {
     await loadCloudStats();
     renderAll();
     showAuth(!state.currentUser);
+    await registerInstallableApp();
   } catch (error) {
     document.body.innerHTML = `<div class="empty">题库加载失败：${escapeHtml(error.message)}</div>`;
     throw error;

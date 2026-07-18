@@ -79,7 +79,8 @@ def main() -> None:
         "loginForm", "registerForm", "resetForm", "resetName", "resetRole",
         "examSubmitStatus", "retryExamSubmitBtn", "adminDataWarning",
         "adminEmployeeForm", "adminEmployeeList", "adminPracticeList",
-        "exportPracticeRecordsBtn",
+        "exportPracticeRecordsBtn", "adminQuestionList", "adminQuestionForm",
+        "adminQuestionSearch", "adminQuestionDialog", "installAppBtn",
     }
     missing = sorted(required_ids - parser.ids)
     if missing:
@@ -95,6 +96,8 @@ def main() -> None:
         "CLOUD_TIMEOUT_MS = 60000", "PRACTICE_AUTO_NEXT_DELAY_MS",
         "FORMAL_AUTO_NEXT_DELAY_MS", "adminEmployeeForm", "adminEmployeeList",
         "practice-submit", "adminPracticeList", "exportPracticeRecordsBtn",
+        "admin-questions", "adminQuestionList", "adminQuestionForm",
+        "service-worker.js", "manifest.webmanifest", "beforeinstallprompt",
     )
     for needle in required:
         if needle not in app_text and needle not in index_text:

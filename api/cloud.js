@@ -186,6 +186,9 @@ const MISTAKE_FIELD_NAMES = [
   '记录时间', '错选', '正确答案', '解析', '题库', '知识点',
   '考试提交编号', '题目', '姓名', '手机号', '岗位',
 ];
+const QUESTION_CHANGE_FIELD_NAMES = [
+  '题目ID', '状态', '修改内容', '修改时间', '修改人', '修改人手机',
+];
 const tableFieldsReady = new Map();
 
 async function listFields(tableId) {
@@ -251,6 +254,7 @@ async function ensureTableFields(tableIdPromise, fieldNames) {
 }
 
 let practiceTablePromise = null;
+let questionChangeTablePromise = null;
 
 async function practiceTableId() {
   if (practiceTablePromise) return practiceTablePromise;
@@ -288,9 +292,44 @@ async function practiceTableId() {
   }
 }
 
+async function questionChangeTableId() {
+  if (questionChangeTablePromise) return questionChangeTablePromise;
+  questionChangeTablePromise = (async () => {
+    try {
+      return await resolveTableId('', ['题库修改记录', '题库管理记录']);
+    } catch (error) {
+      if (error?.code !== 'TABLE_NOT_FOUND') throw error;
+      const token = await getTenantToken();
+      const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          table: {
+            name: '题库修改记录',
+            default_view_name: '题库修改',
+            fields: QUESTION_CHANGE_FIELD_NAMES.map((fieldName) => ({ field_name: fieldName, type: 1 })),
+          },
+        }),
+      });
+      const tableId = data?.data?.table?.table_id || data?.data?.table_id;
+      if (!tableId) throw new FeishuApiError('题库修改记录表创建失败', { code: 'QUESTION_CHANGE_TABLE_CREATE_FAILED', status: 500 });
+      cachedTables = null;
+      cachedTablesExpireAt = 0;
+      return tableId;
+    }
+  })();
+  try {
+    return await questionChangeTablePromise;
+  } catch (error) {
+    questionChangeTablePromise = null;
+    throw error;
+  }
+}
+
 const examTableReady = () => ensureTableFields(examTableId(), EXAM_FIELD_NAMES);
 const practiceTableReady = () => ensureTableFields(practiceTableId(), PRACTICE_FIELD_NAMES);
 const mistakeTableReady = () => ensureTableFields(mistakeTableId(), MISTAKE_FIELD_NAMES);
+const questionChangeTableReady = () => ensureTableFields(questionChangeTableId(), QUESTION_CHANGE_FIELD_NAMES);
 
 const allowedRoles = new Set([
   '运营', '客服', '美工', '主播', '中控', '采购', '财务', '行政', '审单', '仓储', '管理', '新员工',
@@ -299,12 +338,14 @@ const allowedRoles = new Set([
 const PRODUCT_QUESTION_PATH = path.join(__dirname, '..', 'outputs', 'product_quiz', '金尊产品知识库题库.json');
 const ROLE_QUESTION_PATH = path.join(__dirname, '..', 'outputs', 'role_quiz', '岗位学习考核题库.json');
 let serverQuestionsPromise = null;
+let questionChangesCache = null;
+let questionChangesExpireAt = 0;
 
 function loadJsonFile(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
-async function loadServerQuestions() {
+function loadBaseServerQuestions() {
   if (!serverQuestionsPromise) {
     serverQuestionsPromise = Promise.resolve([
       ...loadJsonFile(PRODUCT_QUESTION_PATH),
@@ -312,6 +353,47 @@ async function loadServerQuestions() {
     ]);
   }
   return serverQuestionsPromise;
+}
+
+async function loadQuestionChanges() {
+  if (questionChangesCache && Date.now() < questionChangesExpireAt) return questionChangesCache;
+  const tableId = await questionChangeTableReady();
+  const records = await listRecords(tableId);
+  questionChangesCache = records.flatMap((record) => {
+    const id = String(record['题目ID'] || '').trim();
+    if (!id) return [];
+    let patch = {};
+    try {
+      patch = JSON.parse(String(record['修改内容'] || '{}'));
+    } catch {
+      patch = {};
+    }
+    return [{
+      id,
+      status: String(record['状态'] || '启用') === '删除' ? 'deleted' : 'active',
+      patch: patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : {},
+      updatedAt: record['修改时间'] || '',
+      updatedBy: record['修改人'] || '',
+    }];
+  });
+  questionChangesExpireAt = Date.now() + 15_000;
+  return questionChangesCache;
+}
+
+function applyQuestionChanges(questions, changes, includeDeleted = false) {
+  const byId = new Map(changes.map((change) => [String(change.id), change]));
+  return questions.flatMap((question) => {
+    const change = byId.get(String(question.id));
+    if (!change) return [{ ...question, _changeStatus: 'original' }];
+    const merged = { ...question, ...change.patch, _changeStatus: change.status, _updatedAt: change.updatedAt, _updatedBy: change.updatedBy };
+    if (change.status === 'deleted' && !includeDeleted) return [];
+    return [merged];
+  });
+}
+
+async function loadServerQuestions() {
+  const [questions, changes] = await Promise.all([loadBaseServerQuestions(), loadQuestionChanges()]);
+  return applyQuestionChanges(questions, changes);
 }
 
 const publicQuestion = (question) => {
@@ -663,6 +745,73 @@ async function handleAdminPassword(payload) {
   if (!record) throw httpError(404, '未找到员工账号');
   await updateRecord(tableId, record.record_id, { '密码哈希': await passwordHash(password), '登录失败次数': '0', '锁定截止时间': '', '密码更新时间': dt(new Date()), '会话版本': nextSessionVersion(record), '备注': '管理员修改员工密码' });
   return { ok: true, phone };
+}
+
+const QUESTION_EDITABLE_FIELDS = [
+  'bank', 'code', 'knowledgePoint', 'question',
+  'optionA', 'optionB', 'optionC', 'optionD', 'answer', 'explanation',
+];
+
+function questionPatchFromPayload(payload, original) {
+  const input = payload.question && typeof payload.question === 'object' ? payload.question : {};
+  const patch = {};
+  for (const field of QUESTION_EDITABLE_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(input, field)) continue;
+    const limit = field === 'explanation' ? 3000 : field.startsWith('option') || field === 'question' ? 1000 : 200;
+    patch[field] = String(input[field] ?? '').trim().slice(0, limit);
+  }
+  const merged = { ...original, ...patch };
+  if (!merged.bank || !merged.question || !merged.optionA || !merged.optionB || !merged.optionC || !merged.optionD) {
+    throw httpError(400, '题库、题干和四个选项不能为空');
+  }
+  if (!['A', 'B', 'C', 'D'].includes(merged.answer)) throw httpError(400, '正确答案必须是 A、B、C 或 D');
+  patch.answerText = merged[`option${merged.answer}`];
+  return patch;
+}
+
+async function saveQuestionChange(id, status, patch, user) {
+  const tableId = await questionChangeTableReady();
+  const existing = await searchRecordsReliable(tableId, '题目ID', id);
+  const fields = {
+    '题目ID': id,
+    '状态': status === 'deleted' ? '删除' : '启用',
+    '修改内容': JSON.stringify(patch || {}),
+    '修改时间': dt(new Date()),
+    '修改人': user.name || '',
+    '修改人手机': cleanPhone(user.phone),
+  };
+  const saved = existing[0]?.record_id
+    ? await updateRecord(tableId, existing[0].record_id, fields)
+    : await createRecord(tableId, fields);
+  questionChangesCache = null;
+  questionChangesExpireAt = 0;
+  return saved;
+}
+
+async function handleAdminQuestions(payload, user) {
+  const operation = String(payload.operation || 'list');
+  if (operation === 'list') {
+    const [questions, changes] = await Promise.all([loadBaseServerQuestions(), loadQuestionChanges()]);
+    return { ok: true, total: questions.length, changes };
+  }
+  const id = String(payload.id || '').trim().slice(0, 120);
+  if (!id) throw httpError(400, '题目ID不正确');
+  const questions = await loadBaseServerQuestions();
+  const original = questions.find((question) => String(question.id) === id);
+  if (!original) throw httpError(404, '未找到该题目');
+  const existingChange = (await loadQuestionChanges()).find((change) => String(change.id) === id);
+  if (operation === 'update') {
+    const patch = questionPatchFromPayload(payload, { ...original, ...(existingChange?.patch || {}) });
+    await saveQuestionChange(id, 'active', { ...(existingChange?.patch || {}), ...patch }, user);
+  } else if (operation === 'delete') {
+    await saveQuestionChange(id, 'deleted', existingChange?.patch || {}, user);
+  } else if (operation === 'restore') {
+    await saveQuestionChange(id, 'active', existingChange?.patch || {}, user);
+  } else {
+    throw httpError(400, '不支持的题库管理操作');
+  }
+  const change = (await loadQuestionChanges()).find((item) => String(item.id) === id);
+  return { ok: true, change };
 }
 
 async function createRecord(tableId, fields) {
@@ -1100,12 +1249,17 @@ module.exports = async (req, res) => {
       const user = await requireActiveUser(req, payload);
       return json(req, res, 200, { ok: true, token: authTokenFor(user), user });
     }
+    if (action === 'questions') {
+      await requireActiveUser(req, payload);
+      return json(req, res, 200, { ok: true, changes: await loadQuestionChanges() });
+    }
     if (action.startsWith('admin-')) {
       const user = await requireAdmin(req, payload);
       if (action === 'admin-list') return json(req, res, 200, await handleAdminList());
       if (action === 'admin-add') return json(req, res, 200, await handleAdminAdd(payload));
       if (action === 'admin-delete') return json(req, res, 200, await handleAdminDelete(payload, user));
       if (action === 'admin-password') return json(req, res, 200, await handleAdminPassword(payload));
+      if (action === 'admin-questions') return json(req, res, 200, await handleAdminQuestions(payload, user));
     }
     if (action === 'reset') return json(req, res, 200, await handlePasswordReset(payload));
     if (action === 'register') return json(req, res, 200, await handleRegister(payload));
@@ -1144,5 +1298,8 @@ module.exports = async (req, res) => {
   }
 };
 
-module.exports._test = { selectExamQuestions, selectMooncakeExamQuestions, examPool, productQuestionAllowedForRole, handlePracticeSubmitOnce };
+module.exports._test = {
+  selectExamQuestions, selectMooncakeExamQuestions, examPool, productQuestionAllowedForRole,
+  handlePracticeSubmitOnce, applyQuestionChanges, questionPatchFromPayload,
+};
 

@@ -3,8 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#123d4d" />
+    <meta name="application-name" content="金尊知识库" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20260718-question-admin1" />
+    <link rel="icon" href="./assets/app-icons/icon-192.png" />
     <title>金尊知识库学习考核</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-practice-sync-fix1" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-question-admin1" />
   </head>
   <body>
     <section id="authView" class="auth-view">
@@ -148,6 +152,7 @@
             <button id="logoutBtn" class="text-btn" type="button">切换账号</button>
           </div>
         </div>
+        <button id="installAppBtn" class="install-app-btn hidden" type="button">安装到电脑</button>
 
         <div class="side-panel">
           <p class="side-label">题库筛选</p>
@@ -350,6 +355,20 @@
             <p id="adminAccountStatus" class="form-error"></p>
             <div id="adminEmployeeList" class="admin-table"></div>
           </div>
+          <div class="admin-panel admin-question-panel">
+            <div class="admin-question-head">
+              <div><h4>题库明细</h4><p>管理员的修改和删除会同时影响学习、练习和正式考试。</p></div>
+              <strong id="adminQuestionCount">0 题</strong>
+            </div>
+            <div class="admin-question-filters">
+              <input id="adminQuestionSearch" class="text-input" placeholder="搜索题目ID、货号、题干或选项" />
+              <select id="adminQuestionBank" class="select"><option value="">全部题库</option></select>
+              <select id="adminQuestionStatus" class="select"><option value="active">当前有效</option><option value="changed">已修改</option><option value="deleted">已删除</option><option value="all">全部状态</option></select>
+            </div>
+            <p id="adminQuestionMessage" class="form-error"></p>
+            <div id="adminQuestionList" class="admin-table admin-question-list"></div>
+            <div id="adminQuestionPagination" class="pagination"></div>
+          </div>
           <div id="adminMetrics" class="summary-grid"></div>
           <div class="admin-grid">
             <div class="admin-panel">
@@ -365,12 +384,33 @@
             <h4>最近练习记录</h4>
             <div id="adminPracticeList" class="admin-table"></div>
           </div>
+          <dialog id="adminQuestionDialog" class="admin-question-dialog">
+            <form id="adminQuestionForm">
+              <div class="dialog-head"><div><p class="eyebrow">Question editor</p><h4>修改题目</h4></div><button id="adminQuestionDialogClose" class="icon-btn" type="button" aria-label="关闭" title="关闭">&times;</button></div>
+              <input id="adminQuestionId" type="hidden" />
+              <div class="admin-question-form-grid">
+                <label>题库<input id="adminEditBank" class="text-input" required maxlength="200" /></label>
+                <label>货号/编码<input id="adminEditCode" class="text-input" maxlength="200" /></label>
+                <label>知识点<input id="adminEditKnowledgePoint" class="text-input" maxlength="200" /></label>
+                <label>正确答案<select id="adminEditAnswer" class="select" required><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
+              </div>
+              <label>题干<textarea id="adminEditQuestion" class="text-input" required maxlength="1000" rows="3"></textarea></label>
+              <div class="admin-option-grid">
+                <label>A 选项<textarea id="adminEditOptionA" class="text-input" required maxlength="1000" rows="2"></textarea></label>
+                <label>B 选项<textarea id="adminEditOptionB" class="text-input" required maxlength="1000" rows="2"></textarea></label>
+                <label>C 选项<textarea id="adminEditOptionC" class="text-input" required maxlength="1000" rows="2"></textarea></label>
+                <label>D 选项<textarea id="adminEditOptionD" class="text-input" required maxlength="1000" rows="2"></textarea></label>
+              </div>
+              <label>答案解析<textarea id="adminEditExplanation" class="text-input" maxlength="3000" rows="3"></textarea></label>
+              <div class="dialog-actions"><button id="adminQuestionCancel" class="secondary-btn" type="button">取消</button><button class="primary-btn" type="submit">保存修改</button></div>
+            </form>
+          </dialog>
         </section>
       </main>
     </div>
 
     <script src="./mooncake-filter.js?v=af8d1d9"></script>
-    <script src="./app.js?v=20260718-practice-sync-fix1" type="module"></script>
+    <script src="./app.js?v=20260718-question-admin1" type="module"></script>
   </body>
 </html>
 

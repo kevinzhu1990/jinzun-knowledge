@@ -11,11 +11,13 @@ required_api = (
     "examSubmitLocks", "考试会话ID", "考试提交编号", "wrong_details",
     "requireActiveUser", "Authorization", "admin-add", "admin-delete",
     "admin-password", "session", "是否管理员",
+    "admin-questions", "questionChangeTableReady", "applyQuestionChanges",
     "selectMooncakeExamQuestions", "MOONCAKE_IMAGE_POINTS", "MOONCAKE_FLAVOR_POINTS",
 )
 required_app = (
     "cloudRequest", 'cloudRequest("exam-start"', 'cloudRequest("exam-submit"',
     'syncLater("practice-submit"', "exportPracticeRecordsBtn", "adminPracticeList",
+    "adminQuestionList", "adminQuestionForm", "loadQuestionChanges",
     'syncLater("mistakes"', "PRACTICE_AUTO_NEXT_DELAY_MS",
     "FORMAL_AUTO_NEXT_DELAY_MS", "retryExamSubmitBtn",
     'localStorage.getItem("jz_auth_token")',
