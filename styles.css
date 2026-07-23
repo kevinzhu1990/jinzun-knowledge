@@ -461,6 +461,7 @@ button {
 
 #heroSlogan {
   min-height: 2.6em;
+  color: #17283d;
   opacity: 0;
   transform: translateY(6px);
   transition: none;
@@ -501,6 +502,10 @@ button {
   margin: 12px 0 0;
   color: var(--muted);
   line-height: 1.7;
+}
+
+.hero p {
+  color: #40546a;
 }
 
 .score-ring {
@@ -1271,6 +1276,27 @@ input:disabled {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.review-plan-count {
+  color: #40546a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.review-schedule {
+  color: #7c4a03 !important;
+  background: #fff7d6 !important;
+  border-color: #ead486 !important;
+}
+
+.learn-item.due-review {
+  border-left: 4px solid #c27a08;
+}
+
+.learn-item.scheduled-review {
+  border-left: 4px solid #4d7c8b;
+  background: #f8fbfc;
 }
 
 .wrong-review {

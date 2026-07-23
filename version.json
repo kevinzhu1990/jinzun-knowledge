@@ -1,6 +1,6 @@
 {
-  "buildVersion": "20260718-version-check1",
+  "buildVersion": "20260723-mistake-review1",
   "desktopVersion": "1.0.0",
-  "updatedAt": "2026-07-18T23:30:00+08:00",
-  "notes": "新增应用内自动及手动检查最新版本"
+  "updatedAt": "2026-07-23T12:00:00+08:00",
+  "notes": "错题复习新增1天、3天、7天、14天遗忘曲线排程，并提高总览说明文字对比度"
 }

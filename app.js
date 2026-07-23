@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260718-version-check1";
+const BUILD_VERSION = "20260723-mistake-review1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -870,6 +870,62 @@ const questionIdentity = (question) => [
   question.type || "",
 ].join("|");
 
+const MISTAKE_REVIEW_INTERVAL_DAYS = [0, 1, 3, 7, 14];
+
+function mistakeReviewStage(question) {
+  const stage = Number(question?.reviewStage || 0);
+  return Math.max(0, Math.min(MISTAKE_REVIEW_INTERVAL_DAYS.length - 1, Number.isFinite(stage) ? stage : 0));
+}
+
+function mistakeDueTime(question) {
+  const value = question?.nextReviewAt || question?.savedAt;
+  const timestamp = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function isMistakeDue(question, now = Date.now()) {
+  return mistakeDueTime(question) <= now;
+}
+
+function scheduledReviewDate(days) {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
+}
+
+function reviewDateLabel(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "今日";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  const dayDiff = Math.round((target - today) / 86400000);
+  if (dayDiff <= 0) return "今日";
+  if (dayDiff === 1) return "明日";
+  return `${target.getMonth() + 1}月${target.getDate()}日`;
+}
+
+function advanceMistakeReview(question) {
+  const key = questionIdentity(question);
+  const mistakes = storage.mistakes;
+  const index = mistakes.findIndex((item) => questionIdentity(item) === key);
+  if (index < 0) return;
+  const nextStage = mistakeReviewStage(mistakes[index]) + 1;
+  if (nextStage >= MISTAKE_REVIEW_INTERVAL_DAYS.length) {
+    mistakes.splice(index, 1);
+  } else {
+    mistakes[index] = {
+      ...mistakes[index],
+      reviewStage: nextStage,
+      lastReviewedAt: new Date().toISOString(),
+      nextReviewAt: scheduledReviewDate(MISTAKE_REVIEW_INTERVAL_DAYS[nextStage]),
+    };
+  }
+  storage.mistakes = mistakes;
+}
+
 function reconcileStoredQuestions() {
   if (!state.currentUser) return;
   const byId = new Map(state.allQuestions.map((question) => [question.id, question]));
@@ -887,7 +943,15 @@ function reconcileStoredQuestions() {
     const key = questionIdentity(current);
     if (seen.has(key)) return [];
     seen.add(key);
-    return [{ ...current, selected: oldQuestion.selected || "", savedAt: oldQuestion.savedAt || new Date().toISOString() }];
+    const savedAt = oldQuestion.savedAt || new Date().toISOString();
+    return [{
+      ...current,
+      selected: oldQuestion.selected || "",
+      savedAt,
+      reviewStage: mistakeReviewStage(oldQuestion),
+      nextReviewAt: oldQuestion.nextReviewAt || savedAt,
+      lastReviewedAt: oldQuestion.lastReviewedAt || "",
+    }];
   });
   storage.mistakes = migratedMistakes.slice(0, 300);
 
@@ -952,6 +1016,8 @@ function renderStats() {
 function renderDashboard() {
   const records = storage.examRecords;
   const mistakes = storage.mistakes;
+  const dueMistakes = mistakes.filter((question) => isMistakeDue(question));
+  const scheduledMistakes = mistakes.length - dueMistakes.length;
   const todayRecords = records.filter((record) => record.finishedAt && todayKey(record.finishedAt) === todayKey());
   const best = records.reduce((acc, record) => Math.max(acc, Number(record.percent) || 0), 0);
   const last = records[0];
@@ -961,9 +1027,9 @@ function renderDashboard() {
       <span>${todayRecords.length ? "✓" : "1"}</span>
       <div><strong>完成今日考核</strong><small>${todayRecords.length ? `今日已完成 ${todayRecords.length} 次` : "建议先做 30-50 题正式考核"}</small></div>
     </div>
-    <div class="task-card ${mistakes.length === 0 ? "done" : ""}">
-      <span>${mistakes.length === 0 ? "✓" : "2"}</span>
-      <div><strong>复习错题</strong><small>${mistakes.length ? `还有 ${mistakes.length} 道错题待重练` : "当前没有待复习错题"}</small></div>
+    <div class="task-card ${dueMistakes.length === 0 ? "done" : ""}">
+      <span>${dueMistakes.length === 0 ? "✓" : "2"}</span>
+      <div><strong>复习错题</strong><small>${dueMistakes.length ? `今日待复习 ${dueMistakes.length} 道${scheduledMistakes ? `，另有 ${scheduledMistakes} 道已排程` : ""}` : scheduledMistakes ? `今日已完成，${scheduledMistakes} 道等待后续复习` : "当前没有待复习错题"}</small></div>
     </div>
     <div class="task-card ${best >= 90 ? "done" : ""}">
       <span>${best >= 90 ? "✓" : "3"}</span>
@@ -1700,10 +1766,14 @@ function chooseAnswer(letter) {
   if (correct === true) {
     storage.correct += 1;
     state.score += 1;
+    if (state.examLabelOverride === "错题重练") advanceMistakeReview(question);
   } else if (correct === false) {
     state.quizWrong += 1;
     state.wrongDetails.push({ ...question, selected: letter, savedAt: new Date().toISOString() });
-    if (state.examType === "practice") updateWrongCount();
+    if (state.examType === "practice") {
+      saveMistake(question, letter);
+      updateWrongCount();
+    }
   }
   els.quizScore.textContent = state.examType === "formal"
     ? `已答 ${state.answeredCount} 题`
@@ -1732,7 +1802,8 @@ function chooseAnswer(letter) {
 function saveMistake(question, selected) {
   const key = questionIdentity(question);
   const mistakes = storage.mistakes.filter((item) => questionIdentity(item) !== key);
-  const item = { ...question, selected, savedAt: new Date().toISOString() };
+  const savedAt = new Date().toISOString();
+  const item = { ...question, selected, savedAt, reviewStage: 0, nextReviewAt: savedAt, lastReviewedAt: "" };
   mistakes.unshift(item);
   storage.mistakes = mistakes.slice(0, 300);
 }
@@ -1906,7 +1977,10 @@ function saveExamRecord(percent) {
 
 function renderMistakes() {
   const mistakes = storage.mistakes;
-  els.retryMistakesBtn.disabled = !mistakes.length;
+  const dueMistakes = mistakes.filter((question) => isMistakeDue(question));
+  const scheduledMistakes = mistakes.filter((question) => !isMistakeDue(question));
+  els.retryMistakesBtn.disabled = !dueMistakes.length;
+  els.retryMistakesBtn.textContent = dueMistakes.length ? `重练今日错题（${dueMistakes.length}）` : "今日复习已完成";
   if (!mistakes.length) {
     els.mistakeList.innerHTML = `<div class="empty">现在还没有错题记录。</div>`;
     return;
@@ -1920,18 +1994,20 @@ function renderMistakes() {
     .map(([name, count]) => `<span class="pill">${escapeHtml(name)} ${count}</span>`).join("");
   els.mistakeList.innerHTML = `
     <div class="mistake-summary">
-      <strong>待复习 ${mistakes.length} 道</strong>
+      <strong>今日待复习 ${dueMistakes.length} 道</strong>
+      <span class="review-plan-count">已排程 ${scheduledMistakes.length} 道</span>
       <div>${topTags}</div>
     </div>
-    ${mistakes
+    ${[...dueMistakes, ...scheduledMistakes]
       .map(
         (question) => `
-          <article class="learn-item">
+          <article class="learn-item ${isMistakeDue(question) ? "due-review" : "scheduled-review"}">
             <div>
               <div class="meta">
                 <span>${escapeHtml(question.bank)}</span>
                 <span>${escapeHtml(question.knowledgePoint)}</span>
                 <span>错选：${escapeHtml(question.selected)}</span>
+                <span class="review-schedule">${isMistakeDue(question) ? "今日到期" : `下次复习 ${reviewDateLabel(question.nextReviewAt)}`} · 第 ${mistakeReviewStage(question) + 1} 轮</span>
               </div>
               <h4>${escapeHtml(question.question)}</h4>
               <p class="answer-line">正确答案：${escapeHtml(question.answer)}｜${escapeHtml(displayAnswerText(question))}</p>
@@ -1948,7 +2024,7 @@ function renderMistakes() {
 
 function startMistakeQuiz() {
   clearAutoNextTimer();
-  const mistakes = storage.mistakes;
+  const mistakes = storage.mistakes.filter((question) => isMistakeDue(question));
   if (!mistakes.length) return;
   state.quiz = shuffle(mistakes).slice(0, Math.min(30, mistakes.length));
   state.quizIndex = 0;
