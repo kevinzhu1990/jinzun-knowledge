@@ -1,26 +1,62 @@
 from __future__ import annotations
-import json, os, re, sys
+import hashlib, json, os, re, sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=Path(os.environ.get('JINZUN_SOURCE_XLSX', str(ROOT.parent/'26年金尊产品信息表（月饼+饼干）20260709更新.xlsx')))
 PRODUCT=ROOT/'outputs/product_quiz/金尊产品知识库题库.json'
+SNAPSHOT=ROOT/'sources/product_info/product_source_snapshot_20260709.json'
+SYNC_REPORT=ROOT/'outputs/product_quiz/product_sync_diff_20260713.json'
 VERSION='20260714-product-sync'
 sys.path.insert(0,str(ROOT/'scripts'))
 import generate_product_quiz as generator
 
+def load_authoritative_products():
+    sync_report=json.loads(SYNC_REPORT.read_text(encoding='utf-8'))
+    expected_hash=str(sync_report.get('sourceSha256',''))
+    sheets=('26年月饼礼盒','26年散饼','26年糕点饼干')
+    if SOURCE.is_file():
+        actual_hash=hashlib.sha256(SOURCE.read_bytes()).hexdigest()
+        if actual_hash!=expected_hash:
+            raise ValueError(f'权威Excel哈希与同步记录不一致：{actual_hash}')
+        generator.SOURCE=SOURCE
+        data=generator.read_book(); products=[]
+        for sheet in sheets:
+            for row in data.get(sheet,[]):
+                code=generator.code(generator.get(row,'货号')); name=generator.get(row,'产品名称')
+                if code and name:
+                    products.append({'code':code,'name':name,'shelfLife':generator.get(row,'保质期'),'sheet':sheet})
+        return products,SOURCE
+
+    if not SNAPSHOT.is_file():
+        raise FileNotFoundError(f'缺少权威Excel且缺少可追溯快照：{SOURCE}；{SNAPSHOT}')
+    snapshot=json.loads(SNAPSHOT.read_text(encoding='utf-8'))
+    if snapshot.get('snapshotVersion')!='20260709-product-source-v1':
+        raise ValueError('产品权威快照版本不正确')
+    if snapshot.get('sourceSha256')!=expected_hash:
+        raise ValueError('产品权威快照与原始Excel同步哈希不一致')
+    products=snapshot.get('products')
+    if not isinstance(products,list) or len(products)!=73:
+        raise ValueError('产品权威快照必须包含73个在售产品')
+    codes=[str(product.get('code') or '') for product in products]
+    if len(codes)!=len(set(codes)) or any(not code for code in codes):
+        raise ValueError('产品权威快照货号为空或重复')
+    if any(not str(product.get('name') or '') or not str(product.get('shelfLife') or '') for product in products):
+        raise ValueError('产品权威快照缺少产品名称或保质期')
+    actual_sheets={sheet:sum(product.get('sheet')==sheet for product in products) for sheet in sheets}
+    if snapshot.get('sheets')!=actual_sheets:
+        raise ValueError('产品权威快照工作表计数与产品明细不一致')
+    return products,SNAPSHOT
+
 def main():
     errors=[]
-    if not SOURCE.is_file(): errors.append(f'缺少权威Excel：{SOURCE}')
-    if errors: print('\n'.join(errors)); raise SystemExit(1)
-    data=generator.read_book(); active=set(); source_shelf={}
-    for sheet in ('26年月饼礼盒','26年散饼','26年糕点饼干'):
-        for row in data.get(sheet,[]):
-            c=generator.code(generator.get(row,'货号')); n=generator.get(row,'产品名称')
-            if c and n:
-                active.add(c)
-                shelf=generator.get(row,'保质期')
-                if shelf: source_shelf[c]=shelf
+    try:
+        products,authority_source=load_authoritative_products()
+    except (FileNotFoundError,ValueError,json.JSONDecodeError) as error:
+        errors.append(str(error))
+        print('\n'.join(errors)); raise SystemExit(1)
+    active={str(product['code']) for product in products}
+    source_shelf={str(product['code']):str(product['shelfLife']) for product in products}
     qs=json.loads(PRODUCT.read_text(encoding='utf-8'))
     ids=[str(q.get('id','')) for q in qs]
     if len(ids)!=len(set(ids)): errors.append('产品题库ID重复')
@@ -55,7 +91,7 @@ def main():
         if forbidden in text: errors.append(f'存在禁用旧文字：{forbidden}')
     if '"code": "2608"' not in text or '杏仁饼258g' not in text: errors.append('2608杏仁饼资料未正确生成')
     merchant_questions=sum(q.get('bank')=='商家编码题库' for q in qs)
-    result={'ok':not errors,'source':str(SOURCE),'activeProducts':len(active),'productQuestions':len(qs),'merchantQuestions':merchant_questions,'productCodes':len(product_codes),'mooncakeCodes':len(moon),'errors':errors}
+    result={'ok':not errors,'source':str(authority_source),'rawExcelAvailable':SOURCE.is_file(),'activeProducts':len(active),'productQuestions':len(qs),'merchantQuestions':merchant_questions,'productCodes':len(product_codes),'mooncakeCodes':len(moon),'errors':errors}
     print(json.dumps(result,ensure_ascii=False,indent=2))
     if errors: raise SystemExit(1)
 if __name__=='__main__': main()

@@ -4,3 +4,6 @@ node_modules/
 .vercel
 desktop/node_modules/
 desktop/release/
+__pycache__/
+*.pyc
+.pytest_cache/
