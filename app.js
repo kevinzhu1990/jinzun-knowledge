@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260723-mistake-review1";
+const BUILD_VERSION = "20260811-wangdiantong1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -1520,6 +1520,10 @@ function renderLearningOverview() {
       let bank = "";
       if (id.startsWith("product|")) bank = id.split("|")[1] || "";
       else if (id.startsWith("merchant|")) bank = "商家编码题库";
+      else if (id.startsWith("rule|knowledge|")) {
+        const knowledgeId = id.slice("rule|knowledge|".length);
+        bank = state.allQuestions.find((question) => String(question.knowledgeId || "") === knowledgeId)?.bank || "";
+      }
       else if (id.startsWith("rule|")) bank = state.allQuestions.find((question) => question.id === id.slice(5))?.bank || "";
       if (!bank) return;
       const category = learnCategoryForBank(bank);
@@ -1666,16 +1670,111 @@ function learningScenario(question) {
   return String(question.question || "").replace(/[？?]$/, "");
 }
 
-function ruleLearningEntities() {
-  return state.filtered.map((question) => ({
-    id: `rule|${question.id}`,
+function normalizeRuleLearningItems(value) {
+  const values = Array.isArray(value) ? value : [value];
+  return values.map((item) => String(item ?? "").trim()).filter(Boolean);
+}
+
+function normalizeRuleSourceReferences(questions) {
+  const references = [];
+  const seen = new Set();
+  const append = (raw, fallbackSection = "") => {
+    const source = typeof raw === "string"
+      ? { url: raw.trim(), section: fallbackSection }
+      : {
+          url: String(raw?.url || raw?.sourceUrl || "").trim(),
+          section: String(raw?.section || raw?.sourceSection || fallbackSection || "").trim(),
+        };
+    if (!source.url || seen.has(source.url)) return;
+    seen.add(source.url);
+    references.push(source);
+  };
+  questions.forEach((question) => {
+    const rawReferences = Array.isArray(question.sourceReferences) ? question.sourceReferences : [];
+    rawReferences.forEach((reference) => append(reference, question.sourceSection));
+    if (!rawReferences.length && question.sourceUrl) append(question.sourceUrl, question.sourceSection);
+  });
+  return references;
+}
+
+function firstRuleLearningField(questions, field) {
+  for (const question of questions) {
+    const value = question[field];
+    if (Array.isArray(value) ? value.length : String(value ?? "").trim()) return value;
+  }
+  return undefined;
+}
+
+function ruleQuestionMistakes(question) {
+  return "ABCD".split("")
+    .filter((letter) => letter !== question.answer)
+    .map((letter) => question[`option${letter}`])
+    .filter(Boolean);
+}
+
+function buildRuleLearningEntity(questions, knowledgeId = "") {
+  const question = questions[0];
+  const explicitMistakes = normalizeRuleLearningItems(firstRuleLearningField(questions, "commonMistakes"));
+  const fallbackMistakes = [...new Set(questions.flatMap(ruleQuestionMistakes))].slice(0, 2);
+  return {
+    id: knowledgeId ? `rule|knowledge|${knowledgeId}` : `rule|${question.id}`,
+    knowledgeId,
+    questions,
     question,
-    title: question.code || question.knowledgePoint || question.module || question.bank,
-    scenario: learningScenario(question),
-    action: question.answerText,
-    reason: question.explanation,
-    mistakes: "ABCD".split("").filter((letter) => letter !== question.answer).map((letter) => question[`option${letter}`]).filter(Boolean).slice(0, 2),
-  }));
+    questionCount: questions.length,
+    title: firstRuleLearningField(questions, "knowledgeTitle") || question.code || question.knowledgePoint || question.module || question.bank,
+    scenario: firstRuleLearningField(questions, "learningScenario") || learningScenario(question),
+    action: firstRuleLearningField(questions, "standardAction") || question.answerText,
+    reason: firstRuleLearningField(questions, "explanation") || question.explanation,
+    entryPath: normalizeRuleLearningItems(firstRuleLearningField(questions, "entryPath")),
+    prerequisites: normalizeRuleLearningItems(firstRuleLearningField(questions, "prerequisites")),
+    steps: normalizeRuleLearningItems(firstRuleLearningField(questions, "steps")),
+    successChecks: normalizeRuleLearningItems(firstRuleLearningField(questions, "successChecks")),
+    exceptions: normalizeRuleLearningItems(firstRuleLearningField(questions, "exceptions")),
+    mistakes: explicitMistakes.length ? explicitMistakes : fallbackMistakes,
+    sources: normalizeRuleSourceReferences(questions),
+    riskLevel: questions.some((item) => item.riskLevel === "redline") ? "redline" : question.riskLevel,
+  };
+}
+
+function ruleLearningEntities() {
+  const knowledgeBuckets = new Map();
+  state.filtered.forEach((question) => {
+    const knowledgeId = String(question.knowledgeId || "").trim();
+    const key = knowledgeId ? `knowledge|${knowledgeId}` : `question|${question.id}`;
+    if (!knowledgeBuckets.has(key)) knowledgeBuckets.set(key, { knowledgeId, questions: [] });
+    knowledgeBuckets.get(key).questions.push(question);
+  });
+  return [...knowledgeBuckets.values()].map(({ knowledgeId, questions }) => buildRuleLearningEntity(questions, knowledgeId));
+}
+
+function renderRuleLearningBlock(label, values, variant = "", ordered = false) {
+  if (!values.length) return "";
+  const content = ordered
+    ? values.map((value, index) => `${index + 1}. ${escapeHtml(value)}`).join("<br>")
+    : values.map((value) => escapeHtml(value)).join("；");
+  return `<div class="rule-knowledge-block${variant ? ` ${variant}` : ""}"><span>${label}</span><p>${content}</p></div>`;
+}
+
+function renderRuleSourceReferences(sources) {
+  if (!sources.length) return "";
+  const content = sources.map((source, index) => {
+    const label = source.section || `资料来源 ${index + 1}`;
+    if (/^https?:\/\//i.test(source.url)) {
+      return `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+    }
+    return `<span>${escapeHtml(label)}</span>`;
+  }).join("；");
+  return `<div class="rule-knowledge-block"><span>资料来源</span><p>${content}</p></div>`;
+}
+
+function renderRuleOperationalBlocks(item) {
+  return `${item.entryPath.length ? renderRuleLearningBlock("入口路径", [item.entryPath.join(" → ")], "key") : ""}
+    ${renderRuleLearningBlock("前置条件", item.prerequisites)}
+    ${renderRuleLearningBlock("操作步骤", item.steps, "key", true)}
+    ${renderRuleLearningBlock("完成标志", item.successChecks)}
+    ${renderRuleLearningBlock("异常处理", item.exceptions, "warning", true)}
+    ${renderRuleSourceReferences(item.sources)}`;
 }
 
 function renderRuleLearning() {
@@ -1689,11 +1788,11 @@ function renderRuleLearning() {
     return;
   }
   if (state.learnMode === "compare") {
-    els.learnList.innerHTML = `<div class="learning-table-wrap"><table class="learning-compare-table"><thead><tr><th>模块</th><th>工作场景</th><th>标准动作</th><th>记忆原因</th></tr></thead><tbody>${pageItems.map((item) => `<tr><td>${escapeHtml(item.question.knowledgePoint || item.question.module)}</td><td>${escapeHtml(item.scenario)}</td><td>${escapeHtml(item.action)}</td><td>${escapeHtml(item.reason)}</td></tr>`).join("")}</tbody></table></div>`;
+    els.learnList.innerHTML = `<div class="learning-table-wrap"><table class="learning-compare-table"><thead><tr><th>模块</th><th>工作场景</th><th>入口路径</th><th>标准动作</th><th>完成标志</th><th>记忆原因</th></tr></thead><tbody>${pageItems.map((item) => `<tr><td>${escapeHtml(item.question.knowledgePoint || item.question.module)}</td><td>${escapeHtml(item.scenario)}</td><td>${escapeHtml(item.entryPath.join(" → ") || "--")}</td><td>${escapeHtml(item.action)}</td><td>${escapeHtml(item.successChecks.join("；") || "--")}</td><td>${escapeHtml(item.reason)}</td></tr>`).join("")}</tbody></table></div>`;
   } else if (state.learnMode === "flash") {
-    els.learnList.innerHTML = `<div class="memory-flash-grid">${pageItems.map((item) => `<article class="memory-flash-card"><div class="flash-front"><span>${escapeHtml(item.question.bank)}</span><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.scenario)}</p></div><div class="flash-back"><strong>标准动作</strong><p>${escapeHtml(item.action)}</p><small>${escapeHtml(item.reason)}</small>${learningActionButtons(item.id)}</div><button type="button" class="flash-reveal-btn" data-reveal-card>查看要点</button></article>`).join("")}</div>`;
+    els.learnList.innerHTML = `<div class="memory-flash-grid">${pageItems.map((item) => `<article class="memory-flash-card"><div class="flash-front"><span>${escapeHtml(item.question.bank)}</span><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.scenario)}</p></div><div class="flash-back"><div class="rule-knowledge-block key"><span>标准动作</span><p>${escapeHtml(item.action)}</p></div>${renderRuleOperationalBlocks(item)}${item.mistakes.length ? renderRuleLearningBlock("常见误区", item.mistakes, "warning") : ""}<small>${escapeHtml(item.reason)}</small>${learningActionButtons(item.id)}</div><button type="button" class="flash-reveal-btn" data-reveal-card>查看要点</button></article>`).join("")}</div>`;
   } else {
-    els.learnList.innerHTML = `<div class="rule-learning-grid">${pageItems.map((item) => `<article class="rule-knowledge-card"><div class="meta"><span>${escapeHtml(item.question.bank)}</span><span>${escapeHtml(item.question.knowledgePoint || item.question.module)}</span>${item.question.riskLevel === "redline" ? "<span class=\"redline-tag\">红线</span>" : ""}</div><h4>${escapeHtml(item.title)}</h4><div class="rule-knowledge-block"><span>工作场景</span><p>${escapeHtml(item.scenario)}</p></div><div class="rule-knowledge-block key"><span>标准动作</span><p>${escapeHtml(item.action)}</p></div><div class="rule-knowledge-block"><span>为什么</span><p>${escapeHtml(item.reason)}</p></div>${item.mistakes.length ? `<div class="rule-knowledge-block warning"><span>常见误区</span><p>${escapeHtml(item.mistakes.join("；"))}</p></div>` : ""}${learningActionButtons(item.id)}</article>`).join("")}</div>`;
+    els.learnList.innerHTML = `<div class="rule-learning-grid">${pageItems.map((item) => `<article class="rule-knowledge-card"><div class="meta"><span>${escapeHtml(item.question.bank)}</span><span>${escapeHtml(item.question.knowledgePoint || item.question.module)}</span>${item.riskLevel === "redline" ? "<span class=\"redline-tag\">红线</span>" : ""}${item.questionCount > 1 ? `<span>${item.questionCount} 道关联题</span>` : ""}</div><h4>${escapeHtml(item.title)}</h4><div class="rule-knowledge-block"><span>工作场景</span><p>${escapeHtml(item.scenario)}</p></div><div class="rule-knowledge-block key"><span>标准动作</span><p>${escapeHtml(item.action)}</p></div>${renderRuleOperationalBlocks(item)}<div class="rule-knowledge-block"><span>为什么</span><p>${escapeHtml(item.reason)}</p></div>${item.mistakes.length ? renderRuleLearningBlock("常见误区", item.mistakes, "warning") : ""}${learningActionButtons(item.id)}</article>`).join("")}</div>`;
   }
   bindLearningInteractions();
 }

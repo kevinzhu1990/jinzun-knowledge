@@ -39,6 +39,7 @@ ALLOWED_INTERNAL_SOURCES = {
     "INTERNAL-CS-SOP-2026": "客服内部服务规范与各平台售后规则",
     "INTERNAL-DESIGN-SOP-2026": "电商视觉规范与内部设计流程",
     "INTERNAL-ROLE-SOP-2026": "金尊岗位实操场景规范",
+    "INTERNAL-WDT-YUQUE-SOP-2026": "旺店通操作手册与金尊内部操作口径",
 }
 
 

@@ -6,6 +6,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import generate_product_quiz as generator
+import verify_product_quiz as product_verifier
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -81,14 +82,8 @@ def test_2535_shelf_life_has_requested_distractors():
 
 
 def test_every_shelf_life_answer_matches_latest_excel():
-    source = generator.read_book()
-    expected = {}
-    for sheet in ("26年月饼礼盒", "26年散饼", "26年糕点饼干"):
-        for row in source.get(sheet, []):
-            code = generator.code(generator.get(row, "货号"))
-            shelf = generator.get(row, "保质期")
-            if code and shelf:
-                expected[code] = shelf
+    products, _ = product_verifier.load_authoritative_products()
+    expected = {str(product["code"]): str(product["shelfLife"]) for product in products}
     questions = [question for question in load_product_questions() if question.get("knowledgePoint") == "保质期"]
     assert questions
     for question in questions:

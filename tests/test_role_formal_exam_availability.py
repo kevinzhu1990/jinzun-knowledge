@@ -22,12 +22,15 @@ def is_formal(question):
 
 def test_all_role_questions_are_ready_for_formal_exam():
     questions = load_questions()
-    assert len(questions) == 194
+    assert len(questions) == 314
     assert all(is_formal(question) for question in questions)
 
 
 def test_legacy_role_questions_have_traceable_internal_sources_and_realistic_options():
-    questions = [question for question in load_questions() if not str(question.get("id", "")).startswith("OPS-")]
+    questions = [
+        question for question in load_questions()
+        if not str(question.get("id", "")).startswith(("OPS-", "WDT-"))
+    ]
     assert len(questions) == 64
     forbidden = ("只发表情", "随便猜", "不回答", "保存个人密码", "直接删掉原文", "客户星座")
     for question in questions:
@@ -38,6 +41,24 @@ def test_legacy_role_questions_have_traceable_internal_sources_and_realistic_opt
         assert len(set(options)) == 4
         assert question[f"option{question['answer']}"] == question["answerText"]
         assert not any(term in option for option in options for term in forbidden)
+
+
+def test_wangdiantong_questions_are_split_by_employee_role():
+    questions = [question for question in load_questions() if str(question.get("id", "")).startswith("WDT-")]
+    expected = {
+        "客服": ("旺店通-客服", 36),
+        "审单": ("旺店通-审单", 32),
+        "运营": ("旺店通-运营", 26),
+        "采购": ("旺店通-采购", 16),
+        "管理": ("旺店通-管理", 10),
+    }
+    assert len(questions) == 120
+    assert "全员" not in {question.get("role") for question in questions}
+    for role, (bank, count) in expected.items():
+        matching = [question for question in questions if question.get("role") == role]
+        assert len(matching) == count, role
+        assert {question.get("bank") for question in matching} == {bank}
+        assert all(is_formal(question) for question in matching)
 
 
 def test_every_account_role_has_a_formal_all_staff_bank():
