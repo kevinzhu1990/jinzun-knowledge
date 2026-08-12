@@ -16,10 +16,15 @@ from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DATE = "2026-08-11"
-IMPORT_VERSION = "20260811-wangdiantong-quiz1"
+LEGACY_IMPORT_VERSION = "20260811-wangdiantong-quiz1"
+IMPORT_VERSION = "20260812-wdt-cs-inventory1"
 EXPECTED_CARD_COUNT = 60
-QUESTIONS_PER_CARD = 2
-EXPECTED_QUESTION_COUNT = EXPECTED_CARD_COUNT * QUESTIONS_PER_CARD
+DEFAULT_QUESTIONS_PER_CARD = 2
+CARD_QUESTION_COUNT_OVERRIDES = {"WDT-K018": 3}
+ADDITIONAL_ANSWER_TARGETS = {"WDT-018-C": "C"}
+LEGACY_QUESTION_COUNT = EXPECTED_CARD_COUNT * DEFAULT_QUESTIONS_PER_CARD
+EXPECTED_QUESTION_COUNT = LEGACY_QUESTION_COUNT + len(ADDITIONAL_ANSWER_TARGETS)
+EXPECTED_ANSWER_DISTRIBUTION = {"A": 30, "B": 30, "C": 31, "D": 30}
 QUESTION_PREFIX = "WDT-"
 SOURCE_ID = "INTERNAL-WDT-YUQUE-SOP-2026"
 SOURCE_TITLE = "旺店通操作手册与金尊内部操作口径"
@@ -58,8 +63,8 @@ ROLE_XLSX = ROLE_DIR / "岗位学习考核题库.xlsx"
 ARCHIVE_DIR = ROLE_DIR / "archive"
 ARCHIVE_JSON = ARCHIVE_DIR / "岗位学习考核题库-before-wangdiantong-20260811.json"
 ARCHIVE_XLSX = ARCHIVE_DIR / "岗位学习考核题库-before-wangdiantong-20260811.xlsx"
-REPORT_JSON = ROLE_DIR / "旺店通题库导入报告_20260811.json"
-REPORT_MD = ROLE_DIR / "旺店通题库导入报告_20260811.md"
+REPORT_JSON = ROLE_DIR / "旺店通题库导入报告_20260812.json"
+REPORT_MD = ROLE_DIR / "旺店通题库导入报告_20260812.md"
 
 BASE_FIELDS = (
     "id",
@@ -439,14 +444,18 @@ def canonical_question(card: dict, raw_question: dict, question_index: int) -> d
         "humanReviewStatus": human_review_status,
         "sourceConflict": source_conflict,
         "semanticDuplicate": semantic_duplicate,
-        "reviewedAt": SOURCE_DATE,
+        "reviewedAt": _inherit(raw_question, card, "reviewedAt", SOURCE_DATE),
         "reviewNote": _inherit(
             raw_question,
             card,
             "reviewNote",
             "已按旺店通语雀操作手册和金尊内部操作口径核对题干、步骤、答案与干扰项。",
         ),
-        "importBatch": IMPORT_VERSION,
+        "importBatch": (
+            IMPORT_VERSION
+            if question_id in ADDITIONAL_ANSWER_TARGETS
+            else LEGACY_IMPORT_VERSION
+        ),
     }
 
     # Source-only authoring conveniences must not become redundant runtime fields.
@@ -468,10 +477,13 @@ def flatten_cards(cards: list[dict]) -> list[dict]:
             raise ValueError(f"第{card_index + 1}张知识卡缺少id/knowledgeId")
         card_ids.append(card_id)
         questions = card.get("questions")
-        if not isinstance(questions, list) or len(questions) != QUESTIONS_PER_CARD:
+        expected_question_count = CARD_QUESTION_COUNT_OVERRIDES.get(
+            card_id, DEFAULT_QUESTIONS_PER_CARD
+        )
+        if not isinstance(questions, list) or len(questions) != expected_question_count:
             count = len(questions) if isinstance(questions, list) else "非数组"
             raise ValueError(
-                f"{card_id} 必须包含{QUESTIONS_PER_CARD}道完全作者化questions，当前为{count}"
+                f"{card_id} 必须包含{expected_question_count}道完全作者化questions，当前为{count}"
             )
         flattened.extend(
             canonical_question(card, question, index)
@@ -511,11 +523,34 @@ def balance_answer_positions(questions: list[dict]) -> list[dict]:
         raise ValueError(
             f"答案均衡需要{EXPECTED_QUESTION_COUNT}题，当前为{len(questions)}题"
         )
-    target_letters = list("A" * 30 + "B" * 30 + "C" * 30 + "D" * 30)
-    random.Random(IMPORT_VERSION).shuffle(target_letters)
+    legacy_questions = [
+        question
+        for question in questions
+        if question["id"] not in ADDITIONAL_ANSWER_TARGETS
+    ]
+    additional_ids = {
+        question["id"]
+        for question in questions
+        if question["id"] in ADDITIONAL_ANSWER_TARGETS
+    }
+    if len(legacy_questions) != LEGACY_QUESTION_COUNT or additional_ids != set(
+        ADDITIONAL_ANSWER_TARGETS
+    ):
+        raise ValueError(
+            "答案均衡基线异常：必须保留原120题，并包含全部显式新增题"
+        )
+
+    legacy_target_letters = list("A" * 30 + "B" * 30 + "C" * 30 + "D" * 30)
+    random.Random(LEGACY_IMPORT_VERSION).shuffle(legacy_target_letters)
+    target_by_id = {
+        question["id"]: target
+        for question, target in zip(legacy_questions, legacy_target_letters)
+    }
+    target_by_id.update(ADDITIONAL_ANSWER_TARGETS)
     result: list[dict] = []
 
-    for target, original in zip(target_letters, questions):
+    for original in questions:
+        target = target_by_id[original["id"]]
         question = dict(original)
         old_answer = question["answer"]
         old_options = {
@@ -525,7 +560,7 @@ def balance_answer_positions(questions: list[dict]) -> list[dict]:
         distractors = [
             old_options[letter] for letter in "ABCD" if letter != old_answer
         ]
-        random.Random(f"{IMPORT_VERSION}:{question['id']}").shuffle(distractors)
+        random.Random(f"{LEGACY_IMPORT_VERSION}:{question['id']}").shuffle(distractors)
         distractor_iter = iter(distractors)
         new_options = {
             letter: correct_text if letter == target else next(distractor_iter)
@@ -720,7 +755,10 @@ def validate_questions(questions: list[dict]) -> dict[str, Any]:
     bad_knowledge_counts = {
         knowledge_id: count
         for knowledge_id, count in knowledge_counts.items()
-        if count != QUESTIONS_PER_CARD
+        if count
+        != CARD_QUESTION_COUNT_OVERRIDES.get(
+            knowledge_id, DEFAULT_QUESTIONS_PER_CARD
+        )
     }
     if len(knowledge_counts) != EXPECTED_CARD_COUNT or bad_knowledge_counts:
         raise ValueError(
@@ -728,9 +766,10 @@ def validate_questions(questions: list[dict]) -> dict[str, Any]:
         )
 
     answer_counts = Counter(question["answer"] for question in questions)
-    expected_distribution = {letter: 30 for letter in "ABCD"}
-    if dict(answer_counts) != expected_distribution:
-        raise ValueError(f"答案字母分布必须为A/B/C/D各30题，当前为{dict(answer_counts)}")
+    if dict(answer_counts) != EXPECTED_ANSWER_DISTRIBUTION:
+        raise ValueError(
+            f"答案字母分布必须为{EXPECTED_ANSWER_DISTRIBUTION}，当前为{dict(answer_counts)}"
+        )
 
     extremes = correct_extreme_rates(questions)
     if extremes["uniqueLongestCorrectRate"] > 0.40:
@@ -944,10 +983,10 @@ def report_markdown(report: dict[str, Any]) -> str:
         + json.dumps(report["platformDistribution"], ensure_ascii=False, indent=2)
         + "\n```\n\n"
         "## 导入约束\n\n"
-        "- 每张知识卡必须有 2 道完全作者化单选题。\n"
+        "- 默认每张知识卡必须有 2 道完全作者化单选题；WDT-K018 因用户截图增补为 3 道。\n"
         "- 客服、审单、运营、采购、管理分别进入对应的旺店通岗位题库，禁止全员或其他岗位。\n"
         "- 只替换 `WDT-` 前缀题目，其他岗位题保持原样。\n"
-        "- A/B/C/D 各 30 道，不允许复用整组四选项。\n"
+        f"- 答案分布为 {_json_text(EXPECTED_ANSWER_DISTRIBUTION)}，不允许复用整组四选项。\n"
         "- 每个错误选项必须提供独立错误原因。\n"
         "- 正确项唯一最长/最短比例各不超过 40%，单题最长/最短选项长度比不超过 1.8。\n"
     )

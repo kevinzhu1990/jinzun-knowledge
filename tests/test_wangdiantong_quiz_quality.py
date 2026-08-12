@@ -145,13 +145,17 @@ def load_role_output() -> list[dict]:
     return json.loads(module.ROLE_JSON.read_text(encoding="utf-8"))
 
 
-def test_source_has_60_cards_and_two_fully_authored_questions_per_card():
+def test_source_has_60_cards_and_expected_fully_authored_questions_per_card():
     cards = module.load_cards()
     assert len(cards) == 60
     assert len({card.get("id") or card.get("knowledgeId") for card in cards}) == 60
     assert all(isinstance(card.get("questions"), list) for card in cards)
-    assert all(len(card["questions"]) == 2 for card in cards)
-    assert len(authored_questions()) == 120
+    assert next(card for card in cards if card["id"] == "WDT-K018")["questions"][-1]["id"] == "WDT-018-C"
+    assert all(
+        len(card["questions"]) == (3 if card["id"] == "WDT-K018" else 2)
+        for card in cards
+    )
+    assert len(authored_questions()) == 121
 
 
 def test_import_contract_forces_role_specific_banks_and_traceable_internal_source():
@@ -210,6 +214,21 @@ def test_user_confirmed_box_spec_question_and_answer_are_locked_verbatim():
     assert question["answerText"] == "在订单审核页面选择需要拆分的订单，点击按箱规拆分"
     assert question[f"option{question['answer']}"] == question["answerText"]
     assert question["verificationStatus"] == "verified"
+    assert question["effectiveForFormalExam"] is True
+
+
+def test_user_confirmed_inventory_batch_question_is_in_customer_service_bank():
+    question = next(item for item in imported_questions() if item["id"] == "WDT-018-C")
+    assert question["role"] == "客服"
+    assert question["bank"] == "旺店通-客服"
+    assert question["module"] == "库存管理"
+    assert question["question"] == "在哪里查看商品的生产开始日期和批次信息？"
+    assert question["answerText"] == "进入【仓储】>【库存查询】>【库存明细】"
+    assert question["entryPath"] == ["仓储", "库存查询", "库存明细"]
+    assert question["answer"] == "C"
+    assert question[f"option{question['answer']}"] == question["answerText"]
+    assert question["sourceUrl"] == "internal://jinzun/wdt/inventory-detail/2026-08-12"
+    assert question["reviewedAt"] == "2026-08-12"
     assert question["effectiveForFormalExam"] is True
 
 
@@ -327,7 +346,7 @@ def test_every_distractor_is_authored_and_explained():
 def test_answers_are_exactly_balanced_and_do_not_leak_by_uniform_length():
     questions = imported_questions()
     assert Counter(question["answer"] for question in questions) == Counter(
-        {"A": 30, "B": 30, "C": 30, "D": 30}
+        {"A": 30, "B": 30, "C": 31, "D": 30}
     )
     rates = module.correct_extreme_rates(questions)
     assert rates["uniqueLongestCorrectRate"] <= 0.40
@@ -354,8 +373,8 @@ def test_question_stems_and_complete_option_sets_are_unique():
     questions = imported_questions()
     stems = [module.normalize_text(question["question"]) for question in questions]
     signatures = [module.option_signature(question) for question in questions]
-    assert len(stems) == len(set(stems)) == 120
-    assert len(signatures) == len(set(signatures)) == 120
+    assert len(stems) == len(set(stems)) == 121
+    assert len(signatures) == len(set(signatures)) == 121
 
 
 def test_wdt_formal_questions_have_no_semantic_duplicate_groups():
@@ -378,8 +397,8 @@ def test_learning_cards_have_direct_paths_steps_checks_and_mistakes():
 def test_validation_gate_accepts_the_authored_batch():
     quality = module.validate_questions(imported_questions())
     assert quality["knowledgeCardCount"] == 60
-    assert quality["optionSetCount"] == 120
-    assert quality["answerDistribution"] == {"A": 30, "B": 30, "C": 30, "D": 30}
+    assert quality["optionSetCount"] == 121
+    assert quality["answerDistribution"] == {"A": 30, "B": 30, "C": 31, "D": 30}
 
 
 def test_merge_is_idempotent_and_only_replaces_wdt_prefix():
@@ -394,7 +413,7 @@ def test_merge_is_idempotent_and_only_replaces_wdt_prefix():
     assert first == second
     assert first[:2] == baseline[:2]
     assert all(question.get("id") != "WDT-OLD-001" for question in first)
-    assert sum(question["id"].startswith("WDT-") for question in first) == 120
+    assert sum(question["id"].startswith("WDT-") for question in first) == 121
 
 
 def test_generated_json_matches_source_and_preserves_archived_non_wdt_questions():
@@ -402,7 +421,7 @@ def test_generated_json_matches_source_and_preserves_archived_non_wdt_questions(
     output = load_role_output()
     actual = [question for question in output if question["id"].startswith("WDT-")]
     assert actual == expected
-    assert len(actual) == 120
+    assert len(actual) == 121
 
     archived = json.loads(module.ARCHIVE_JSON.read_text(encoding="utf-8"))
     output_non_wdt = [question for question in output if not question["id"].startswith("WDT-")]
@@ -453,15 +472,15 @@ def test_import_report_proves_the_quality_gates_passed():
     report = json.loads(module.REPORT_JSON.read_text(encoding="utf-8"))
     assert report["validation"] == "passed"
     assert report["knowledgeCards"] == 60
-    assert report["importedQuestions"] == 120
-    assert report["answerDistribution"] == {"A": 30, "B": 30, "C": 30, "D": 30}
-    assert report["uniqueOptionSets"] == 120
-    assert report["formalExamQuestions"] + report["pendingQuestions"] == 120
+    assert report["importedQuestions"] == 121
+    assert report["answerDistribution"] == {"A": 30, "B": 30, "C": 31, "D": 30}
+    assert report["uniqueOptionSets"] == 121
+    assert report["formalExamQuestions"] + report["pendingQuestions"] == 121
     assert report["uniqueLongestCorrectRate"] <= 0.40
     assert report["uniqueShortestCorrectRate"] <= 0.40
     assert report["maximumOptionLengthRatio"] <= 1.8
-    assert sum(report["bankDistribution"].values()) == 120
-    assert sum(report["roleDistribution"].values()) == 120
+    assert sum(report["bankDistribution"].values()) == 121
+    assert sum(report["roleDistribution"].values()) == 121
     assert set(report["roleDistribution"]) == set(module.ROLE_BANK_MAP)
     assert set(report["bankDistribution"]) == set(module.ROLE_BANK_MAP.values())
     assert all(

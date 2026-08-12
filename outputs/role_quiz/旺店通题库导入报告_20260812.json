@@ -1,0 +1,94 @@
+{
+  "version": "20260812-wdt-cs-inventory1",
+  "source": "sources/internal_training/2026-08-11/旺店通使用知识卡.json",
+  "sourceSha256": "2d8193cf0b0cffc4d81f834481f7a04b8f9b478b84f0260f9e11c78aeab675bf",
+  "sourceId": "INTERNAL-WDT-YUQUE-SOP-2026",
+  "beforeQuestionCount": 314,
+  "replacedWangdiantongQuestions": 120,
+  "retainedNonWangdiantongQuestions": 194,
+  "knowledgeCards": 60,
+  "importedQuestions": 121,
+  "finalQuestionCount": 315,
+  "answerDistribution": {
+    "D": 30,
+    "C": 31,
+    "B": 30,
+    "A": 30
+  },
+  "bankDistribution": {
+    "旺店通-客服": 37,
+    "旺店通-审单": 32,
+    "旺店通-运营": 26,
+    "旺店通-采购": 16,
+    "旺店通-管理": 10
+  },
+  "moduleDistribution": {
+    "售后管理": 4,
+    "售后自动退款": 12,
+    "库存管理": 13,
+    "店铺对接": 18,
+    "换货流程": 4,
+    "无效货品": 8,
+    "智能退货入库": 2,
+    "权限管理": 4,
+    "经营报表": 8,
+    "补寄流程": 2,
+    "订单审核": 14,
+    "订单拆分": 10,
+    "账号管理": 6,
+    "采购入库": 16
+  },
+  "roleDistribution": {
+    "客服": 37,
+    "审单": 32,
+    "运营": 26,
+    "采购": 16,
+    "管理": 10
+  },
+  "roleBankDistribution": {
+    "客服→旺店通-客服": 37,
+    "审单→旺店通-审单": 32,
+    "运营→旺店通-运营": 26,
+    "采购→旺店通-采购": 16,
+    "管理→旺店通-管理": 10
+  },
+  "platformDistribution": {
+    "京东": 2,
+    "唯品会": 4,
+    "天猫/淘宝": 6,
+    "抖音电商": 6,
+    "拼多多": 6,
+    "视频号": 2,
+    "通用": 92,
+    "阿里巴巴": 3
+  },
+  "difficultyDistribution": {
+    "场景": 51,
+    "基础": 43,
+    "进阶": 27
+  },
+  "riskDistribution": {
+    "practice": 109,
+    "redline": 12
+  },
+  "riskPriorityDistribution": {
+    "中": 51,
+    "低": 5,
+    "高": 65
+  },
+  "verificationDistribution": {
+    "verified": 121
+  },
+  "uniqueOptionSets": 121,
+  "maximumOptionLengthRatio": 1.643,
+  "uniqueLongestCorrect": 19,
+  "uniqueLongestCorrectRate": 0.157,
+  "uniqueShortestCorrect": 21,
+  "uniqueShortestCorrectRate": 0.1736,
+  "formalExamQuestions": 121,
+  "pendingQuestions": 0,
+  "archiveJson": "outputs/role_quiz/archive/岗位学习考核题库-before-wangdiantong-20260811.json",
+  "archiveXlsx": "outputs/role_quiz/archive/岗位学习考核题库-before-wangdiantong-20260811.xlsx",
+  "validation": "passed",
+  "note": "仅替换WDT-前缀题目；按客服、审单、运营、采购、管理拆分题库；全部干扰项和错误原因均来自知识卡作者稿，导入器不自动生成低质量选项。"
+}
