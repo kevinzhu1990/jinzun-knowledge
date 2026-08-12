@@ -141,6 +141,20 @@ def test_rule_learning_entities_merge_shared_knowledge_id_without_changing_legac
             "explanation": "同一知识点的另一种问法。",
         },
         {
+            "id": "WDT-001-C",
+            "knowledgeId": "WDT-001",
+            "bank": "旺店通操作题库",
+            "module": "订单审核",
+            "question": "第三道关联题？",
+            "answerText": "第三个答案",
+            "answer": "C",
+            "optionA": "错误A",
+            "optionB": "错误B",
+            "optionC": "第三个答案",
+            "optionD": "错误D",
+            "explanation": "同一知识点可以关联三道题。",
+        },
+        {
             "id": "LEGACY-001",
             "bank": "岗位规则题库",
             "module": "交接",
@@ -165,7 +179,7 @@ process.stdout.write(JSON.stringify(ruleLearningEntities()));
     assert len(entities) == 2
     wangdiantong, legacy = entities
     assert wangdiantong["id"] == "rule|knowledge|WDT-001"
-    assert wangdiantong["questionCount"] == 2
+    assert wangdiantong["questionCount"] == 3
     assert wangdiantong["title"] == "批量按箱规拆单"
     assert wangdiantong["action"] == "在订单审核页面选择需要拆分的订单，点击按箱规拆分"
     assert wangdiantong["entryPath"] == ["订单", "订单审核"]

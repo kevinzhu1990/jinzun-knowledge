@@ -8565,12 +8565,14 @@
     ],
     "steps": [
       "按货品或仓库筛选库存",
+      "进入库存明细查看商品的生产开始日期和批次信息",
       "打开详情查看库存、库位和出入库记录",
       "批量维护时下载模板并填写仓库、库区、默认库位和系统商家编码后导入",
       "单笔维护时开启编辑并修改默认库位"
     ],
     "successChecks": [
       "库存详情与目标仓库一致",
+      "生产开始日期和批次信息可正常核对",
       "默认库位已正确显示",
       "停售货品仅在库存为零时删除"
     ],
@@ -8583,9 +8585,9 @@
     ],
     "sourceUrl": "https://zsxj.yuque.com/da3ftb/vgswhb/sxf7tz3hh5al2t4v",
     "sourceTitle": "旺店通操作手册与金尊内部操作口径",
-    "sourceSection": "库存查询—详情、默认库位与删除",
+    "sourceSection": "库存查询—库存明细、详情、默认库位与删除",
     "sourceClause": "库存查询详情可查看库存、库位及出入库记录。",
-    "sourceRetrievedAt": "2026-08-11",
+    "sourceRetrievedAt": "2026-08-12",
     "verificationStatus": "verified",
     "question": "要确认某货品在哪个库位以及最近为何增减库存，应怎样查？",
     "difficulty": "基础",
@@ -8639,12 +8641,14 @@
     ],
     "steps": [
       "按货品或仓库筛选库存",
+      "进入库存明细查看商品的生产开始日期和批次信息",
       "打开详情查看库存、库位和出入库记录",
       "批量维护时下载模板并填写仓库、库区、默认库位和系统商家编码后导入",
       "单笔维护时开启编辑并修改默认库位"
     ],
     "successChecks": [
       "库存详情与目标仓库一致",
+      "生产开始日期和批次信息可正常核对",
       "默认库位已正确显示",
       "停售货品仅在库存为零时删除"
     ],
@@ -8657,9 +8661,9 @@
     ],
     "sourceUrl": "https://zsxj.yuque.com/da3ftb/vgswhb/sxf7tz3hh5al2t4v",
     "sourceTitle": "旺店通操作手册与金尊内部操作口径",
-    "sourceSection": "库存查询—详情、默认库位与删除",
+    "sourceSection": "库存查询—库存明细、详情、默认库位与删除",
     "sourceClause": "停售货品库存为 0 时才可删除。",
-    "sourceRetrievedAt": "2026-08-11",
+    "sourceRetrievedAt": "2026-08-12",
     "verificationStatus": "verified",
     "question": "一个停售系统货品仍有库存 5 件，能否直接从库存查询删除？",
     "difficulty": "场景",
@@ -8692,6 +8696,87 @@
     "reviewedAt": "2026-08-11",
     "reviewNote": "已按旺店通语雀操作手册和金尊内部操作口径核对题干、步骤、答案与干扰项。",
     "importBatch": "20260811-wangdiantong-quiz1"
+  },
+  {
+    "id": "WDT-018-C",
+    "bank": "旺店通-客服",
+    "title": "查询库存明细并维护默认库位",
+    "knowledgePoint": "库存查询与库位",
+    "knowledgeTitle": "从库存总量追到库位和出入库记录",
+    "goal": "快速查到仓库、库存、库区库位及出入库记录，并安全维护默认库位。",
+    "module": "库存管理",
+    "role": "客服",
+    "platform": "通用",
+    "entryPath": [
+      "仓储",
+      "库存查询",
+      "库存明细"
+    ],
+    "prerequisites": [
+      "系统货品资料已建立",
+      "有相应仓库查看或编辑权限"
+    ],
+    "steps": [
+      "进入仓储",
+      "打开库存查询",
+      "进入库存明细",
+      "按商品筛选并查看生产开始日期和批次信息"
+    ],
+    "successChecks": [
+      "列表显示目标商品的生产开始日期",
+      "列表显示对应批次信息"
+    ],
+    "exceptions": [
+      "停售货品库存不为零时不能删除"
+    ],
+    "commonMistakes": [
+      "把有效期管理误当成批次明细入口",
+      "到入库单或采购单中反查库存批次"
+    ],
+    "sourceUrl": "internal://jinzun/wdt/inventory-detail/2026-08-12",
+    "sourceTitle": "旺店通操作手册与金尊内部操作口径",
+    "sourceSection": "库存明细中查看（用户2026-08-12截图补充）",
+    "sourceClause": "仓储→库存查询→库存明细；列表显示商品生产开始日期和批次信息。",
+    "sourceRetrievedAt": "2026-08-12",
+    "verificationStatus": "verified",
+    "question": "在哪里查看商品的生产开始日期和批次信息？",
+    "difficulty": "基础",
+    "riskLevel": "practice",
+    "mandatory": false,
+    "optionA": "进入【采购】>【采购单】>【采购明细】",
+    "optionB": "进入【仓储】>【库存查询】>【有效期管理】",
+    "optionC": "进入【仓储】>【库存查询】>【库存明细】",
+    "optionD": "进入【仓储】>【入库管理】>【入库单明细】",
+    "answer": "C",
+    "answerText": "进入【仓储】>【库存查询】>【库存明细】",
+    "explanation": "旺店通的库存明细列表可查看商品的生产开始日期和批次信息。",
+    "sourceReferences": [
+      {
+        "url": "internal://jinzun/wdt/inventory-detail/2026-08-12",
+        "title": "用户提供的旺店通库存明细截图",
+        "section": "库存明细中查看"
+      }
+    ],
+    "reviewedAt": "2026-08-12",
+    "reviewNote": "已按用户2026-08-12提供的旺店通截图核对入口、题干、答案与干扰项。",
+    "distractorRationales": {
+      "A": "错模块：采购明细不是库存批次查询入口。",
+      "B": "错页面：有效期管理展示保质期、有效期和距离到期天数。",
+      "D": "错模块：入库单明细用于核对入库业务。"
+    },
+    "type": "单选题",
+    "riskPriority": "低",
+    "knowledgeId": "WDT-K018",
+    "source": "旺店通操作手册与金尊内部操作口径",
+    "sourceId": "INTERNAL-WDT-YUQUE-SOP-2026",
+    "sourceType": "internal_sop",
+    "sourceLevel": "C",
+    "answerBasis": "internal_sop",
+    "effectiveForFormalExam": true,
+    "humanReviewStatus": "approved",
+    "sourceConflict": false,
+    "semanticDuplicate": false,
+    "importBatch": "20260812-wdt-cs-inventory1"
   },
   {
     "id": "WDT-019-A",
