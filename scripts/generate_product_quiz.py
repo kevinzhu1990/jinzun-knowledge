@@ -19,13 +19,16 @@ DIFF_MD=OUT/'product_sync_diff_20260713.md'
 NS={'a':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 RETIRED_CODE='2576'
 CANONICAL_CODE='2608'
-CANONICAL_NAME='\u674f\u4ec1\u997c258g'
-CANONICAL_LABEL=CANONICAL_CODE+CANONICAL_NAME
+CANONICAL_NAME='2608杏仁饼小盒装258g'
+CANONICAL_LABEL=CANONICAL_NAME
 
 def clean(v):
     s='' if v is None else str(v); s=re.sub(r'\r?\n+','；',s); s=re.sub(r'\s+',' ',s).strip()
     s=s.replace(chr(0x76ee)+chr(0x997c),chr(0x6708)+chr(0x997c)); s=re.sub(r'(\d+)g'+chr(0x514b),r'\1g',s)
     s=s.replace(RETIRED_CODE,CANONICAL_CODE)
+    s=re.sub(r'(?:2608)?杏仁饼258g', CANONICAL_NAME, s)
+    s=re.sub(r'(?<!\d)2580(?!\d)', '2642', s)
+    s=s.replace('6924535425807', '6924535426422')
     s=re.sub(CANONICAL_CODE+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+r'(?:小盒装)?258g?',CANONICAL_LABEL,s)
     s=s.replace(CANONICAL_CODE+'：'+CANONICAL_LABEL,CANONICAL_LABEL)
     s=s.replace(CANONICAL_CODE+':'+CANONICAL_LABEL,CANONICAL_LABEL)

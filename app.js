@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260812-wdt-cs-inventory1";
+const BUILD_VERSION = "20261110-product-2642";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;

@@ -25,7 +25,7 @@ def test_retired_2576_is_fully_replaced_by_2608():
     assert "2576" not in serialized
     current = [q for q in questions if str(q.get("code")) == "2608"]
     assert current
-    assert all(q.get("productName") == "杏仁饼258g" for q in current)
+    assert all(q.get("productName") == "2608杏仁饼小盒装258g" for q in current)
 
 
 def test_every_active_question_has_four_visible_options():

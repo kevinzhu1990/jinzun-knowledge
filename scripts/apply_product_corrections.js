@@ -3,16 +3,18 @@ const path = require('node:path');
 
 const CANONICAL_CODE = '2608';
 const RETIRED_CODE = '2576';
-const CANONICAL_NAME = '杏仁饼258g';
+const CANONICAL_NAME = '2608杏仁饼小盒装258g';
 const MERCHANT_1940_1392 = '1940金尊陈皮豆沙月饼100g 散饼5个+1392金尊黄油椰蓉月饼100g 散饼5个';
 
 function replaceLegacyText(value) {
   if (typeof value !== 'string') return value;
   return value
     .replaceAll(RETIRED_CODE, CANONICAL_CODE)
+    .replace(/(?<!\d)2580(?!\d)/g, '2642')
+    .replaceAll('6924535425807', '6924535426422')
     .replaceAll('2608粒粒杏仁饼小盒装258g', CANONICAL_NAME)
     .replaceAll('2608粒粒杏仁饼258g', CANONICAL_NAME)
-    .replaceAll('2608杏仁饼258g', CANONICAL_NAME);
+    .replace(/(?:2608)?杏仁饼258g/g, CANONICAL_NAME);
 }
 
 function normalize2608Question(question) {

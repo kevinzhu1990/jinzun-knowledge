@@ -89,7 +89,7 @@ def main():
     if '2576' in text: errors.append('产品题库仍包含已停用货号2576')
     for forbidden in (chr(0x76ee)+chr(0x997c),'150g'+chr(0x514b),'2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+chr(0x5c0f)+chr(0x76d2)+chr(0x88c5)+'258g','2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g'):
         if forbidden in text: errors.append(f'存在禁用旧文字：{forbidden}')
-    if '"code": "2608"' not in text or '杏仁饼258g' not in text: errors.append('2608杏仁饼资料未正确生成')
+    if '"code": "2608"' not in text or '2608杏仁饼小盒装258g' not in text: errors.append('2608杏仁饼资料未正确生成')
     merchant_questions=sum(q.get('bank')=='商家编码题库' for q in qs)
     result={'ok':not errors,'source':str(authority_source),'rawExcelAvailable':SOURCE.is_file(),'activeProducts':len(active),'productQuestions':len(qs),'merchantQuestions':merchant_questions,'productCodes':len(product_codes),'mooncakeCodes':len(moon),'errors':errors}
     print(json.dumps(result,ensure_ascii=False,indent=2))

@@ -154,9 +154,9 @@ const fixture = [
 const corrected = correctProductQuestions(fixture);
 const almond = corrected.find((question) => question.code === '2608');
 assert.ok(almond, '旧货号2576必须转换为2608');
-assert.equal(almond.productName, '杏仁饼258g');
+assert.equal(almond.productName, '2608杏仁饼小盒装258g');
 assert.equal(almond.question, '2608 对应的产品名称是什么？');
-assert.equal(almond.answerText, '杏仁饼258g');
+assert.equal(almond.answerText, '2608杏仁饼小盒装258g');
 assert.equal(almond.questionImage, 'assets/product-images/daily/2608.jpg');
 assert.equal(JSON.stringify(corrected).includes('2576'), false, '题库不得残留2576');
 assert.equal(corrected.some((question) => question.code === '2545'), true, '2545必须保留在售');
