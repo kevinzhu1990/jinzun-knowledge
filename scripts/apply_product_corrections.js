@@ -67,9 +67,49 @@ function merchantNameReferences(value) {
   return [...String(value || '').matchAll(/(?:^|\D)(\d{4})(?!\d)(?!\s*(?:g|克|cm|年|款))/gi)].map((match) => match[1]);
 }
 
+function correctGiftBoxesAndRetire2601(questions) {
+  const giftCodes = new Set(['2367', '2368', '2370', '2381']);
+  const retired = (value) => /(?<!\d)2601(?!\d)|6924535426019/.test(String(value || ''));
+  const retained = questions.filter((question) => ![
+    question.code, question.productName, question.question, question.answerText, question.explanation,
+  ].some(retired)).map((question) => {
+    const result = { ...question };
+    if (giftCodes.has(String(result.code))) {
+      result.productLine = '糕点礼盒类';
+      if (result.knowledgePoint === '产品线') {
+        result.answerText = '糕点礼盒类';
+        result.explanation = `${result.code} 属于哪条产品线：糕点礼盒类。`;
+        const existing = [...'ABCD'].find((letter) => result[`option${letter}`] === result.answerText);
+        if (existing) result.answer = existing;
+        else result[`option${result.answer}`] = result.answerText;
+      }
+    }
+    return result;
+  });
+  for (const question of retained) {
+    for (const letter of 'ABCD') {
+      if (![question[`option${letter}`], question[`option${letter}Image`]].some(retired)) continue;
+      const used = new Set([...'ABCD'].map((other) => question[`option${other}Image`] || question[`option${other}`]));
+      const donor = retained.find((candidate) => candidate.bank === question.bank
+        && candidate.knowledgePoint === question.knowledgePoint
+        && !used.has(candidate.answerText) && !retired(candidate.answerText));
+      if (!donor) throw new Error(`No active replacement option for ${question.id}`);
+      for (const key of Object.keys(question)) {
+        if (key.startsWith(`option${letter}`)) delete question[key];
+      }
+      for (const [key, value] of Object.entries(donor)) {
+        if (key.startsWith(`option${donor.answer}`)) {
+          question[key.replace(`option${donor.answer}`, `option${letter}`)] = value;
+        }
+      }
+    }
+  }
+  return retained;
+}
+
 function correctProductQuestions(questions) {
   if (!Array.isArray(questions)) throw new TypeError('Product questions must be an array');
-  const normalized = questions.map((question) => normalizeMerchantQuestion(normalize0206Question(normalize2608Question(question))));
+  const normalized = correctGiftBoxesAndRetire2601(questions.map((question) => normalizeMerchantQuestion(normalize0206Question(normalize2608Question(question)))));
   const activeCodes = new Set(normalized
     .filter((question) => ['月饼题库', '日常年货题库'].includes(question.bank) && question.knowledgePoint === '产品名称')
     .map((question) => String(question.code || '')));

@@ -24,7 +24,7 @@ def load_authoritative_products():
         for sheet in sheets:
             for row in data.get(sheet,[]):
                 code=generator.code(generator.get(row,'货号')); name=generator.get(row,'产品名称')
-                if code and name:
+                if code and name and code != '2601':
                     products.append({'code':code,'name':name,'shelfLife':generator.get(row,'保质期'),'sheet':sheet})
         return products,SOURCE
 
@@ -36,8 +36,8 @@ def load_authoritative_products():
     if snapshot.get('sourceSha256')!=expected_hash:
         raise ValueError('产品权威快照与原始Excel同步哈希不一致')
     products=snapshot.get('products')
-    if not isinstance(products,list) or len(products)!=73:
-        raise ValueError('产品权威快照必须包含73个在售产品')
+    if not isinstance(products,list) or len(products)!=72:
+        raise ValueError('产品权威快照必须包含72个在售产品')
     codes=[str(product.get('code') or '') for product in products]
     if len(codes)!=len(set(codes)) or any(not code for code in codes):
         raise ValueError('产品权威快照货号为空或重复')

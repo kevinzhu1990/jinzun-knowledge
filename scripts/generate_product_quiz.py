@@ -118,7 +118,7 @@ def q(bank,cat,pl,cd,name,kp,text,correct,pool,note=''):
     return {'id':sid(bank,cd,kp,text),'bank':bank,'category':cat,'productLine':pl,'code':cd,'productName':name,'type':'单选题','difficulty':'基础','knowledgePoint':kp,'question':text,'optionA':os_[0],'optionB':os_[1],'optionC':os_[2],'optionD':os_[3],'answer':ans,'answerText':correct,'explanation':f'{text.rstrip("？")}：{correct}。','questionImage':'','optionAImage':'','optionBImage':'','optionCImage':'','optionDImage':'','source':SOURCE_LABEL,'note':note,'version':VERSION}
 def product(row,bank,sheet):
     cd=code(get(row,'货号')); name=get(row,'产品名称')
-    if not cd or not name:return None
+    if not cd or not name or cd=='2601':return None
     if cd==CANONICAL_CODE:name=CANONICAL_NAME
     moon=bank=='月饼题库'; size=get(row,'产品尺寸长宽高CM','产品尺寸；长宽高cm','产品尺寸长宽高cm')
     if sheet=='26年散饼' and not size:
@@ -127,7 +127,7 @@ def product(row,bank,sheet):
     contents=get(row,'内配','内配明细','内配/口味')
     if cd=='1658':contents='双黄莲蓉月饼250克*2；鲍鱼莲蓉月饼80克*1；豆沙月饼100克*3；凤梨水果味月饼80克*2；莲蓉月饼80克*2；五仁月饼250克*1'
     mooncake_line = '月饼-散饼' if sheet == '26年散饼' else ('月饼-铁罐' if '铁罐' in get(row,'盒型') else '月饼-礼盒')
-    return {'code':cd,'name':name,'bank':bank,'cat':'月饼产品' if moon else '日常年货产品','line':mooncake_line if moon else line(name,contents),'carton':get(row,'箱规'),'contents':contents,'net':get(row,'净重g','净重'),'shelf':get(row,'保质期'),'size':size,'barcode':get(row,'条码','商品条码'),'unit':get(row,'单位'),'sheet':sheet}
+    return {'code':cd,'name':name,'bank':bank,'cat':'月饼产品' if moon else '日常年货产品','line':mooncake_line if moon else ('糕点礼盒类' if cd in {'2367','2368','2370','2381'} else line(name,contents)),'carton':get(row,'箱规'),'contents':contents,'net':get(row,'净重g','净重'),'shelf':get(row,'保质期'),'size':size,'barcode':get(row,'条码','商品条码'),'unit':get(row,'单位'),'sheet':sheet}
 def write_xlsx(path,qs):
     hs=list(qs[0]) if qs else ['id']
     def esc(v):return str(v).replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('\n',' ')

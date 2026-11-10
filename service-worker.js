@@ -1,16 +1,16 @@
-const CACHE_VERSION = 'jinzun-20261110-product-2642';
+const CACHE_VERSION = 'jinzun-20261110-giftboxes-retire2601';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './styles.css?v=20261110-product-2642',
-  './app.js?v=20261110-product-2642',
+  './styles.css?v=20261110-giftboxes-retire2601',
+  './app.js?v=20261110-giftboxes-retire2601',
   './mooncake-filter.js?v=af8d1d9',
-  './manifest.webmanifest?v=20261110-product-2642',
+  './manifest.webmanifest?v=20261110-giftboxes-retire2601',
   './assets/brand/jinzun-logo.png',
   './assets/app-icons/icon-192.png',
   './assets/app-icons/icon-512.png',
-  './outputs/product_quiz/金尊产品知识库题库.json?v=20261110-product-2642',
-  './outputs/role_quiz/岗位学习考核题库.json?v=20261110-product-2642'
+  './outputs/product_quiz/金尊产品知识库题库.json?v=20261110-giftboxes-retire2601',
+  './outputs/role_quiz/岗位学习考核题库.json?v=20261110-giftboxes-retire2601'
 ];
 
 self.addEventListener('install', (event) => {
