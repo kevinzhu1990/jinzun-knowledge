@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#123d4d" />
     <meta name="application-name" content="金尊知识库" />
-    <link rel="manifest" href="./manifest.webmanifest?v=20261110-giftboxes-retire2601" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20261110-growth2" />
     <link rel="icon" href="./assets/app-icons/icon-192.png" />
     <title>金尊知识库学习考核</title>
-    <link rel="stylesheet" href="./styles.css?v=20261110-giftboxes-retire2601" />
+    <link rel="stylesheet" href="./styles.css?v=20261110-growth2" />
   </head>
   <body>
     <section id="authView" class="auth-view">
@@ -19,7 +19,7 @@
           <button id="showLoginTab" class="auth-tab active" type="button">员工登录</button>
           <button id="showRegisterTab" class="auth-tab" type="button">员工注册</button>
         </div>
-        <p class="auth-note">首次使用请先注册；已注册手机号可用公司口令重新设置密码。姓名、手机号、岗位、考试成绩和错题会上传至公司内部系统；密码不会保存为明文。</p>
+        <p class="auth-note">首次使用请注册。学习和成绩仅用于公司内部培训。</p>
         <form id="loginForm" class="auth-form">
           <label>
             姓名或手机号
@@ -34,7 +34,7 @@
           </label>
           <p id="loginError" class="form-error"></p>
           <button class="primary-btn" type="submit">登录</button>
-          <button id="showResetForm" class="auth-link-btn" type="button">忘记密码？使用公司口令重置</button>
+          <details class="auth-details"><summary>账号与数据说明</summary><p>姓名、手机号、岗位、考试成绩、错题和学习进度用于公司内部培训并同步至公司系统。密码不会保存为明文。忘记密码可使用公司口令重置。</p></details><button id="showResetForm" class="auth-link-btn" type="button">忘记密码？使用公司口令重置</button>
         </form>
         <form id="registerForm" class="auth-form hidden">
           <label>
@@ -180,7 +180,7 @@
             <h2 id="pageTitle">学习总览</h2>
           </div>
           <div class="top-actions">
-            <input id="searchInput" class="search" type="search" placeholder="搜索货号、题目、产品名" />
+            <input id="searchInput" class="search" type="search" placeholder="搜索货号、旧货号、条码或产品名（支持扫码枪）" />
             <button id="resetBtn" class="icon-btn" type="button" title="清空本机学习记录" aria-label="清空本机学习记录">↺</button>
           </div>
         </header>
@@ -255,7 +255,7 @@
               <button class="mode-tab" data-mode="role">岗位考试</button>
             </div>
             <div id="modeRandom" class="mode-panel">
-              <p class="mode-desc">从月饼、日常年货和业务场景题库中随机抽题。搜索或侧边栏筛选生效时，优先使用当前筛选结果。</p>
+              <p class="mode-desc">从月饼和日常年货题库随机抽题。考核使用本页选定题库，搜索和左侧学习筛选不影响抽题。</p>
             </div>
             <div id="modeProduct" class="mode-panel hidden">
               <label class="mode-label">
@@ -357,6 +357,15 @@
             <p id="adminAccountStatus" class="form-error"></p>
             <div id="adminEmployeeList" class="admin-table"></div>
           </div>
+          <div class="admin-panel" id="productManagerPanel">
+            <h4>产品资料统一维护</h4><p>先预览关联影响，再保存；产品资料同时用于知识卡与考试。</p>
+            <label>选择产品<select id="managedProduct" class="select"><option>加载中</option></select></label>
+            <form id="productManagerForm"><div id="productManagerFields" class="product-manager-fields"></div>
+            <label>对比货号（逗号分隔）<input id="productCompareCodes" class="text-input" /></label>
+            <button class="secondary-btn" type="button" id="previewProductChange">预览关联影响</button>
+            <button class="primary-btn" type="submit" id="saveProductChange" disabled>确认保存</button></form>
+            <p id="productManagerStatus" role="status"></p>
+          </div>
           <div class="admin-panel admin-question-panel">
             <div class="admin-question-head">
               <div><h4>题库明细</h4><p>管理员的修改和删除会同时影响学习、练习和正式考试。</p></div>
@@ -411,8 +420,9 @@
       </main>
     </div>
 
+    <script src="./knowledge-core.js?v=20261110-growth2"></script>
     <script src="./mooncake-filter.js?v=af8d1d9"></script>
-    <script src="./app.js?v=20261110-giftboxes-retire2601" type="module"></script>
+    <script src="./app.js?v=20261110-growth2" type="module"></script>
   </body>
 </html>
 

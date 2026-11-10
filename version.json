@@ -1,6 +1,7 @@
 {
-  "buildVersion": "20261110-giftboxes-retire2601",
+  "buildVersion": "20261110-growth2",
   "desktopVersion": "1.0.0",
-  "updatedAt": "2026-11-10T08:50:46+08:00",
-  "notes": "2367、2368、2370、2381归为糕点礼盒类；删除停售2601产品及题库引用"
+  "updatedAt": "2026-11-10T09:23:22+08:00",
+  "notes": "统一产品资料维护、学习进度云同步、条码与旧货号查询、岗位学习任务和考试版本核对",
+  "productHash": "ffd3e627bc750c5ac9ba183c9480cbe867fd16de9eca4e2036c01c838497543c"
 }

@@ -1,6 +1,7 @@
 .git
 .github
 .vercel
+.env*
 .pytest_cache
 node_modules
 desktop

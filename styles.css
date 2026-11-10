@@ -1,3 +1,16 @@
+.data-health { padding: 10px 14px; border: 1px solid #e4c27b; background: #fff6df; border-radius: 10px; font-size: 14px; line-height: 1.6; }
+.data-health.healthy { background: #eaf7f2; border-color: #9dd4bd; color: #125039; }
+.product-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.product-tools button { min-height: 40px; padding: 8px; }
+.product-work-card { margin: 10px 0; padding: 10px; background: #f3f7fa; border-radius: 8px; font-size: 14px; line-height: 1.65; }
+.product-work-card summary, .auth-details summary { cursor: pointer; min-height: 36px; }
+.product-manager-fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 12px; margin: 12px 0; }
+.product-manager-fields label { display: grid; gap: 6px; }
+.auth-details { font-size: 13px; line-height: 1.65; color: var(--muted); }
+.data-notice { padding: 10px; background: #eaf7f2; border-radius: 8px; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid #008c98; outline-offset: 3px; }
+@media (max-width: 600px) { .product-card-body dt, .product-card-body dd { font-size: 14px; } .auth-note { font-size: 14px; } .product-manager-fields { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 :root {
   color-scheme: light;
   --ink: #101827;
@@ -1833,3 +1846,5 @@ input:disabled {
 .dialog-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:16px; }
 @media (max-width: 760px) { .admin-account-form { grid-template-columns: 1fr; } .admin-employee-row { align-items: flex-start; flex-direction: column; } .admin-employee-actions { justify-content: flex-start; } .admin-question-filters,.admin-question-form-grid,.admin-option-grid { grid-template-columns:1fr; } .admin-question-list .admin-question-text { min-width:240px; } }
 
+
+@media (max-width: 600px) { .product-knowledge-card .product-card-body dt, .product-knowledge-card .product-card-body dd { font-size: 14px; } }

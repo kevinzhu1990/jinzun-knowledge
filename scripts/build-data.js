@@ -1,0 +1,14 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { projectQuestions } = require('../knowledge-core');
+const root=path.resolve(__dirname,'..');
+require('./apply_product_corrections').applyProductCorrections(root);
+const file=path.join(root,'outputs/product_quiz/金尊产品知识库题库.json');
+const products=JSON.parse(fs.readFileSync(path.join(root,'products.json'),'utf8'));
+fs.writeFileSync(file,JSON.stringify(projectQuestions(JSON.parse(fs.readFileSync(file,'utf8')),products),null,2)+'\n');
+const {dataHealth}=require('../api/health');
+const versionFile=path.join(root,'version.json');
+const version=JSON.parse(fs.readFileSync(versionFile,'utf8'));
+version.productHash=dataHealth().productHash;
+fs.writeFileSync(versionFile,JSON.stringify(version,null,2)+'\n');
+console.log(JSON.stringify(dataHealth()));

@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node scripts/apply_product_corrections.js",
+  "buildCommand": "node scripts/build-data.js",
   "outputDirectory": ".",
   "headers": [
     {
@@ -14,16 +14,20 @@
   ],
   "functions": {
     "api/cloud.js": {
-      "includeFiles": "outputs/**/*.json",
+      "includeFiles": "{outputs/**/*.json,products.json,version.json,knowledge-core.js}",
       "maxDuration": 60
     },
     "api/practice-submit.js": {
-      "includeFiles": "outputs/**/*.json",
+      "includeFiles": "{outputs/**/*.json,products.json,version.json,knowledge-core.js}",
       "maxDuration": 60
     },
     "api/internal-practice-setup.js": {
-      "includeFiles": "outputs/**/*.json",
+      "includeFiles": "{outputs/**/*.json,products.json,version.json,knowledge-core.js}",
       "maxDuration": 60
+    },
+    "api/health.js": {
+      "includeFiles": "{outputs/**/*.json,products.json,version.json,knowledge-core.js}",
+      "maxDuration": 10
     }
   }
 }

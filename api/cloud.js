@@ -2,6 +2,9 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const bcrypt = require('bcryptjs');
+const core = require('../knowledge-core');
+const { dataHealth } = require('./health');
+const baseProducts = require('../products.json');
 
 const BASE_TOKEN = process.env.LARK_BASE_TOKEN || '';
 const EMPLOYEE_TABLE_ID = process.env.LARK_EMPLOYEE_TABLE_ID || '';
@@ -393,7 +396,82 @@ function applyQuestionChanges(questions, changes, includeDeleted = false) {
 
 async function loadServerQuestions() {
   const [questions, changes] = await Promise.all([loadBaseServerQuestions(), loadQuestionChanges()]);
-  return applyQuestionChanges(questions, changes);
+  return core.projectQuestions(applyQuestionChanges(questions, changes), activeProducts(changes));
+}
+
+function questionRevision(changes) {
+  const ordered=[...changes].sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+  return crypto.createHash('sha256').update(JSON.stringify(ordered)).digest('hex');
+}
+
+
+function activeProducts(changes) {
+  return baseProducts.map(product => {
+    const change = changes.find(item => item.id === `product:${product.code}`);
+    return change ? {...product,...change.patch,code:product.code} : {...product};
+  });
+}
+
+async function handleAdminProducts(payload,user) {
+  const changes=await loadQuestionChanges();
+  if (payload.operation === 'list') return {ok:true,products:activeProducts(changes)};
+  const code=String(payload.code || '');
+  const current=activeProducts(changes).find(p=>p.code===code);
+  if (!current) throw httpError(404,'产品不存在');
+  const allowed=['name','line','net','carton','contents','shelf','barcode','status','audience','scenario','sellingPoints','objections','pairing','forbiddenClaims'];
+  const patch={};
+  for (const field of allowed) if (Object.hasOwn(payload.product || {},field)) patch[field]=String(payload.product[field] || '').trim().slice(0,1000);
+  if (Object.hasOwn(payload.product || {},'compareCodes')) patch.compareCodes=[...new Set(payload.product.compareCodes)].filter(c=>/^\d{4}$/.test(c)&&c!==code&&baseProducts.some(p=>p.code===c)).slice(0,5);
+  const candidate={...current,...patch,updatedAt:new Date().toISOString()};
+  core.validateProduct(candidate);
+  const products=activeProducts(changes).map(p=>p.code===code?candidate:p);
+  const questions=await loadBaseServerQuestions();
+  const projected=core.projectQuestions(applyQuestionChanges(questions,changes),products);
+  const before=await loadServerQuestions();
+  const affected=questions.filter(q=>JSON.stringify(before.find(p=>p.id===q.id))!==JSON.stringify(projected.find(p=>p.id===q.id))).length;
+  if (payload.operation === 'preview') return {ok:true,affected,removed:before.length-projected.length,product:candidate};
+  if (payload.operation !== 'update') throw httpError(400,'不支持的产品操作');
+  await saveQuestionChange(`product:${code}`,'active',candidate,user);
+  return {ok:true,affected,products:activeProducts(await loadQuestionChanges())};
+}
+
+let progressTablePromise;
+async function learningTableId() {
+  if (!progressTablePromise) progressTablePromise=(async()=>{
+    try { return await resolveTableId('', ['员工学习进度']); }
+    catch(error) {
+      if (error?.code !== 'TABLE_NOT_FOUND') throw error;
+      const token=await getTenantToken();
+      const data=await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables`,{
+        method:'POST',headers:{'Content-Type':'application/json; charset=utf-8',Authorization:`Bearer ${token}`},
+        body:JSON.stringify({table:{name:'员工学习进度',default_view_name:'学习进度',fields:['手机号','设备ID','学习进度','更新时间'].map(field_name=>({field_name,type:1}))}})
+      });
+      cachedTables=null; cachedTablesExpireAt=0;
+      return data?.data?.table?.table_id || data?.data?.table_id;
+    }
+  })().catch(error=>{progressTablePromise=null;throw error;});
+  return progressTablePromise;
+}
+async function handleLearningProgress(payload,user,dependencies={table:learningTableId,search:searchRecordsReliable,update:updateRecord,create:createRecord}) {
+  const tableId=await dependencies.table();
+  const phone=cleanPhone(user.phone);
+  const device=String(payload.deviceId || '').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,100);
+  if (!device) throw httpError(400,'缺少设备标识');
+  const records=await dependencies.search(tableId,'手机号',phone);
+  let merged={};
+  for (const record of records) {
+    let progress={};
+    try {progress=JSON.parse(record['学习进度'] || '{}');} catch {}
+    merged=core.mergeProgress(merged,progress);
+  }
+  merged=core.mergeProgress(merged,payload.progress);
+  if (payload.progress && Object.keys(payload.progress).length) {
+    const existing=records.find(record=>record['设备ID']===device);
+    const fields={'手机号':phone,'设备ID':device,'学习进度':JSON.stringify(merged),'更新时间':dt()};
+    if (existing) await dependencies.update(tableId,existing.record_id,fields);
+    else await dependencies.create(tableId,fields);
+  }
+  return {ok:true,progress:merged};
 }
 
 const publicQuestion = (question) => {
@@ -914,7 +992,11 @@ function productQuestionAllowedForRole(question, role) {
 
 async function handleExamStart(payload, user) {
   const size = Math.min(100, Math.max(1, Number(payload.size) || 50));
-  const questions = await loadServerQuestions();
+  questionChangesCache=null;
+  questionChangesExpireAt=0;
+  const changes=await loadQuestionChanges();
+  if (payload.questionRevision!==questionRevision(changes)) throw httpError(409,'产品或题目刚刚更新，请重新开始考试以加载最新资料');
+  const questions = core.projectQuestions(applyQuestionChanges(await loadBaseServerQuestions(),changes),activeProducts(changes));
   const pool = examPool(questions, payload, user);
   if (pool.length < 1) {
     if (payload.mode === 'role') {
@@ -1255,9 +1337,16 @@ module.exports = async (req, res) => {
       const user = await requireActiveUser(req, payload);
       return json(req, res, 200, { ok: true, token: authTokenFor(user), user });
     }
+    if (action === 'learning-progress') {
+      const user=await requireActiveUser(req,payload);
+      return json(req,res,200,await handleLearningProgress(payload,user));
+    }
     if (action === 'questions') {
       await requireActiveUser(req, payload);
-      return json(req, res, 200, { ok: true, changes: await loadQuestionChanges() });
+      questionChangesCache=null;
+      questionChangesExpireAt=0;
+      const changes=await loadQuestionChanges();
+      return json(req, res, 200, { ok: true, changes, products:activeProducts(changes), revision:questionRevision(changes) });
     }
     if (action.startsWith('admin-')) {
       const user = await requireAdmin(req, payload);
@@ -1265,6 +1354,7 @@ module.exports = async (req, res) => {
       if (action === 'admin-add') return json(req, res, 200, await handleAdminAdd(payload));
       if (action === 'admin-delete') return json(req, res, 200, await handleAdminDelete(payload, user));
       if (action === 'admin-password') return json(req, res, 200, await handleAdminPassword(payload));
+      if (action === 'admin-products') return json(req,res,200,await handleAdminProducts(payload,user));
       if (action === 'admin-questions') return json(req, res, 200, await handleAdminQuestions(payload, user));
     }
     if (action === 'reset') return json(req, res, 200, await handlePasswordReset(payload));
@@ -1273,6 +1363,7 @@ module.exports = async (req, res) => {
       return json(req, res, 200, await handlePasswordLogin(payload));
     }
     if (action === 'exam-start') {
+      if (!core.versionsMatch(payload.dataVersion,dataHealth())) throw httpError(409,'学习与考试题库版本不一致，请更新页面或联系管理员同步发布');
       const user = await requireActiveUser(req, payload);
       return json(req, res, 200, await handleExamStart(payload, user));
     }
@@ -1305,6 +1396,7 @@ module.exports = async (req, res) => {
 };
 
 module.exports._test = {
+  handleLearningProgress, activeProducts,
   selectExamQuestions, selectMooncakeExamQuestions, examPool, productQuestionAllowedForRole,
   handlePracticeSubmitOnce, applyQuestionChanges, questionPatchFromPayload,
 };

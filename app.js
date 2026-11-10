@@ -1,4 +1,5 @@
-const BUILD_VERSION = "20261110-giftboxes-retire2601";
+const core = window.KnowledgeCore;
+const BUILD_VERSION = "20261110-growth2";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -12,6 +13,11 @@ const CLOUD_ENABLED = true;
 const CLOUD_TIMEOUT_MS = 60000;
 const state = {
   baseQuestions: [],
+  products: [],
+  baseProducts: [],
+  dataVersion: null,
+  serviceReady: false,
+  studyLimit: 0,
   questionChanges: [],
   allQuestions: [],
   filtered: [],
@@ -799,7 +805,17 @@ async function loadCloudStats() {
 }
 
 async function loadQuestions() {
-  const [productRes, roleRes] = await Promise.all([fetch(productUrl), fetch(roleUrl)]);
+  const [productRes, roleRes, catalogueRes, versionRes] = await Promise.all([
+    fetch(productUrl), fetch(roleUrl), fetch(`./products.json?v=${BUILD_VERSION}`), fetch(`./version.json?t=${Date.now()}`,{cache:'no-store'})]);
+  if (!catalogueRes.ok || !versionRes.ok) throw new Error('产品资料或版本清单加载失败');
+  state.baseProducts = await catalogueRes.json();
+  state.products = state.baseProducts;
+  state.dataVersion = await versionRes.json();
+  const quizTexts=await Promise.all([productRes.clone().text(),roleRes.clone().text()]);
+  const catalogText=await (await fetch(`./products.json?v=${BUILD_VERSION}`,{cache:'no-store'})).text();
+  const loadedHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode([catalogText,...quizTexts].map(text=>text.replace(/\r\n/g,'\n')).join('')));
+  const productHash=[...new Uint8Array(loadedHash)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
+  state.dataVersion={buildVersion:BUILD_VERSION,productHash};
   if (!productRes.ok || !roleRes.ok) {
     throw new Error(`题库文件请求失败（产品 ${productRes.status} / 岗位 ${roleRes.status}）`);
   }
@@ -834,6 +850,10 @@ async function loadQuestions() {
 }
 
 function applyQuestionChanges() {
+  state.products = state.baseProducts.map(product => {
+    const change = state.questionChanges.find(item => item.id === `product:${product.code}`);
+    return change ? {...product,...change.patch,code:product.code} : {...product};
+  });
   const byId = new Map(state.questionChanges.map((change) => [String(change.id), change]));
   state.allQuestions = state.baseQuestions.flatMap((question) => {
     const change = byId.get(String(question.id));
@@ -841,6 +861,7 @@ function applyQuestionChanges() {
     if (change.status === "deleted") return [];
     return [{ ...question, ...(change.patch || {}), _changeStatus: "active", _updatedAt: change.updatedAt || "", _updatedBy: change.updatedBy || "" }];
   });
+  state.allQuestions = core.projectQuestions(state.allQuestions, state.products);
 }
 
 function allManagedQuestions() {
@@ -860,6 +881,7 @@ async function loadQuestionChanges() {
   }
   const data = await cloudRequest("questions", {});
   state.questionChanges = Array.isArray(data.changes) ? data.changes : [];
+  state.questionRevision=data.revision;
   applyQuestionChanges();
 }
 
@@ -970,7 +992,8 @@ function banks() {
 }
 
 function bankQuestions() {
-  const keyword = normalize(els.searchInput.value);
+  const resolved = core.resolveProduct(state.products, String(els.searchInput.value).trim());
+  const keyword = normalize(resolved?.code || els.searchInput.value);
   return state.allQuestions.filter((question) => {
     const bankMatch = state.currentBank === "全部题库" || question.bank === state.currentBank;
     if (!bankMatch) return false;
@@ -1025,7 +1048,7 @@ function renderDashboard() {
   els.taskPanel.innerHTML = `
     <div class="task-card ${todayRecords.length ? "done" : ""}">
       <span>${todayRecords.length ? "✓" : "1"}</span>
-      <div><strong>完成今日考核</strong><small>${todayRecords.length ? `今日已完成 ${todayRecords.length} 次` : "建议先做 30-50 题正式考核"}</small></div>
+      <div><strong>完成今日考核</strong><small>${todayRecords.length ? `今日已完成 ${todayRecords.length} 次` : "先学习5张卡，再完成10题练习"}</small></div>
     </div>
     <div class="task-card ${dueMistakes.length === 0 ? "done" : ""}">
       <span>${dueMistakes.length === 0 ? "✓" : "2"}</span>
@@ -1037,6 +1060,8 @@ function renderDashboard() {
     </div>
   `;
 
+  els.taskPanel.insertAdjacentHTML('beforeend','<button class="primary-btn" id="startDailyStudyBtn">开始今日岗位学习</button>');
+  document.querySelector('#startDailyStudyBtn').addEventListener('click',startDailyStudy);
   const total = state.allQuestions.length;
   const productTotal = state.allQuestions.filter((q) => PRODUCT_BANKS.includes(q.bank)).length;
   const roleTotal = total - productTotal;
@@ -1070,6 +1095,7 @@ function renderDashboard() {
   els.bankCards.querySelectorAll(".bank-card").forEach((card) => {
     card.addEventListener("click", () => {
       clearAutoNextTimer();
+      state.studyLimit=0;
       state.currentBank = card.dataset.bank;
       state.learnPage = 1;
       els.bankSelect.value = state.currentBank;
@@ -1179,6 +1205,7 @@ function renderLearnFilter() {
   els.learnFilter.querySelectorAll("[data-learn-category]").forEach((button) => {
     button.addEventListener("click", () => {
       const nextCategory = button.dataset.learnCategory;
+      state.studyLimit=0;state.compareCodes=[];
       state.currentBank = nextCategory === "home" ? "全部题库" : (learnCategoryBanks(nextCategory)[0] || "全部题库");
       state.learnMode = "knowledge";
       state.learnPage = 1;
@@ -1191,6 +1218,7 @@ function renderLearnFilter() {
     btn.addEventListener("click", () => {
       clearAutoNextTimer();
       state.currentBank = btn.dataset.bank;
+      state.studyLimit=0;state.compareCodes=[];
       state.learnPage = 1;
       els.bankSelect.value = state.currentBank;
       renderAll();
@@ -1215,7 +1243,7 @@ function renderLearnList() {
   return renderRuleLearning();
 }
 
-const PRODUCT_BANKS = ["月饼题库", "日常年货题库", "业务场景题库", "品牌知识题库", "商家编码题库"];
+const PRODUCT_BANKS = ["月饼题库", "日常年货题库", "业务场景题库", "品牌题库", "品牌知识题库", "商家编码题库"];
 const CORE_EXAM_BANKS = ["月饼题库", "日常年货题库", "业务场景题库"];
 
 let timerInterval = null;
@@ -1356,7 +1384,10 @@ async function startQuiz() {
     if (mode === "product") bank = els.productBankSelect.value;
     if (mode === "role") bank = els.roleBankSelect.value;
     try {
-      const data = await cloudRequest("exam-start", { mode, bank, size });
+      await checkExamService();
+      if (!state.serviceReady) throw new Error('学习与考试服务尚未同步，请使用练习模式，或联系管理员');
+      await loadQuestionChanges();
+      const data = await cloudRequest("exam-start", { mode, bank, size, dataVersion: state.dataVersion, questionRevision:state.questionRevision });
       if (!data.sessionToken || !data.examId || !Array.isArray(data.questions) || !data.questions.length) {
         throw new Error("服务器未返回有效考试题目");
       }
@@ -1377,6 +1408,7 @@ async function startQuiz() {
     } else if (state.quizMode === "product") {
       const bank = els.productBankSelect.value;
       pool = state.allQuestions.filter((q) => q.bank === bank && productQuestionAllowedForRole(q));
+      if (state.studyLimit && state.studyCodes?.length && bank===state.currentBank) pool=pool.filter(q=>state.studyCodes.includes(String(q.code)));
       state.examLabelOverride = bank;
     } else if (state.quizMode === "role") {
       const bank = els.roleBankSelect.value;
@@ -1440,13 +1472,18 @@ function productKnowledgeValue(questions, point) {
 }
 
 function learningStatus(id) {
-  return storage.learningProgress[id]?.status || "new";
+  const item = storage.learningProgress[id];
+  const product = state.products.find(p => id === `product|${p.bank}|${p.code}`);
+  if (item && product && item.revision !== core.revision(product)) return 'review';
+  return item?.status || 'new';
 }
 
 function updateLearningStatus(id, status) {
   const progress = storage.learningProgress;
-  progress[id] = { status, updatedAt: new Date().toISOString() };
+  const product = state.products.find(p => id === `product|${p.bank}|${p.code}`);
+  progress[id] = { status, updatedAt: new Date().toISOString(), ...(product ? {revision:core.revision(product)} : {}) };
   storage.learningProgress = progress;
+  void syncLearningProgress();
   renderLearnList();
 }
 
@@ -1459,6 +1496,23 @@ function learningActionButtons(id) {
 }
 
 function bindLearningInteractions() {
+  els.learnList.querySelectorAll('[data-copy-product]').forEach(button => button.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(button.dataset.copyProduct); button.textContent='已复制'; }
+    catch { button.textContent='复制失败，请手动选择'; }
+  }));
+  els.learnList.querySelectorAll('[data-compare-product]').forEach(button => button.addEventListener('click', () => {
+    const product=state.products.find(p=>p.code===button.dataset.compareProduct);
+    state.compareCodes=[product.code,...(product.compareCodes || [])];
+    els.searchInput.value=''; state.learnMode='compare'; state.studyLimit=0; renderLearnList();
+  }));
+  els.learnList.querySelectorAll('[data-study-start]').forEach(button => button.addEventListener('click', () => startDailyStudy()));
+  els.learnList.querySelectorAll('[data-study-quiz]').forEach(button => button.addEventListener('click', () => {
+    const productBank=['月饼题库','日常年货题库'].includes(state.currentBank);
+    state.quizMode=productBank?'product':'role';
+    if(productBank) els.productBankSelect.value=state.currentBank; else els.roleBankSelect.value=state.currentBank;
+    els.quizSize.value='10'; els.examType.value='practice';
+    switchView('quiz'); void startQuiz();
+  }));
   els.learnList.querySelectorAll("[data-learning-status]").forEach((button) => {
     button.addEventListener("click", () => updateLearningStatus(button.dataset.learningId, button.dataset.learningStatus));
   });
@@ -1499,15 +1553,16 @@ function renderLearningPagination(total, pageSize) {
 }
 
 function renderLearningProgress() {
-  const progress = Object.values(storage.learningProgress);
-  const learned = progress.filter((item) => item.status === "learned").length;
+  const progress = Object.entries(storage.learningProgress).map(([id,item])=>({...item,status:learningStatus(id)}));
+  const learned = progress.filter(item => item.status === 'learned').length;
+  const verified = progress.filter(item => item.status === 'verified').length;
   const learnedToday = progress.filter((item) => item.status === "learned" && todayKey(item.updatedAt) === todayKey()).length;
   const review = progress.filter((item) => item.status === "review").length;
   els.learnSummary.innerHTML = `<div class="learning-progress-strip">
     <div><span>当前岗位</span><strong>${escapeHtml(state.currentUser?.role || "未设置")}</strong></div>
-    <div><span>已掌握</span><strong>${learned}</strong></div>
+    <div><span>自认记住</span><strong>${learned}</strong></div><div><span>答题验证掌握</span><strong>${verified}</strong></div>
     <div><span>待复习</span><strong>${review}</strong></div>
-    <div><span>今日目标</span><strong>${learnedToday}/10 张</strong></div>
+    <div><span>今日目标</span><strong>${learnedToday}/5 张</strong></div>
   </div>`;
 }
 
@@ -1538,7 +1593,7 @@ function renderLearningOverview() {
     ["brand", "品牌知识", "品牌背书、工艺和统一服务口径", "knowledge"],
   ];
   els.learnCount.textContent = `${storage.learningProgress ? Object.keys(storage.learningProgress).length : 0} 条进度`;
-  els.learnList.innerHTML = `<div class="learning-home">
+  els.learnList.innerHTML = `<div class="learning-home"><section class="learning-home-section"><h4>今日岗位学习</h4><p>先学习5张知识卡，再练习10题。产品卡答对3个不同知识点才记为验证掌握。</p><button class="primary-btn" data-study-start>开始今日学习</button></section>
     <section class="learning-home-section"><div class="learning-section-title"><h4>岗位必学</h4><span>${escapeHtml(state.currentUser?.role || "全员")}</span></div>
       <div class="learning-home-links">${roleBanks.length ? roleBanks.map((bank) => `<button type="button" data-overview-category="role" data-bank-target="${escapeHtml(bank)}"><strong>${escapeHtml(bank)}</strong><span>${state.allQuestions.filter((q) => q.bank === bank && (q.role === state.currentUser?.role || q.role === "全员")).length} 个知识点</span></button>`).join("") : `<p class="empty">当前岗位先学习全员产品与协作规范。</p>`}</div>
     </section>
@@ -1569,13 +1624,17 @@ function productLearningEntities() {
     const image = questions.find((question) => question.questionImage)?.questionImage
       || imageQuestion?.[`option${imageQuestion.answer}Image`]
       || "";
-    const peers = cards
-      .filter(([peerCode, peerQuestions]) => peerCode !== code && peerQuestions[0]?.productLine === questions[0]?.productLine)
-      .sort(([left], [right]) => Math.abs(Number(left) - Number(code)) - Math.abs(Number(right) - Number(code)))
-      .slice(0, 3)
-      .map(([peerCode]) => peerCode);
+    const product = state.products.find(p => p.code === code);
+    const confusion=new Map();
+    storage.mistakes.filter(mistake=>String(mistake.code)===code).forEach(mistake=>{
+      const selected=String(mistake[`option${mistake.selected}`] || mistake.selected || '');
+      state.products.filter(p=>p.code!==code && p.status==='active').forEach(p=>{
+        if (new RegExp(`(?<!\\d)${p.code}(?!\\d)`).test(selected)) confusion.set(p.code,(confusion.get(p.code)||0)+1);
+      });
+    });
+    const peers = [...new Set([...confusion.entries()].sort((a,b)=>b[1]-a[1]).map(([peer])=>peer).concat(product?.compareCodes || []))].filter(peer => state.products.some(p => p.code===peer && p.status==='active')).slice(0,5);
     const roles = suitableRolesForProduct(questions);
-    return { id: `product|${state.currentBank}|${code}`, code, questions, name, image, peers, roles,
+    return { id: `product|${state.currentBank}|${code}`, code, questions, name, image, peers, roles, product,
       line: questions[0]?.productLine || "--", net: productKnowledgeValue(questions, "克重/净重"),
       carton: productKnowledgeValue(questions, "箱规"), contents: productKnowledgeValue(questions, "内配/口味"),
       shelf: productKnowledgeValue(questions, "保质期") };
@@ -1584,17 +1643,23 @@ function productLearningEntities() {
 
 function renderProductLearning() {
   let entities = productLearningEntities();
+  if (state.studyLimit) {
+    entities=entities.sort((a,b)=>({review:0,new:1,learned:2,verified:3}[learningStatus(a.id)]-({review:0,new:1,learned:2,verified:3}[learningStatus(b.id)]))).slice(0,state.studyLimit);
+    state.studyCodes=entities.map(item=>item.code);
+  }
+  if (state.learnMode==='compare' && state.compareCodes?.length) entities=entities.filter(item=>state.compareCodes.includes(item.code));
   if (state.learnMode === "review") entities = entities.filter((item) => learningStatus(item.id) === "review");
   const pageSize = state.learnMode === "compare" ? 30 : 16;
   const { start, end } = renderLearningPagination(entities.length, pageSize);
   const pageItems = entities.slice(start, end);
   els.learnCount.textContent = `${entities.length} 个产品`;
   if (!pageItems.length) {
-    els.learnList.innerHTML = `<div class="empty">${state.learnMode === "review" ? "当前产品题库没有待复习内容。" : "没有找到匹配的产品。"}</div>`;
+    const retired=core.resolveProduct(state.products,String(els.searchInput.value).trim())?.status==='retired';
+    els.learnList.innerHTML = `<div class="empty">${retired ? '该产品已停售，不再用于学习和考试。' : state.learnMode === "review" ? "当前产品题库没有待复习内容。" : "没有找到匹配的产品。"}</div>`;
     return;
   }
   if (state.learnMode === "compare") {
-    els.learnList.innerHTML = `<div class="learning-table-wrap"><table class="learning-compare-table"><thead><tr><th>货号</th><th>产品</th><th>产品线</th><th>净重</th><th>箱规</th><th>保质期</th><th>易混货号</th></tr></thead><tbody>${pageItems.map((item) => `<tr><td><strong>${escapeHtml(item.code)}</strong></td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.line)}</td><td>${escapeHtml(item.net)}</td><td>${escapeHtml(item.carton)}</td><td>${escapeHtml(item.shelf)}</td><td>${escapeHtml(item.peers.join("、") || "--")}</td></tr>`).join("")}</tbody></table></div>`;
+    els.learnList.innerHTML = `<div class="learning-table-wrap"><table class="learning-compare-table"><thead><tr><th>货号</th><th>产品</th><th>产品线</th><th>净重</th><th>箱规</th><th>保质期</th><th>已确认对比款</th></tr></thead><tbody>${pageItems.map((item) => `<tr><td><strong>${escapeHtml(item.code)}</strong></td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.line)}</td><td>${escapeHtml(item.net)}</td><td>${escapeHtml(item.carton)}</td><td>${escapeHtml(item.shelf)}</td><td>${escapeHtml(item.peers.join("、") || "--")}</td></tr>`).join("")}</tbody></table></div>`;
   } else if (state.learnMode === "flash") {
     els.learnList.innerHTML = `<div class="memory-flash-grid">${pageItems.map((item) => `<article class="memory-flash-card">
       <div class="flash-front">${item.image ? `<img src="${imagePath(item.image)}" alt="${escapeHtml(item.name)}" loading="lazy" decoding="async" />` : ""}<span>${escapeHtml(item.line)}</span><h4>${escapeHtml(item.name)}</h4><strong>${escapeHtml(item.code)}</strong></div>
@@ -1604,9 +1669,13 @@ function renderProductLearning() {
     els.learnList.innerHTML = `<div class="product-knowledge-grid">${pageItems.map((item) => `<article class="product-knowledge-card">
       ${item.image ? `<img src="${imagePath(item.image)}" alt="${escapeHtml(item.code)} ${escapeHtml(item.name)}" loading="lazy" decoding="async" />` : `<div class="product-image-empty">暂无产品图</div>`}
       <div class="product-card-body"><div class="meta"><span>${escapeHtml(item.line)}</span><span>${escapeHtml(item.code)}</span></div><h4>${escapeHtml(item.name)}</h4>
-        <dl><div><dt>净重</dt><dd>${escapeHtml(item.net)}</dd></div><div><dt>箱规</dt><dd>${escapeHtml(item.carton)}</dd></div><div><dt>内配/口味</dt><dd>${escapeHtml(item.contents)}</dd></div><div><dt>保质期</dt><dd>${escapeHtml(item.shelf)}</dd></div><div><dt>易混货号</dt><dd>${escapeHtml(item.peers.join("、") || "--")}</dd></div><div><dt>适用岗位</dt><dd>${escapeHtml(item.roles.join("、") || "全员基础学习")}</dd></div></dl>
-        ${learningActionButtons(item.id)}</div></article>`).join("")}</div>`;
+        <dl><div><dt>净重</dt><dd>${escapeHtml(item.net)}</dd></div><div><dt>箱规</dt><dd>${escapeHtml(item.carton)}</dd></div><div><dt>内配/口味</dt><dd>${escapeHtml(item.contents)}</dd></div><div><dt>保质期</dt><dd>${escapeHtml(item.shelf)}</dd></div><div><dt>对比货号</dt><dd>${escapeHtml(item.peers.join("、") || "尚未设置对比款")}</dd></div><div><dt>条码</dt><dd>${escapeHtml(item.product?.barcode || "待确认")}</dd></div><div><dt>适用岗位</dt><dd>${escapeHtml(item.roles.join("、") || "全员基础学习")}</dd></div></dl>
+        ${productWorkCard(item)}${learningActionButtons(item.id)}</div></article>`).join("")}</div>`;
   }
+  if (state.studyLimit) els.learnList.insertAdjacentHTML('beforeend','<button class="primary-btn" data-study-quiz>完成学习，做10题练习</button>');
+  const resolved=core.resolveProduct(state.products,String(els.searchInput.value).trim());
+  if (resolved?.status==='retired') els.learnList.innerHTML='<div class="empty">该产品已停售，不再用于学习和考试。请选择其他在售产品。</div>';
+  else if (resolved?.aliases?.includes(String(els.searchInput.value).trim())) els.learnList.insertAdjacentHTML('afterbegin',`<p class="data-notice">旧货号已更新，当前货号：${escapeHtml(resolved.code)}</p>`);
   bindLearningInteractions();
 }
 
@@ -1779,6 +1848,7 @@ function renderRuleOperationalBlocks(item) {
 
 function renderRuleLearning() {
   let entities = ruleLearningEntities();
+  if (state.studyLimit) entities=entities.slice(0,state.studyLimit);
   if (state.learnMode === "review") entities = entities.filter((item) => learningStatus(item.id) === "review");
   const { start, end } = renderLearningPagination(entities.length, state.learnMode === "compare" ? 30 : 18);
   const pageItems = entities.slice(start, end);
@@ -1794,6 +1864,7 @@ function renderRuleLearning() {
   } else {
     els.learnList.innerHTML = `<div class="rule-learning-grid">${pageItems.map((item) => `<article class="rule-knowledge-card"><div class="meta"><span>${escapeHtml(item.question.bank)}</span><span>${escapeHtml(item.question.knowledgePoint || item.question.module)}</span>${item.riskLevel === "redline" ? "<span class=\"redline-tag\">红线</span>" : ""}${item.questionCount > 1 ? `<span>${item.questionCount} 道关联题</span>` : ""}</div><h4>${escapeHtml(item.title)}</h4><div class="rule-knowledge-block"><span>工作场景</span><p>${escapeHtml(item.scenario)}</p></div><div class="rule-knowledge-block key"><span>标准动作</span><p>${escapeHtml(item.action)}</p></div>${renderRuleOperationalBlocks(item)}<div class="rule-knowledge-block"><span>为什么</span><p>${escapeHtml(item.reason)}</p></div>${item.mistakes.length ? renderRuleLearningBlock("常见误区", item.mistakes, "warning") : ""}${learningActionButtons(item.id)}</article>`).join("")}</div>`;
   }
+  if (state.studyLimit) els.learnList.insertAdjacentHTML('beforeend','<button class="primary-btn" data-study-quiz>完成学习，做10题练习</button>');
   bindLearningInteractions();
 }
 
@@ -1861,6 +1932,7 @@ function chooseAnswer(letter) {
   state.answeredQuestionIds.add(question.id);
   const correct = state.examType === "formal" ? null : isEquivalentAnswer(question, letter);
   if (state.examType === "formal") state.answers.set(question.id, letter);
+  if (correct !== null) recordProductMastery(question, correct);
   storage.attempts += 1;
   if (correct === true) {
     storage.correct += 1;
@@ -2702,6 +2774,8 @@ function saveAuthenticatedUser(data) {
 async function refreshAuthenticatedQuestions() {
   try {
     await loadQuestionChanges();
+    void syncLearningProgress();
+    void loadProductManager();
     reconcileStoredQuestions();
     renderBankSelect();
     renderQuizSetup();
@@ -2841,11 +2915,13 @@ function bindEvents() {
   els.navTabs.forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
   els.bankSelect.addEventListener("change", () => {
     clearAutoNextTimer();
+    state.studyLimit=0;state.compareCodes=[];
     state.currentBank = els.bankSelect.value;
     state.learnPage = 1;
     renderAll();
   });
   els.searchInput.addEventListener("input", () => {
+    state.compareCodes=[];
     state.learnPage = 1;
     renderAll();
   });
@@ -2871,6 +2947,7 @@ function bindEvents() {
     const button = event.target.closest("[data-learn-mode]");
     if (!button) return;
     state.learnMode = button.dataset.learnMode;
+    state.compareCodes=[];
     state.learnPage = 1;
     renderLearnFilter();
     renderLearnList();
@@ -2944,6 +3021,117 @@ function bindEvents() {
   });
 }
 
+async function checkExamService() {
+  let message='考试服务版本检查中';
+  try {
+    const response=await fetchWithTimeout(`${API_BASE}/api/health`,{cache:'no-store'},10000);
+    if (!response.ok) throw new Error('版本接口尚未更新');
+    const health=await response.json();
+    state.serviceReady=core.versionsMatch(state.dataVersion,health);
+    message=state.serviceReady?'学习与考试题库版本一致':'学习与考试题库版本不一致，正式考试暂不可用；练习可正常使用';
+  } catch {state.serviceReady=false;message='考试服务尚未完成版本核对；可先学习和练习';}
+  let banner=document.querySelector('#dataHealthStatus');
+  if (!banner) {banner=document.createElement('p');banner.id='dataHealthStatus';banner.setAttribute('role','status');document.querySelector('.main')?.prepend(banner);}
+  banner.className=state.serviceReady?'data-health healthy':'data-health';banner.textContent=message;
+}
+
+let progressSyncing=false;
+let progressRetry=null;
+async function syncLearningProgress() {
+  if (!state.currentUser || progressSyncing) return;
+  const phone=state.currentUser.phone;
+  progressSyncing=true;
+  const local=storage.learningProgress;
+  for (const [id,item] of Object.entries(local)) {
+    const product=state.products.find(p=>id===`product|${p.bank}|${p.code}`);
+    if (product && item.revision!==core.revision(product)) local[id]={status:'review',revision:core.revision(product),updatedAt:new Date().toISOString()};
+  }
+  storage.learningProgress=local;
+  const sent=local;
+  try {
+    const data=await cloudRequest('learning-progress',{progress:sent});
+    if (state.currentUser?.phone!==phone) return;
+    storage.learningProgress=core.mergeProgress(data.progress,storage.learningProgress);
+    if (state.currentView==='learn') renderLearnList();
+    if (JSON.stringify(storage.learningProgress)!==JSON.stringify(core.mergeProgress(data.progress,sent))) {
+      clearTimeout(progressRetry);progressRetry=setTimeout(()=>void syncLearningProgress(),800);
+    }
+    setSyncStatus('学习进度已同步','success');
+  } catch {
+    if (state.currentUser?.phone!==phone) return;
+    setSyncStatus('学习进度已保存在本机，联网后重试','error');
+    clearTimeout(progressRetry);progressRetry=setTimeout(()=>void syncLearningProgress(),60000);
+  } finally {progressSyncing=false;}
+}
+window.addEventListener('online',()=>void syncLearningProgress());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden) void syncLearningProgress();});
+
+function recordProductMastery(question,correct) {
+  const product=state.products.find(p=>p.code===String(question.code)&&p.bank===question.bank&&p.status==='active');
+  if (!product) return;
+  const id=`product|${product.bank}|${product.code}`;
+  const progress=storage.learningProgress;
+  const previous=progress[id]?.revision===core.revision(product)?progress[id]:{};
+  const passed=correct?[...new Set([...(previous.passedPoints || []),question.knowledgePoint])]:[];
+  progress[id]={status:correct?(passed.length>=3?'verified':previous.status || 'learned'):'review',passedPoints:passed,revision:core.revision(product),updatedAt:new Date().toISOString()};
+  storage.learningProgress=progress;
+  void syncLearningProgress();
+}
+
+function startDailyStudy() {
+  state.studyLimit=5;state.learnMode='knowledge';state.learnPage=1;els.searchInput.value='';
+  const roleBank=learnCategoryBanks('role')[0];
+  state.currentBank=state.currentUser?.role==='新员工'?'日常年货题库':roleBank || '日常年货题库';
+  // Product practice follows this study bank; role banks use the role quiz controls.
+
+  els.bankSelect.value=state.currentBank;switchView('learn');renderAll();
+}
+
+function productWorkCard(item) {
+  const p=item.product || {};
+  const factual=`货号：${item.code}\n名称：${item.name}\n净重：${item.net}\n内配：${item.contents}\n保质期：${item.shelf}\n条码：${p.barcode || '待确认'}`;
+  const fields=[['适合人群','audience'],['购买场景','scenario'],['核心卖点','sellingPoints'],['顾虑回应','objections'],['推荐搭配','pairing']];
+  const confirmed=fields.filter(([,key])=>p[key]);
+  return `<div class="product-tools"><button class="text-btn" data-copy-product="${escapeHtml(item.code)}">复制货号</button><button class="text-btn" data-copy-product="${escapeHtml(p.barcode || '')}" ${p.barcode?'':'disabled'}>复制条码</button><button class="text-btn" data-copy-product="${escapeHtml(factual)}">复制产品资料</button>${item.peers.length?`<button class="text-btn" data-compare-product="${escapeHtml(item.code)}">查看规格差异</button>`:''}</div>
+    <details class="product-work-card"><summary>销售工作卡${confirmed.length?'':' · 负责人待补充'}</summary>
+    ${confirmed.map(([label,key])=>`<p><strong>${label}</strong>：${escapeHtml(p[key])}</p>`).join('')}
+    ${confirmed.length?'':'<p>卖点、购买场景和顾虑回应尚未确认，可先复制已核实的规格资料。</p>'}
+    <p><strong>服务边界</strong>：${escapeHtml(p.forbiddenClaims || '不承诺未经确认的功效、成分、库存或到货时间')}</p>
+    <p>${learningStatus(item.id)==='verified'?'已答对3个不同知识点，完成掌握验证':'答对3个不同知识点后记为验证掌握；资料更新后需重新确认。'}</p></details>`;
+}
+
+const productEditFields=[['name','名称'],['line','产品分类'],['net','净重'],['carton','箱规'],['contents','内配/口味'],['shelf','保质期'],['barcode','条码'],['audience','适合人群'],['scenario','购买场景'],['sellingPoints','核心卖点（仅填写有依据的内容）'],['objections','顾虑回应'],['pairing','推荐搭配'],['forbiddenClaims','禁止承诺']];
+function fillProductManager() {
+  const select=document.querySelector('#managedProduct');
+  const product=state.products.find(p=>p.code===select.value);
+  if (!product) return;
+  document.querySelector('#productManagerFields').innerHTML=productEditFields.map(([key,label])=>`<label>${label}<input class="text-input" name="${key}" value="${escapeHtml(product[key] || '')}" maxlength="1000" ${key==='name'?'required':''} /></label>`).join('')+`<label>在售状态<select name="status" class="select"><option value="active" ${product.status==='active'?'selected':''}>在售</option><option value="retired" ${product.status==='retired'?'selected':''}>停售（清理产品及关联组合）</option></select></label>`;
+  document.querySelector('#productCompareCodes').value=(product.compareCodes || []).join(',');
+  document.querySelector('#saveProductChange').disabled=true;
+  document.querySelector('#productManagerStatus').textContent='保存前请预览，系统会检查关联题和选项。';
+}
+async function loadProductManager() {
+  if (!isAdminUser()) return;
+  const select=document.querySelector('#managedProduct');
+  if (!select || select.dataset.ready) return;
+  select.innerHTML=state.products.map(p=>`<option value="${escapeHtml(p.code)}">${escapeHtml(p.code)} ${escapeHtml(p.name)}${p.status==='retired'?'（停售）':''}</option>`).join('');
+  select.dataset.ready='true';select.addEventListener('change',fillProductManager);
+  const form=document.querySelector('#productManagerForm');
+  form.addEventListener('input',()=>{document.querySelector('#saveProductChange').disabled=true;});
+  const payload=()=>({code:select.value,product:{...Object.fromEntries(new FormData(form)),compareCodes:document.querySelector('#productCompareCodes').value.split(/[,，、\s]+/).filter(Boolean)}});
+  document.querySelector('#previewProductChange').addEventListener('click',async()=>{
+    const status=document.querySelector('#productManagerStatus');
+    try { const data=await cloudRequest('admin-products',{operation:'preview',...payload()});status.textContent=`将更新 ${data.affected} 道关联题，移除 ${Math.max(0,data.removed)} 道失效题。确认资料后保存。`;document.querySelector('#saveProductChange').disabled=false; }
+    catch(error) {status.textContent=error.message;}
+  });
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();const button=document.querySelector('#saveProductChange');button.disabled=true;
+    try {await cloudRequest('admin-products',{operation:'update',...payload()});await loadQuestionChanges();reconcileStoredQuestions();renderAll();document.querySelector('#productManagerStatus').textContent='已保存，知识卡与正式考试共用最新资料。';}
+    catch(error) {document.querySelector('#productManagerStatus').textContent=error.message;}
+  });
+  fillProductManager();
+}
+
 async function init() {
   try {
     await loadQuestions();
@@ -2973,6 +3161,9 @@ async function init() {
     await loadCloudStats();
     renderAll();
     showAuth(!state.currentUser);
+    void checkExamService();
+    void syncLearningProgress();
+    void loadProductManager();
     await registerInstallableApp();
     await checkLatestVersion({ silent: true });
     window.setInterval(() => checkLatestVersion({ silent: true }), 10 * 60 * 1000);
