@@ -4,6 +4,9 @@ const path = require('node:path');
 const modulePath = path.join(__dirname, '../knowledge-core.js');
 assert.ok(fs.existsSync(modulePath), 'shared catalogue and progress rules must exist');
 const core = require(modulePath);
+assert.equal(typeof core.fingerprintSource,'function','content fingerprint must ignore JSON response formatting');
+assert.equal(core.fingerprintSource(['{\n  "x": 1\n}\n','[]\n']),'{"x":1}[]');
+assert.equal(core.fingerprintSource(['{"x":1}','[]']),'{"x":1}[]');
 const products = [
   {code:'2642',name:'2642曲奇礼盒',line:'糕点礼盒类',barcode:'6924535426422',net:'612g',status:'active',aliases:['2580'],compareCodes:['2381']},
   {code:'2381',name:'2381四宝礼盒',line:'糕点礼盒类',barcode:'123',status:'active'},

@@ -1,5 +1,5 @@
 const core = window.KnowledgeCore;
-const BUILD_VERSION = "20261110-growth2";
+const BUILD_VERSION = "20261110-growth3";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -813,7 +813,7 @@ async function loadQuestions() {
   state.dataVersion = await versionRes.json();
   const quizTexts=await Promise.all([productRes.clone().text(),roleRes.clone().text()]);
   const catalogText=await (await fetch(`./products.json?v=${BUILD_VERSION}`,{cache:'no-store'})).text();
-  const loadedHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode([catalogText,...quizTexts].map(text=>text.replace(/\r\n/g,'\n')).join('')));
+  const loadedHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(core.fingerprintSource([catalogText,...quizTexts])));
   const productHash=[...new Uint8Array(loadedHash)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
   state.dataVersion={buildVersion:BUILD_VERSION,productHash};
   if (!productRes.ok || !roleRes.ok) {
@@ -1503,7 +1503,7 @@ function bindLearningInteractions() {
   els.learnList.querySelectorAll('[data-compare-product]').forEach(button => button.addEventListener('click', () => {
     const product=state.products.find(p=>p.code===button.dataset.compareProduct);
     state.compareCodes=[product.code,...(product.compareCodes || [])];
-    els.searchInput.value=''; state.learnMode='compare'; state.studyLimit=0; renderLearnList();
+    els.searchInput.value=''; state.learnMode='compare'; state.studyLimit=0; renderAll();
   }));
   els.learnList.querySelectorAll('[data-study-start]').forEach(button => button.addEventListener('click', () => startDailyStudy()));
   els.learnList.querySelectorAll('[data-study-quiz]').forEach(button => button.addEventListener('click', () => {
@@ -3023,16 +3023,18 @@ function bindEvents() {
 
 async function checkExamService() {
   let message='考试服务版本检查中';
+  let details='';
   try {
     const response=await fetchWithTimeout(`${API_BASE}/api/health`,{cache:'no-store'},10000);
     if (!response.ok) throw new Error('版本接口尚未更新');
     const health=await response.json();
+    details=`页面 ${state.dataVersion?.buildVersion} / ${state.dataVersion?.productHash}；考试 ${health.buildVersion} / ${health.productHash}`;
     state.serviceReady=core.versionsMatch(state.dataVersion,health);
     message=state.serviceReady?'学习与考试题库版本一致':'学习与考试题库版本不一致，正式考试暂不可用；练习可正常使用';
   } catch {state.serviceReady=false;message='考试服务尚未完成版本核对；可先学习和练习';}
   let banner=document.querySelector('#dataHealthStatus');
   if (!banner) {banner=document.createElement('p');banner.id='dataHealthStatus';banner.setAttribute('role','status');document.querySelector('.main')?.prepend(banner);}
-  banner.className=state.serviceReady?'data-health healthy':'data-health';banner.textContent=message;
+  banner.className=state.serviceReady?'data-health healthy':'data-health';banner.textContent=message;banner.title=details;
 }
 
 let progressSyncing=false;

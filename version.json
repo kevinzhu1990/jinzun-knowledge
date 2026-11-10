@@ -1,7 +1,7 @@
 {
-  "buildVersion": "20261110-growth2",
+  "buildVersion": "20261110-growth3",
   "desktopVersion": "1.0.0",
   "updatedAt": "2026-11-10T09:23:22+08:00",
   "notes": "统一产品资料维护、学习进度云同步、条码与旧货号查询、岗位学习任务和考试版本核对",
-  "productHash": "ffd3e627bc750c5ac9ba183c9480cbe867fd16de9eca4e2036c01c838497543c"
+  "productHash": "7456bd446b6530e754fe405ea5166ac672a0ce3e8c84b8c21ceea79cfeb4baac"
 }

@@ -88,5 +88,6 @@
     return (hash>>>0).toString(16);
   }
   const versionsMatch=(a,b)=>Boolean(a&&b&&a.buildVersion===b.buildVersion&&a.productHash===b.productHash);
-  return {validateProduct,resolveProduct,projectQuestions,mergeProgress,revision,versionsMatch};
+  const fingerprintSource=texts=>texts.map(text=>JSON.stringify(JSON.parse(text))).join('');
+  return {validateProduct,resolveProduct,projectQuestions,mergeProgress,revision,versionsMatch,fingerprintSource};
 });
