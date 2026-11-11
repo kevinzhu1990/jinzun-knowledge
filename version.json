@@ -1,7 +1,7 @@
 {
-  "buildVersion": "20261110-growth3",
+  "buildVersion": "20261111-employees1",
   "desktopVersion": "1.0.0",
-  "updatedAt": "2026-11-10T09:23:22+08:00",
-  "notes": "统一产品资料维护、学习进度云同步、条码与旧货号查询、岗位学习任务和考试版本核对",
+  "updatedAt": "2026-11-11T10:00:00+08:00",
+  "notes": "员工账号支持批量勾选、全选、确认删除和失败重试",
   "productHash": "7456bd446b6530e754fe405ea5166ac672a0ce3e8c84b8c21ceea79cfeb4baac"
 }

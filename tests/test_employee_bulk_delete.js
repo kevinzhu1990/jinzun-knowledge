@@ -1,0 +1,47 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync(require.resolve('../app.js'), 'utf8');
+const start = source.indexOf('let adminEmployees =');
+assert.ok(start >= 0, 'employee selection and bulk deletion must exist');
+const code = source.slice(start, source.indexOf('function renderAdminQuestions()', start));
+function fixture(confirm = true) {
+  const calls = [], confirmations = [];
+  const employees = [{phone:'100',name:'当前管理员'}, {phone:'200',name:'离职甲'}, {phone:'300',name:'离职乙'}];
+  const els = Object.fromEntries(['adminEmployeeList','adminAccountStatus','adminEmployeeSelectAll','adminEmployeeSelectedCount','adminEmployeeBulkDelete','adminEmployeeClearSelection'].map(k=>[k, {textContent:'',innerHTML:'',disabled:false}]));
+  const context = vm.createContext({els, state:{currentUser:{phone:'100'}}, isAdminUser:()=>true, escapeHtml:s=>String(s), window:{confirm:message=>{confirmations.push(message);return confirm;}}, cloudRequest:async(action,payload)=>{calls.push({action,...payload}); if(action==='admin-list') return {employees}; if(payload.phone==='300') throw Error('网络失败'); return {ok:true};}});
+  vm.runInContext(code,context);
+  return {context,els,calls,confirmations,run:s=>vm.runInContext(s,context)};
+}
+(async()=>{
+  const f=fixture();
+  await f.run('refreshAdminEmployees()');
+  f.run('setAdminEmployeeSelection("all", true)');
+  assert.equal(f.run('adminEmployeeSelection.has("100")'), false, 'select all excludes self');
+  assert.equal(f.run('adminEmployeeSelection.size'),2);
+  await f.run('deleteSelectedAdminEmployees()');
+  assert.deepEqual(f.calls.filter(c=>c.action==='admin-delete').map(c=>c.phone),['200','300']);
+  assert.match(f.confirmations[0],/离职甲/);
+  assert.match(f.confirmations[0],/离职乙/);
+  assert.equal(f.run('adminEmployeeSelection.has("200")'),false,'successful deletion is deselected');
+  assert.equal(f.run('adminEmployeeSelection.has("300")'),true,'failed deletion stays selected');
+  assert.match(f.els.adminAccountStatus.textContent,/1.*1/);
+  assert.equal(f.els.adminEmployeeBulkDelete.disabled,false,'can retry after failure');
+  const cancelled=fixture(false);
+  await cancelled.run('refreshAdminEmployees()');
+  cancelled.run('setAdminEmployeeSelection("all", true)');
+  await cancelled.run('deleteSelectedAdminEmployees()');
+  assert.equal(cancelled.calls.filter(c=>c.action==='admin-delete').length,0,'cancel does not delete');
+  const empty=fixture();
+  await empty.run('deleteSelectedAdminEmployees()');
+  assert.equal(empty.confirmations.length,0);
+  const injected=fixture();
+  await injected.run('refreshAdminEmployees()');
+  injected.run('adminEmployeeSelection.add("100"); adminEmployeeSelection.add("unknown")');
+  await injected.run('deleteSelectedAdminEmployees()');
+  assert.equal(injected.calls.filter(c=>c.action==='admin-delete').length,0,'stale or self selections never delete');
+  const checkbox=fixture();
+  await checkbox.run('handleAdminEmployeeAction({target:{closest:()=>null}})');
+  assert.equal(checkbox.calls.length,0,'checkbox click never triggers password action');
+  console.log('employee bulk deletion tests passed');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1803,6 +1803,11 @@ input:disabled {
 .exam-sync-error{margin:0 0 12px;padding:10px 12px;border:1px solid #fcd34d;border-radius:10px;background:#fffbeb;color:#92400e;font-weight:700}
 
 .admin-account-tools { margin: 18px 0; }
+.admin-employee-bulk-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 16px 0 8px; }
+.admin-employee-bulk-tools label, .admin-employee-identity { display: flex; align-items: center; gap: 12px; }
+.admin-employee-bulk-tools input, .admin-employee-checkbox { width: 20px; height: 20px; flex-shrink: 0; accent-color: #0d6474; }
+.admin-employee-identity { min-width: 0; cursor: pointer; }
+.admin-employee-bulk-tools small { color: var(--muted, #6d7d8d); }
 .admin-practice-panel { margin-top: 14px; }
 .admin-account-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 10px; align-items: center; }
 .admin-account-form .text-input, .admin-account-form .select { min-width: 0; }

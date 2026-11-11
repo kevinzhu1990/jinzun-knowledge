@@ -1,5 +1,5 @@
 const core = window.KnowledgeCore;
-const BUILD_VERSION = "20261110-growth3";
+const BUILD_VERSION = "20261111-employees1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -156,6 +156,10 @@ const els = {
   adminEmployeeRole: document.querySelector("#adminEmployeeRole"),
   adminEmployeePassword: document.querySelector("#adminEmployeePassword"),
   adminEmployeeList: document.querySelector("#adminEmployeeList"),
+  adminEmployeeSelectAll: document.querySelector("#adminEmployeeSelectAll"),
+  adminEmployeeSelectedCount: document.querySelector("#adminEmployeeSelectedCount"),
+  adminEmployeeBulkDelete: document.querySelector("#adminEmployeeBulkDelete"),
+  adminEmployeeClearSelection: document.querySelector("#adminEmployeeClearSelection"),
   adminAccountStatus: document.querySelector("#adminAccountStatus"),
   adminQuestionSearch: document.querySelector("#adminQuestionSearch"),
   adminQuestionBank: document.querySelector("#adminQuestionBank"),
@@ -2284,21 +2288,90 @@ function renderRanking() {
   });
 }
 
+let adminEmployees = [];
+const adminEmployeeSelection = new Set();
+let adminEmployeeDeleting = false;
+
+function selectableAdminEmployees() {
+  return adminEmployees.filter(employee => String(employee.phone) !== String(state.currentUser?.phone));
+}
+
+function setAdminEmployeeSelection(phone, checked) {
+  if (adminEmployeeDeleting || !isAdminUser()) return;
+  const selectable = selectableAdminEmployees();
+  if (phone === "all") {
+    adminEmployeeSelection.clear();
+    if (checked) selectable.forEach(employee => adminEmployeeSelection.add(String(employee.phone)));
+  } else if (selectable.some(employee => String(employee.phone) === phone)) {
+    if (checked) adminEmployeeSelection.add(phone);
+    else adminEmployeeSelection.delete(phone);
+  }
+  renderAdminEmployees();
+}
+
+function renderAdminEmployees() {
+  const selectable = selectableAdminEmployees();
+  const allowed = new Set(selectable.map(employee => String(employee.phone)));
+  for (const phone of adminEmployeeSelection) if (!allowed.has(phone)) adminEmployeeSelection.delete(phone);
+  const count = adminEmployeeSelection.size;
+  els.adminEmployeeSelectAll.checked = selectable.length > 0 && count === selectable.length;
+  els.adminEmployeeSelectAll.indeterminate = count > 0 && count < selectable.length;
+  els.adminEmployeeSelectAll.disabled = adminEmployeeDeleting || !selectable.length;
+  els.adminEmployeeSelectedCount.textContent = `已选 ${count} 人`;
+  els.adminEmployeeBulkDelete.disabled = adminEmployeeDeleting || !count;
+  els.adminEmployeeBulkDelete.textContent = adminEmployeeDeleting ? "正在删除…" : `删除所选员工（${count}）`;
+  els.adminEmployeeClearSelection.disabled = adminEmployeeDeleting || !count;
+  els.adminEmployeeList.innerHTML = adminEmployees.map((employee) => {
+    const self = String(employee.phone) === String(state.currentUser?.phone);
+    return `
+      <div class="admin-employee-row">
+        <label class="admin-employee-identity"><input class="admin-employee-checkbox" type="checkbox" data-employee-phone="${escapeHtml(employee.phone)}" aria-label="选择员工 ${escapeHtml(employee.name)}" ${adminEmployeeSelection.has(String(employee.phone)) ? "checked" : ""} ${self || adminEmployeeDeleting ? "disabled" : ""} />
+        <span><strong>${escapeHtml(employee.name)}${employee.isAdmin ? " · 管理员" : ""}</strong><small>${escapeHtml(employee.phone)} · ${escapeHtml(employee.role)} · ${escapeHtml(employee.status)} · 最近登录 ${escapeHtml(employee.lastLoginAt || "暂无")}</small></span></label>
+        <div class="admin-employee-actions">
+          <button class="secondary-btn admin-password-btn" type="button" data-phone="${escapeHtml(employee.phone)}" ${adminEmployeeDeleting ? "disabled" : ""}>修改密码</button>
+          ${self
+            ? '<button class="secondary-btn" type="button" disabled>当前账号</button>'
+            : `<button class="danger-btn admin-delete-btn" type="button" data-phone="${escapeHtml(employee.phone)}" ${adminEmployeeDeleting ? "disabled" : ""}>删除员工</button>`}
+        </div>
+      </div>`;
+  }).join("") || '<div class="empty">暂无员工账号。</div>';
+}
+
+async function deleteSelectedAdminEmployees() {
+  if (!isAdminUser() || adminEmployeeDeleting) return;
+  const selected = selectableAdminEmployees().filter(employee => adminEmployeeSelection.has(String(employee.phone)));
+  if (!selected.length) return;
+  const names = selected.map(employee => `${employee.name}（${employee.phone}）`).join("\n");
+  if (!window.confirm(`确定删除以下 ${selected.length} 个员工账号吗？\n\n${names}\n\n删除后这些员工需要重新注册。请核对离职名单后确认。`)) return;
+  adminEmployeeDeleting = true;
+  renderAdminEmployees();
+  let deleted = 0;
+  const failed = [];
+  try {
+    for (const employee of selected) {
+      els.adminAccountStatus.textContent = `正在处理 ${deleted + failed.length + 1}/${selected.length}…`;
+      try {
+        await cloudRequest("admin-delete", { phone: employee.phone });
+        adminEmployeeSelection.delete(String(employee.phone));
+        adminEmployees = adminEmployees.filter(row => String(row.phone) !== String(employee.phone));
+        deleted++;
+      } catch (error) {
+        failed.push(`${employee.name}：${error.message || "删除失败"}`);
+      }
+    }
+    els.adminAccountStatus.textContent = `已删除 ${deleted} 人${failed.length ? `，失败 ${failed.length} 人（已保留勾选）：${failed.join("；")}` : "。"}`;
+  } finally {
+    adminEmployeeDeleting = false;
+    renderAdminEmployees();
+  }
+}
+
 async function refreshAdminEmployees() {
   if (!isAdminUser() || !els.adminEmployeeList) return;
   try {
     const data = await cloudRequest("admin-list", {});
-    els.adminEmployeeList.innerHTML = (data.employees || []).map((employee) => `
-      <div class="admin-employee-row">
-        <div><strong>${escapeHtml(employee.name)}${employee.isAdmin ? " · 管理员" : ""}</strong><small>${escapeHtml(employee.phone)} · ${escapeHtml(employee.role)} · ${escapeHtml(employee.status)} · 最近登录 ${escapeHtml(employee.lastLoginAt || "暂无")}</small></div>
-        <div class="admin-employee-actions">
-          <button class="secondary-btn admin-password-btn" type="button" data-phone="${escapeHtml(employee.phone)}">修改密码</button>
-          ${String(employee.phone) === String(state.currentUser?.phone)
-            ? '<button class="secondary-btn" type="button" disabled>当前账号</button>'
-            : `<button class="danger-btn admin-delete-btn" type="button" data-phone="${escapeHtml(employee.phone)}">删除员工</button>`}
-        </div>
-      </div>
-    `).join("") || '<div class="empty">暂无员工账号。</div>';
+    adminEmployees = data.employees || [];
+    renderAdminEmployees();
   } catch (error) {
     if (els.adminAccountStatus) els.adminAccountStatus.textContent = error.message || "员工账号读取失败";
   }
@@ -2328,8 +2401,8 @@ async function addAdminEmployee(event) {
 }
 
 async function handleAdminEmployeeAction(event) {
-  const button = event.target.closest("[data-phone]");
-  if (!button) return;
+  const button = event.target.closest("button[data-phone]");
+  if (!button || adminEmployeeDeleting) return;
   const phone = button.dataset.phone;
   if (button.classList.contains("admin-delete-btn")) {
     if (!window.confirm(`确定删除员工账号 ${phone} 吗？删除后该员工需要重新注册。`)) return;
@@ -2985,6 +3058,13 @@ function bindEvents() {
   els.retryExamSubmitBtn?.addEventListener("click", finishQuiz);
   els.adminEmployeeForm?.addEventListener("submit", addAdminEmployee);
   els.adminEmployeeList?.addEventListener("click", handleAdminEmployeeAction);
+  els.adminEmployeeList?.addEventListener("change", (event) => {
+    const checkbox = event.target.closest(".admin-employee-checkbox");
+    if (checkbox) setAdminEmployeeSelection(checkbox.dataset.employeePhone, checkbox.checked);
+  });
+  els.adminEmployeeSelectAll?.addEventListener("change", (event) => setAdminEmployeeSelection("all", event.target.checked));
+  els.adminEmployeeClearSelection?.addEventListener("click", () => setAdminEmployeeSelection("all", false));
+  els.adminEmployeeBulkDelete?.addEventListener("click", deleteSelectedAdminEmployees);
   els.adminQuestionForm?.addEventListener("submit", saveAdminQuestion);
   els.adminQuestionList?.addEventListener("click", handleAdminQuestionAction);
   els.adminQuestionPagination?.addEventListener("click", handleAdminQuestionAction);

@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#123d4d" />
     <meta name="application-name" content="金尊知识库" />
-    <link rel="manifest" href="./manifest.webmanifest?v=20261110-growth3" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20261111-employees1" />
     <link rel="icon" href="./assets/app-icons/icon-192.png" />
     <title>金尊知识库学习考核</title>
-    <link rel="stylesheet" href="./styles.css?v=20261110-growth3" />
+    <link rel="stylesheet" href="./styles.css?v=20261111-employees1" />
   </head>
   <body>
     <section id="authView" class="auth-view">
@@ -354,7 +354,14 @@
               <input id="adminEmployeePassword" class="text-input" required minlength="8" placeholder="初始密码：至少8位，含字母和数字" />
               <button class="primary-btn" type="submit">添加员工</button>
             </form>
-            <p id="adminAccountStatus" class="form-error"></p>
+            <div class="admin-employee-bulk-tools">
+              <label><input id="adminEmployeeSelectAll" type="checkbox" disabled /> 全选员工</label>
+              <span id="adminEmployeeSelectedCount" role="status">已选 0 人</span>
+              <button id="adminEmployeeClearSelection" class="secondary-btn" type="button" disabled>取消选择</button>
+              <button id="adminEmployeeBulkDelete" class="danger-btn" type="button" disabled>删除所选员工（0）</button>
+              <small>当前登录账号不可选择；删除前会核对名单。</small>
+            </div>
+            <p id="adminAccountStatus" class="form-error" role="status" aria-live="polite"></p>
             <div id="adminEmployeeList" class="admin-table"></div>
           </div>
           <div class="admin-panel" id="productManagerPanel">
@@ -420,9 +427,9 @@
       </main>
     </div>
 
-    <script src="./knowledge-core.js?v=20261110-growth3"></script>
+    <script src="./knowledge-core.js?v=20261111-employees1"></script>
     <script src="./mooncake-filter.js?v=af8d1d9"></script>
-    <script src="./app.js?v=20261110-growth3" type="module"></script>
+    <script src="./app.js?v=20261111-employees1" type="module"></script>
   </body>
 </html>
 
