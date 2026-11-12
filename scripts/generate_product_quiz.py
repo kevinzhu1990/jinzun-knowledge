@@ -152,7 +152,7 @@ def main():
             x=product(r,bk,sh)
             if x:items.append(x)
     by={}; [by.setdefault(x['code'],x) for x in items]; items=list(by.values()); qs=[]
-    fields=[('产品名称','name','{c} 对应的产品名称是什么？'),('产品线','line','{c} 属于哪条产品线？'),('箱规','carton','{c} 的箱规是多少？'),('内配/口味','contents','{c} 的内配/口味是什么？'),('克重/净重','net','{c} 的克重/净重是多少？'),('保质期','shelf','{c} 的保质期是多少？'),('尺寸/外箱','size','{c} 的尺寸/外箱是多少？'),('条码','barcode','{c} 的商品条码是什么？'),('单位','unit','{c} 的销售单位是什么？')]
+    fields=[('产品名称','name','{c} 对应的产品名称是什么？'),('产品线','line','{c} 属于哪条产品线？'),('箱规','carton','{c} 的箱规是多少？'),('内配/口味','contents','{c} 的内配/口味是什么？'),('克重/净重','net','{c} 的克重/净重是多少？'),('保质期','shelf','{c} 的保质期是多少？'),('条码','barcode','{c} 的商品条码是什么？'),('单位','unit','{c} 的销售单位是什么？')]
     for x in items:
         same=[y for y in items if y['bank']==x['bank']]
         for kp,f,p in fields:

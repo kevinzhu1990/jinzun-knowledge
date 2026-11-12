@@ -32,7 +32,7 @@
       for (const [before,after] of replacements) if (before) value=value.split(before).join(after);
       return value;
     };
-    const retained = questions.filter(q=>![q.code,q.productName,q.question,q.answerText,q.explanation].some(retiredValue)).map(q=> {
+    const retained = questions.filter(q=>q.knowledgePoint !== '尺寸/外箱').filter(q=>![q.code,q.productName,q.question,q.answerText,q.explanation].some(retiredValue)).map(q=> {
       const result=Object.fromEntries(Object.entries(q).map(([key,value])=>[key,replaceText(value)]));
       const p=byCode.get(String(q.code));
       if (!p || p.status !== 'active') return result;

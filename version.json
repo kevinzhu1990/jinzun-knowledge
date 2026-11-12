@@ -1,7 +1,7 @@
 {
-  "buildVersion": "20261111-employees1",
+  "buildVersion": "20261112-no-dimensions1",
   "desktopVersion": "1.0.0",
-  "updatedAt": "2026-11-11T10:00:00+08:00",
-  "notes": "员工账号支持批量勾选、全选、确认删除和失败重试",
-  "productHash": "7456bd446b6530e754fe405ea5166ac672a0ce3e8c84b8c21ceea79cfeb4baac"
+  "updatedAt": "2026-11-12T10:00:00+08:00",
+  "notes": "暂停全部产品尺寸与外箱尺寸考题，保留每箱数量题",
+  "productHash": "9ef76348508b76dfd9b72583d36cca1e7cae4ad7a687ab64df8bfe5ad6a5ad28"
 }

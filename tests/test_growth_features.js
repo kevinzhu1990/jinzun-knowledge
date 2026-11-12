@@ -19,6 +19,12 @@ const questions = [
   {id:'combo',bank:'商家编码题库',code:'JZ-2601+2381',answerText:'JZ-2601+2381'},
 ];
 const projected = core.projectQuestions(questions, products);
+const dimensionQuestions = [
+  {id:'size',bank:'日常年货题库',code:'2642',knowledgePoint:'尺寸/外箱'},
+  {id:'carton',bank:'日常年货题库',code:'2642',knowledgePoint:'箱规'},
+];
+assert.deepEqual(core.projectQuestions(dimensionQuestions,products).map(q=>q.id),['carton'],
+  'paused dimension questions must not enter learning or exams; carton quantity remains');
 assert.deepEqual(projected.map(q=>q.id), ['one','two']);
 assert.equal(projected[0].productName, '2642曲奇礼盒');
 assert.equal(projected[0].answerText, projected[0].optionB);
