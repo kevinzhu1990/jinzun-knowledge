@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { _test } = require('../api/cloud.js');
+const { addDailyImageQuestions } = require('../scripts/daily_image_quiz');
 
 const makeQuestions = (knowledgePoint, count, prefix) => Array.from({ length: count }, (_, index) => ({
   id: `${prefix}-${index}`,
@@ -49,3 +50,30 @@ for (const size of [10, 20, 30, 50, 100]) {
 }
 
 console.log('Mooncake exam selection verification passed');
+
+for (const size of [10, 20, 30, 50]) {
+  const selected = _test.selectExamQuestions(pool, { mode: 'product', bank: '日常年货题库' }, size);
+  const imageCount = selected.filter(q => ['看货号选图片', '看图片选货号'].includes(q.knowledgePoint)).length;
+  assert.equal(imageCount, Math.round(size * 0.7), '年货正式考试必须使用与月饼一致的图片比例');
+  assert.equal(selected.filter(q => q.knowledgePoint === '内配/口味').length, Math.round(size * 0.1));
+  assert.equal(new Set(selected.map(q => q.id)).size, size);
+}
+
+const dailyPool = realQuestions.filter(q => q.bank === '日常年货题库');
+const products = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'products.json'), 'utf8'));
+const roleQuestions = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'outputs/role_quiz/岗位学习考核题库.json'), 'utf8'));
+assert.deepEqual(addDailyImageQuestions(realQuestions, products, roleQuestions), realQuestions,
+  '重复发布不能重复添加图片题或改动原题');
+const withoutNewImages = realQuestions.filter(q => !(q.bank === '日常年货题库' && q.knowledgePoint === '看货号选图片'));
+const extended = addDailyImageQuestions(withoutNewImages, products, roleQuestions);
+assert.deepEqual(extended.slice(0, withoutNewImages.length), withoutNewImages, '新增图片题必须保留现有题目内容与答案');
+assert.deepEqual(extended, realQuestions, '重新构建必须生成相同题目和答案');
+for (const size of [10, 20, 30, 50, 100, 300]) {
+  const selected = _test.selectExamQuestions(dailyPool, { mode: 'product', bank: '日常年货题库' }, size);
+  const expectedSize = Math.min(size, dailyPool.length);
+  const imageCount = selected.filter(q => ['看货号选图片', '看图片选货号'].includes(q.knowledgePoint)).length;
+  assert.equal(selected.length, expectedSize);
+  assert.equal(imageCount, Math.min(Math.round(expectedSize * 0.7), 50));
+  assert.equal(new Set(selected.map(q => q.id)).size, expectedSize, '图片题不足时应从其他题补足且不重复');
+}
+console.log('Daily image exam selection verification passed');

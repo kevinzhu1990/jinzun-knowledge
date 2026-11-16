@@ -1,5 +1,5 @@
 const core = window.KnowledgeCore;
-const BUILD_VERSION = "20261112-no-dimensions1";
+const BUILD_VERSION = "20261116-daily-image1";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -1422,7 +1422,7 @@ async function startQuiz() {
       pool = state.allQuestions.filter((q) => CORE_EXAM_BANKS.includes(q.bank));
       state.examLabelOverride = "综合产品题库";
     }
-    state.quiz = state.quizMode === "product" && els.productBankSelect.value === "月饼题库"
+    state.quiz = state.quizMode === "product" && ["月饼题库", "日常年货题库"].includes(els.productBankSelect.value)
       ? selectMooncakeQuizQuestions(pool, size)
       : shuffle(pool).slice(0, Math.min(size, pool.length));
   }
