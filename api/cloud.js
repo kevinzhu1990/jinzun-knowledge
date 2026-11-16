@@ -524,7 +524,7 @@ function selectMooncakeExamQuestions(pool, requestedSize) {
 }
 
 function selectExamQuestions(pool, payload, requestedSize) {
-  if (payload.mode === 'product' && payload.bank === '月饼题库') {
+  if (payload.mode === 'product' && ['月饼题库', '日常年货题库'].includes(payload.bank)) {
     return selectMooncakeExamQuestions(pool, requestedSize);
   }
   return shuffleServer(pool).slice(0, Math.min(requestedSize, pool.length));

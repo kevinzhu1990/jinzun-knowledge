@@ -85,6 +85,13 @@ def main():
     if product_codes!=active: errors.append(f'产品货号集合不一致：题库{len(product_codes)}源表{len(active)}')
     if product_codes!=image_codes: errors.append('产品货号没有完整图片识别题')
     if moon!=moon_image: errors.append('月饼货号没有完整货号选图片题')
+    daily={str(q.get('code')) for q in qs if q.get('bank')=='日常年货题库'}
+    daily_image={str(q.get('code')) for q in qs if q.get('bank')=='日常年货题库' and q.get('knowledgePoint')=='看货号选图片'}
+    if daily!=daily_image: errors.append('年货货号没有完整货号选图片题')
+    for question in qs:
+        for key,value in question.items():
+            if key!='id' and re.search(r'(?<!\d)2601(?!\d)|6924535426019',str(value)):
+                errors.append(f"{question.get('id')} {key}仍包含停售货号2601")
     text=PRODUCT.read_text(encoding='utf-8')
     if '2576' in text: errors.append('产品题库仍包含已停用货号2576')
     for forbidden in (chr(0x76ee)+chr(0x997c),'150g'+chr(0x514b),'2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+chr(0x5c0f)+chr(0x76d2)+chr(0x88c5)+'258g','2576'+chr(0x7c92)*2+chr(0x674f)+chr(0x4ec1)+chr(0x997c)+'258g'):

@@ -36,6 +36,33 @@ def test_every_active_question_has_four_visible_options():
             assert all(question.get(f"option{letter}") or question.get(f"option{letter}Image") for letter in "ABCD"), question.get("id")
 
 
+def test_daily_products_have_both_image_question_types_with_active_options():
+    products = json.loads((ROOT / "products.json").read_text(encoding="utf-8"))
+    active = {p["code"]: p for p in products if p["status"] == "active" and p["bank"] == "日常年货题库"}
+    questions = [q for q in load_product_questions() if q["bank"] == "日常年货题库"]
+    for code, product in active.items():
+        for point in ("看图片选货号", "看货号选图片"):
+            matches = [q for q in questions if q["code"] == code and q["knowledgePoint"] == point]
+            assert len(matches) == 1, (code, point)
+            question = matches[0]
+            if point == "看图片选货号":
+                assert question["questionImage"] == product["image"]
+            else:
+                images = [question[f"option{letter}Image"] for letter in "ABCD"]
+                assert len(set(images)) == 4
+                assert set(images) <= {p["image"] for p in active.values()}
+                assert question[f"option{question['answer']}Image"] == product["image"]
+                assert question["answerText"] == product["image"]
+                assert all((ROOT / image).is_file() for image in images)
+                assert all(not question.get(f"option{letter}") for letter in "ABCD")
+
+
+def test_retired_2601_has_no_learning_exam_or_distractor_references():
+    questions = load_product_questions()
+    assert all("2601" not in str(value) and "6924535426019" not in str(value)
+               for q in questions for key, value in q.items() if key != "id")
+
+
 def test_all_loose_mooncake_codes_are_mooncake_loose_piece():
     loose_codes = {"1391", "1392", "1393", "1930", "1937", "1940", "2175", "2176"}
     all_questions = load_product_questions()
