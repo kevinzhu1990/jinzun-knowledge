@@ -14,11 +14,14 @@ def function_block(source: str, start: str, end: str) -> str:
 def test_formal_and_practice_use_separate_feishu_tables():
     formal = function_block(API, "async function handleExamSubmitOnce", "async function handlePracticeSubmit")
     practice = function_block(API, "async function handlePracticeSubmitOnce", "async function handleStats")
-    assert "examTableReady()" in formal
+    assert "searchRecordFamily('exams'," in formal
+    assert "writeRecordFamily('exams'," in formal
+    assert "exams: { name: '考试成绩记录', ready: examTableReady" in API
     assert "practiceTableReady()" not in formal
     assert "'考核类型': '正式考试'" in formal
     assert "practiceTableReady()" in practice
     assert "examTableReady()" not in practice
+    assert "writeRecordFamily('exams'," not in practice
     assert "'练习提交编号': submissionId" in practice
     assert "'练习成绩记录'" in API
     assert "LARK_PRACTICE_TABLE_ID" in API

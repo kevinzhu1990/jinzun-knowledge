@@ -136,13 +136,21 @@ async function getTenantToken() {
 
 const normalizeTableName = (value) => String(value || '').replace(/[\s_-]/g, '').toLowerCase();
 
-async function listTables() {
-  if (cachedTables && Date.now() < cachedTablesExpireAt) return cachedTables;
+async function listTables(fresh = false) {
+  if (!fresh && cachedTables && Date.now() < cachedTablesExpireAt) return cachedTables;
   const token = await getTenantToken();
-  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables?page_size=100`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  cachedTables = data?.data?.items || [];
+  const tables = [];
+  let pageToken = '';
+  do {
+    const query = new URLSearchParams({ page_size: '100' });
+    if (pageToken) query.set('page_token', pageToken);
+    const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables?${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    tables.push(...(data?.data?.items || []));
+    pageToken = data?.data?.has_more ? data.data.page_token : '';
+  } while (pageToken);
+  cachedTables = tables;
   cachedTablesExpireAt = Date.now() + 5 * 60 * 1000;
   return cachedTables;
 }
@@ -178,7 +186,7 @@ const ACCOUNT_TEXT_FIELDS = [
 let accountFieldsReady = null;
 const EXAM_FIELD_NAMES = [
   '考试名称', '考核类型', '题库', '总题数', '答对数', '答错数', '分数',
-  '是否通过', '用时秒数', '提交时间', '考试提交编号', '考试会话ID', '设备ID',
+  '是否通过', '用时秒数', '提交时间', '考试提交编号', '考试会话ID', '设备ID', '姓名', '手机号', '岗位',
 ];
 const PRACTICE_FIELD_NAMES = [
   '练习名称', '练习类型', '题库', '总题数', '答对数', '答错数', '分数',
@@ -187,7 +195,7 @@ const PRACTICE_FIELD_NAMES = [
 ];
 const MISTAKE_FIELD_NAMES = [
   '记录时间', '错选', '正确答案', '解析', '题库', '知识点',
-  '考试提交编号', '题目', '姓名', '手机号', '岗位',
+  '考试提交编号', '题目', '姓名', '手机号', '岗位', '错题编号',
 ];
 const QUESTION_CHANGE_FIELD_NAMES = [
   '题目ID', '状态', '修改内容', '修改时间', '修改人', '修改人手机',
@@ -333,6 +341,88 @@ const examTableReady = () => ensureTableFields(examTableId(), EXAM_FIELD_NAMES);
 const practiceTableReady = () => ensureTableFields(practiceTableId(), PRACTICE_FIELD_NAMES);
 const mistakeTableReady = () => ensureTableFields(mistakeTableId(), MISTAKE_FIELD_NAMES);
 const questionChangeTableReady = () => ensureTableFields(questionChangeTableId(), QUESTION_CHANGE_FIELD_NAMES);
+
+// Full tables stay read-only archives. Never delete history to make a submission fit.
+const recordFamilies = {
+  exams: { name: '考试成绩记录', ready: examTableReady, fields: EXAM_FIELD_NAMES },
+  mistakes: { name: '错题记录', ready: mistakeTableReady, fields: MISTAKE_FIELD_NAMES },
+};
+const examNumberFields = new Set(['总题数', '答对数', '答错数', '分数', '用时秒数']);
+const fullRecordTables = new Set();
+const overflowTablePromises = new Map();
+
+async function recordFamilyTables(kind, fresh = false) {
+  const family = recordFamilies[kind];
+  const baseId = await family.ready();
+  const prefix = `${family.name}-续表-`;
+  const tables = await listTables(fresh);
+  return [baseId, ...tables.filter(table => table.table_id !== baseId && table.name.startsWith(prefix))
+    .sort((a, b) => a.name.localeCompare(b.name)).map(table => table.table_id)];
+}
+
+async function searchRecordFamily(kind, field, value) {
+  // Never use a stale directory for idempotency: another worker can roll over.
+  const tables = await recordFamilyTables(kind, true);
+  return (await Promise.all(tables.map(table => searchRecords(table, field, value)))).flat();
+}
+
+async function listRecordFamily(kind) {
+  return (await Promise.all((await recordFamilyTables(kind, true)).map(table => listRecords(table)))).flat();
+}
+
+async function createOverflowTable(kind) {
+  if (overflowTablePromises.has(kind)) return overflowTablePromises.get(kind);
+  const pending = (async () => {
+    const family = recordFamilies[kind];
+    const token = await getTenantToken();
+    const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ table: {
+        name: `${family.name}-续表-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
+        default_view_name: family.name,
+        fields: family.fields.map(field_name => ({ field_name, type: kind === 'exams' && examNumberFields.has(field_name) ? 2 : 1 })),
+      } }),
+    });
+    cachedTables = null;
+    cachedTablesExpireAt = 0;
+    const id = data?.data?.table?.table_id || data?.data?.table_id;
+    if (!id) throw httpError(503, '续表创建未返回数据表ID');
+    return id;
+  })();
+  overflowTablePromises.set(kind, pending);
+  try { return await pending; }
+  finally { if (overflowTablePromises.get(kind) === pending) overflowTablePromises.delete(kind); }
+}
+
+async function writeRecordFamily(kind, write) {
+  const tried = new Set();
+  const tryTables = async (tables) => {
+    for (const tableId of [...tables].reverse()) {
+      if (tried.has(tableId) || fullRecordTables.has(tableId)) continue;
+      tried.add(tableId);
+      try { return { result: await write(tableId) }; }
+      catch (error) {
+        if (error?.code !== '1254103') throw error;
+        fullRecordTables.add(tableId);
+      }
+    }
+    return null;
+  };
+  let saved = await tryTables(await recordFamilyTables(kind));
+  if (saved) return saved.result;
+  try {
+    // Another worker may already have made a continuation table; discover it first.
+    saved = await tryTables(await recordFamilyTables(kind, true));
+    if (saved) return saved.result;
+    const tableId = await createOverflowTable(kind);
+    return await write(tableId);
+  } catch (error) {
+    throw new FeishuApiError(`${recordFamilies[kind].name}表容量已满，续存失败（${error.message}）。原有记录未删除，请管理员检查飞书容量和应用权限`, {
+      code: error?.code || 'RECORD_OVERFLOW_FAILED', status: 503,
+    });
+  }
+}
 
 const allowedRoles = new Set([
   '运营', '客服', '美工', '主播', '中控', '采购', '财务', '行政', '审单', '仓储', '管理', '新员工',
@@ -1046,8 +1136,7 @@ async function handleExamStart(payload, user) {
 async function writeMistakeRecords(user, items, submissionId = '') {
   const normalized = Array.isArray(items) ? items.slice(0, 100) : [];
   if (!normalized.length) return [];
-  const tableId = await mistakeTableReady();
-  const existing = submissionId ? await searchRecords(tableId, '考试提交编号', submissionId) : [];
+  const existing = submissionId ? await searchRecordFamily('mistakes', '考试提交编号', submissionId) : [];
   const existingByKey = new Map(existing.map((record) => [`${record['错题编号'] || ''}:${record['错选'] || ''}`, record.record_id]));
   const recordIds = [];
   const pending = [];
@@ -1065,7 +1154,7 @@ async function writeMistakeRecords(user, items, submissionId = '') {
       '考试提交编号': submissionId,
     } });
   }
-  const created = await createRecords(tableId, pending);
+  const created = pending.length ? await writeRecordFamily('mistakes', tableId => createRecords(tableId, pending)) : [];
   recordIds.push(...created.map(record => record.record_id));
   return recordIds;
 }
@@ -1096,8 +1185,7 @@ async function handleExamSubmitOnce(payload, user) {
   if (!examSessionId) throw httpError(400, '考试会话ID无效');
   const submittedAt = Date.now();
   const duration = Math.max(0, Math.round((submittedAt - Number(session.startedAt || submittedAt)) / 1000));
-  const examTable = await examTableReady();
-  const existingBySession = await searchRecords(examTable, '考试会话ID', examSessionId);
+  const existingBySession = await searchRecordFamily('exams', '考试会话ID', examSessionId);
   if (existingBySession[0]?.record_id) {
     const record = existingBySession[0];
     return {
@@ -1136,7 +1224,7 @@ async function handleExamSubmitOnce(payload, user) {
     '是否通过': percent >= 80 ? '通过' : '未通过', '用时秒数': duration,
     '考试提交编号': submissionId || examSessionId, '考试会话ID': examSessionId, '设备ID': String(payload.deviceId || '').slice(0, 500),
   };
-  const created = await createRecord(examTable, fields);
+  const created = await writeRecordFamily('exams', tableId => createRecord(tableId, fields));
   if (!created?.record_id) throw httpError(503, '考试记录未返回记录ID');
   return {
     ok: true,
@@ -1221,9 +1309,9 @@ async function handlePracticeSubmitOnce(payload, user) {
 async function handleStats() {
   const entries = await Promise.allSettled([
     employeeTableId().then((tableId) => listRecords(tableId)),
-    examTableId().then((tableId) => listRecords(tableId)),
+    listRecordFamily('exams'),
     practiceTableId().then((tableId) => listRecords(tableId)),
-    mistakeTableId().then((tableId) => listRecords(tableId)),
+    listRecordFamily('mistakes'),
   ]);
   const [employeeRecords, examRecords, practiceRecords, mistakeRecords] = entries.map((entry) => entry.status === 'fulfilled' ? entry.value : []);
   const employees = employeeRecords.map((record) => ({
@@ -1294,7 +1382,7 @@ async function handleStats() {
 }
 
 async function handleRanking(user) {
-  const records = await listRecords(await examTableId());
+  const records = await listRecordFamily('exams');
   const formal = records.filter((record) => String(record['考核类型'] || '') === '正式考试').map((record) => ({
     name: record['姓名'] || '',
     phone: cleanPhone(record['手机号']),

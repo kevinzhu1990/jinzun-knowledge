@@ -8,21 +8,34 @@ const apiPath = path.resolve(__dirname, '../api/cloud.js');
 const questions = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../outputs/product_quiz/金尊产品知识库题库.json'), 'utf8')).slice(0, 50);
 const secret = 'exam-submit-local-regression-secret';
 const user = { id: 'test-employee', name: '回归测试', phone: '13000000000', role: '运营', sessionVersion: '1' };
-function fixture({ partialBatch = false, lostBatchResponse = false } = {}) {
-  const records = { employees: [], exams: [], mistakes: [], changes: [] };
+function fixture({ partialBatch = false, lostBatchResponse = false, fullTables = [], denyCreate = false, storage = null } = {}) {
+  const records = storage?.records || { employees: [], exams: [], mistakes: [], changes: [] };
+  const tables = storage?.tables || [ ['employees', '员工信息'], ['exams', '考试成绩记录'], ['mistakes', '错题记录'], ['changes', '题库修改记录'] ].map(([table_id, name]) => ({ table_id, name }));
   const calls = [];
   const idempotentWrites = new Map();
   const fieldNames = ['员工ID', '密码哈希', '账号状态', '是否管理员', '注册时间', '最后登录时间', '登录失败次数', '锁定截止时间', '密码更新时间', '客户端标识', '会话版本', '备注',
     '考试名称', '考核类型', '题库', '总题数', '答对数', '答错数', '分数', '是否通过', '用时秒数', '提交时间', '考试提交编号', '考试会话ID', '设备ID',
     '记录时间', '错选', '正确答案', '解析', '知识点', '题目', '姓名', '手机号', '岗位', '错题编号', '题目ID', '状态', '修改内容', '修改时间', '修改人', '修改人手机'];
-  records.employees.push({ record_id: 'test-employee', fields: { '员工ID': user.id, '姓名': user.name, '手机号': user.phone, '岗位': user.role, '会话版本': '1', '账号状态': '正常' } });
+  if (!records.employees.length) records.employees.push({ record_id: 'test-employee', fields: { '员工ID': user.id, '姓名': user.name, '手机号': user.phone, '岗位': user.role, '会话版本': '1', '账号状态': '正常' } });
   const reply = data => ({ ok: true, status: 200, json: async () => ({ code: 0, data }) });
   const fakeFetch = async (url, options = {}) => {
     const parsed = new URL(url), table = parsed.pathname.match(/\/tables\/([^/]+)/)?.[1];
     const body = JSON.parse(options.body || '{}');
     calls.push({ path: parsed.pathname, method: options.method || 'GET', body, table });
     if (parsed.pathname.endsWith('/auth/v3/tenant_access_token/internal')) return { ok: true, json: async () => ({ code: 0, tenant_access_token: 'test-only-token', expire: 7200 }) };
-    if (parsed.pathname.endsWith('/tables')) return reply({ items: [ ['employees', '员工信息'], ['exams', '考试成绩记录'], ['mistakes', '错题记录'], ['changes', '题库修改记录'] ].map(([table_id, name]) => ({ table_id, name })) });
+    if (parsed.pathname.endsWith('/tables') && options.method === 'POST') {
+      if (denyCreate) return { ok: false, status: 403, json: async () => ({ code: 91403, msg: 'Forbidden' }) };
+      const table_id = `overflow-${tables.length}`;
+      tables.push({ table_id, name: body.table.name });
+      records[table_id] = [];
+      assert.ok(body.table.fields.some(f => f.field_name === '手机号'));
+      if (body.table.name.startsWith('考试成绩记录')) assert.equal(body.table.fields.find(f => f.field_name === '分数').type, 2, '成绩数值字段不能误建为文本');
+      return reply({ table_id });
+    }
+    if (parsed.pathname.endsWith('/tables')) {
+      const offset = Number(parsed.searchParams.get('page_token') || 0);
+      return reply({ items: tables.slice(offset, offset + 4), has_more: tables.length > offset + 4, page_token: String(offset + 4) });
+    }
     if (parsed.pathname.endsWith('/fields')) return reply({ items: fieldNames.map(field_name => ({ field_name, type: 1 })) });
     if (parsed.pathname.endsWith('/records/search')) {
       const condition = body.filter.conditions[0];
@@ -32,6 +45,7 @@ function fixture({ partialBatch = false, lostBatchResponse = false } = {}) {
         page_token: matches.length > offset + 20 ? String(offset + 20) : '' });
     }
     if (parsed.pathname.endsWith('/records/batch_create')) {
+      if (fullTables.includes(table)) return { ok: true, status: 200, json: async () => ({ code: 1254103, msg: 'RecordExceedLimit' }) };
       const token = parsed.searchParams.get('client_token');
       if (token && idempotentWrites.has(token)) return reply({ records: idempotentWrites.get(token) });
       const created = body.records.map((r, index) => ({ record_id: `${table}-${records[table].length + index}`, fields: r.fields }));
@@ -41,6 +55,7 @@ function fixture({ partialBatch = false, lostBatchResponse = false } = {}) {
       return reply({ records: partialBatch ? created.slice(0, -1) : created });
     }
     if (parsed.pathname.endsWith('/records') && options.method === 'POST') {
+      if (fullTables.includes(table)) return { ok: true, status: 200, json: async () => ({ code: 1254103, msg: 'RecordExceedLimit' }) };
       const record = { record_id: `${table}-${records[table].length}`, fields: body.fields };
       records[table].push(record);
       return reply({ record });
@@ -62,14 +77,14 @@ function fixture({ partialBatch = false, lostBatchResponse = false } = {}) {
     const encrypted = Buffer.concat([cipher.update(JSON.stringify(data)), cipher.final()]);
     return [iv, cipher.getAuthTag(), encrypted].map(part => part.toString('base64url')).join('.');
   }
-  async function submit(sessionToken = session()) {
-    const payload = { sessionToken, submissionId: 'test-submission', answers: questions.map(q => ({ id: q.id, answer: q.answer === 'A' ? 'B' : 'A' })) };
-    const req = { method: 'POST', url: '/api/exam-submit', headers: { host: 'localhost', origin: 'https://jinzun-knowledge.vercel.app', authorization: `Bearer ${auth}` }, async *[Symbol.asyncIterator]() { yield Buffer.from(JSON.stringify(payload)); } };
+  async function request(action, payload = {}) {
+    const req = { method: 'POST', url: `/api/${action}`, headers: { host: 'localhost', origin: 'https://jinzun-knowledge.vercel.app', authorization: `Bearer ${auth}` }, async *[Symbol.asyncIterator]() { yield Buffer.from(JSON.stringify(payload)); } };
     const res = { statusCode: 200, setHeader() {}, end(text) { this.body = JSON.parse(text); } };
     await sandbox.module.exports(req, res);
     return { status: res.statusCode, ...res.body };
   }
-  return { records, calls, session, submit };
+  const submit = (sessionToken = session()) => request('exam-submit', { sessionToken, submissionId: 'test-submission', answers: questions.map(q => ({ id: q.id, answer: q.answer === 'A' ? 'B' : 'A' })) });
+  return { records, tables, calls, session, submit, request, storage: { records, tables } };
 }
 
 (async () => {
@@ -112,5 +127,32 @@ function fixture({ partialBatch = false, lostBatchResponse = false } = {}) {
   const other = fixture();
   assert.equal((await other.submit(other.session({ uid: 'different-employee' }))).status, 401);
   assert.equal(other.records.exams.length, 0, '其他员工不能提交或查询该考试会话');
+  for (const fullTables of [['mistakes'], ['exams'], ['mistakes', 'exams']]) {
+    const capacity = fixture({ fullTables });
+    capacity.records.mistakes.push({ record_id: 'historic-mistake', fields: { '题目': '保留历史记录' } });
+    const saved = await capacity.submit();
+    assert.equal(saved.ok, true, `满表时应续存而不是阻止交卷: ${JSON.stringify(saved)}`);
+    assert.ok(saved.record_id);
+    assert.equal(Object.values(capacity.records).flat().filter(r => r.fields['考试会话ID'] === 'test-exam').length, 1);
+    assert.equal(Object.values(capacity.records).flat().filter(r => r.fields['考试提交编号'] === 'test-submission' && r.fields['错题编号']).length, 50);
+    assert.ok(capacity.records.mistakes.some(r => r.record_id === 'historic-mistake'), '历史记录不得删除');
+    assert.equal(capacity.calls.filter(c => c.method === 'DELETE').length, 0);
+    const cold = fixture({ fullTables, storage: capacity.storage });
+    assert.equal((await cold.submit()).record_id, saved.record_id, '冷启动重试应从续表取回原成绩，不重复保存');
+    const ranking = await cold.request('ranking');
+    assert.equal(ranking.ownHistory.length, 1, '续表成绩必须出现在个人历史和排行中');
+    assert.equal(ranking.ranking.length, 1);
+  }
+  const blocked = fixture({ fullTables: ['mistakes'], denyCreate: true });
+  const denied = await blocked.submit();
+  assert.equal(denied.ok, false, '无续表权限时不能误报交卷成功');
+  assert.match(denied.error, /错题.*满|错题.*容量/);
+  assert.equal(blocked.records.exams.length, 0);
+  const warm = fixture({ fullTables: ['mistakes', 'exams'] });
+  await warm.request('ranking'); // Prime one server's table cache before a different server rolls over.
+  const separateWorker = fixture({ fullTables: ['mistakes', 'exams'], storage: warm.storage });
+  const separatelySaved = await separateWorker.submit();
+  assert.equal((await warm.submit()).record_id, separatelySaved.record_id, '缓存了旧表目录的服务器也必须发现其他服务器刚创建的续表，避免重复交卷');
+  assert.equal(Object.values(warm.records).flat().filter(r => r.fields['考试会话ID'] === 'test-exam').length, 1);
   console.log(JSON.stringify({ ok: true, questions: 50, wrong: result.wrong, coldRequestCount, mistakeWriteRequests: mistakeWrites.length, simulatedNetworkMs: coldRequestCount * 1500, duplicateSafe: true, expiredRecovery: true, lostResponseSafe: true }));
 })().catch(error => { console.error(error); process.exitCode = 1; });
