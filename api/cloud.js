@@ -547,7 +547,7 @@ const sealExamSession = (payload) => {
   const encrypted = Buffer.concat([cipher.update(JSON.stringify(payload), 'utf8'), cipher.final()]);
   return [iv, cipher.getAuthTag(), encrypted].map((part) => part.toString('base64url')).join('.');
 };
-const openExamSession = (token) => {
+const openExamSession = (token, { allowExpired = false } = {}) => {
   try {
     const [ivText, tagText, encryptedText] = String(token || '').split('.');
     if (!ivText || !tagText || !encryptedText) return null;
@@ -555,7 +555,7 @@ const openExamSession = (token) => {
     decipher.setAuthTag(Buffer.from(tagText, 'base64url'));
     const raw = Buffer.concat([decipher.update(Buffer.from(encryptedText, 'base64url')), decipher.final()]);
     const payload = JSON.parse(raw.toString('utf8'));
-    return payload.exp > Date.now() ? payload : null;
+    return allowExpired || payload.exp > Date.now() ? payload : null;
   } catch {
     return null;
   }
@@ -894,12 +894,27 @@ async function handleAdminQuestions(payload, user) {
 
 async function createRecord(tableId, fields) {
   const token = await getTenantToken();
-  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records`, {
+  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records?client_token=${crypto.randomUUID()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ fields }),
   });
   return data?.data?.record || data?.data;
+}
+
+async function createRecords(tableId, records) {
+  if (!records.length) return [];
+  const token = await getTenantToken();
+  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records/batch_create?client_token=${crypto.randomUUID()}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ records }),
+  });
+  const created = data?.data?.records || [];
+  if (created.length !== records.length || created.some(record => !record.record_id)) {
+    throw httpError(503, '错题记录未返回完整记录ID，请重试交卷');
+  }
+  return created;
 }
 
 async function updateRecord(tableId, recordId, fields) {
@@ -919,18 +934,25 @@ async function deleteRecord(tableId, recordId) {
 
 async function searchRecords(tableId, fieldName, fieldValue) {
   const token = await getTenantToken();
-  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records/search`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({
-      page_size: 20,
-      filter: {
-        conjunction: 'and',
-        conditions: [{ field_name: fieldName, operator: 'is', value: [String(fieldValue)] }],
-      },
-    }),
-  });
-  return (data?.data?.items || []).map((item) => ({ record_id: item.record_id, ...item.fields }));
+  const records = [];
+  let pageToken = '';
+  do {
+    const query = new URLSearchParams({ page_size: '500' });
+    if (pageToken) query.set('page_token', pageToken);
+    const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records/search?${query}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        filter: {
+          conjunction: 'and',
+          conditions: [{ field_name: fieldName, operator: 'is', value: [String(fieldValue)] }],
+        },
+      }),
+    });
+    records.push(...(data?.data?.items || []));
+    pageToken = data?.data?.has_more ? String(data.data.page_token || '') : '';
+  } while (pageToken);
+  return records.map((item) => ({ record_id: item.record_id, ...item.fields }));
 }
 
 async function listRecords(tableId) {
@@ -1025,25 +1047,26 @@ async function writeMistakeRecords(user, items, submissionId = '') {
   const normalized = Array.isArray(items) ? items.slice(0, 100) : [];
   if (!normalized.length) return [];
   const tableId = await mistakeTableReady();
-  const existing = submissionId ? await searchRecordsReliable(tableId, '考试提交编号', submissionId) : [];
+  const existing = submissionId ? await searchRecords(tableId, '考试提交编号', submissionId) : [];
   const existingByKey = new Map(existing.map((record) => [`${record['错题编号'] || ''}:${record['错选'] || ''}`, record.record_id]));
   const recordIds = [];
+  const pending = [];
   for (const item of normalized) {
     const key = `${item.id || ''}:${item.selected || ''}`;
     if (existingByKey.has(key)) {
       recordIds.push(existingByKey.get(key));
       continue;
     }
-    const created = await createRecord(tableId, {
+    pending.push({ fields: {
       '记录时间': dt(item.savedAt || new Date()), '姓名': user.name, '手机号': cleanPhone(user.phone),
       '岗位': user.role || '', '错题编号': item.id || '', '题目': item.question || '',
       '错选': item.selected || '', '正确答案': item.answer ? `${item.answer} ${item.answerText || ''}`.trim() : '',
       '解析': item.explanation || '', '题库': item.bank || '', '知识点': item.knowledgePoint || '',
       '考试提交编号': submissionId,
-    });
-    if (!created?.record_id) throw httpError(503, '错题记录未返回记录ID');
-    recordIds.push(created.record_id);
+    } });
   }
+  const created = await createRecords(tableId, pending);
+  recordIds.push(...created.map(record => record.record_id));
   return recordIds;
 }
 
@@ -1053,7 +1076,7 @@ async function handleMistakes(payload, user) {
 }
 
 async function handleExamSubmit(payload, user) {
-  const sessionHint = openExamSession(payload.sessionToken);
+  const sessionHint = openExamSession(payload.sessionToken, { allowExpired: true });
   const lockKey = sessionHint?.examId ? `${user.id}:${sessionHint.examId}` : `${user.id}:invalid`;
   const previous = examSubmitLocks.get(lockKey) || Promise.resolve();
   const current = previous.catch(() => undefined).then(() => handleExamSubmitOnce(payload, user));
@@ -1066,16 +1089,15 @@ async function handleExamSubmit(payload, user) {
 }
 
 async function handleExamSubmitOnce(payload, user) {
-  const session = openExamSession(payload.sessionToken);
+  const session = openExamSession(payload.sessionToken, { allowExpired: true });
   if (!session || session.kind !== 'exam' || session.uid !== user.id || session.phone !== user.phone
     || session.sessionVersion !== user.sessionVersion) throw httpError(401, '考试会话已失效，请重新开始考试');
   const examSessionId = String(session.examId || '').trim();
   if (!examSessionId) throw httpError(400, '考试会话ID无效');
   const submittedAt = Date.now();
-  if (submittedAt > Number(session.deadlineAt || 0) + 30_000) throw httpError(408, '考试已超时，请重新开始考试');
   const duration = Math.max(0, Math.round((submittedAt - Number(session.startedAt || submittedAt)) / 1000));
   const examTable = await examTableReady();
-  const existingBySession = await searchRecordsReliable(examTable, '考试会话ID', examSessionId);
+  const existingBySession = await searchRecords(examTable, '考试会话ID', examSessionId);
   if (existingBySession[0]?.record_id) {
     const record = existingBySession[0];
     return {
@@ -1089,6 +1111,10 @@ async function handleExamSubmitOnce(payload, user) {
       duration: num(record['用时秒数']),
       wrong_details: [],
     };
+  }
+  // An expired session may read its saved result, but cannot submit new answers.
+  if (submittedAt > Number(session.deadlineAt || 0) + 30_000 || submittedAt > Number(session.exp || 0)) {
+    throw httpError(408, '考试已超时，请重新开始考试');
   }
   const submissionId = String(payload.submissionId || '').trim();
   const answers = new Map((Array.isArray(payload.answers) ? payload.answers : [])
