@@ -1,7 +1,7 @@
 {
-  "buildVersion": "20261118-exam-capacity2",
+  "buildVersion": "20261118-exam-unique3",
   "desktopVersion": "1.0.0",
-  "updatedAt": "2026-11-18T11:57:00+08:00",
-  "notes": "修复RecordExceedLimit：成绩和错题满表后自动续存，不删除历史；查询、排行和重试读取全部续表，续存失败明确提示容量和权限",
+  "updatedAt": "2026-11-18T12:10:00+08:00",
+  "notes": "考试与练习同场去重：同题号、相同题干、同产品同知识点只取一题；同产品正反向图片题不重复，图片不足时用其他题补足；保留全部学习内容及交卷续存修复",
   "productHash": "37922361a05757efb6e134a4cf82b085bf29f8209d27eaf41fb125dad3dc3fa8"
 }

@@ -45,7 +45,7 @@ for (const size of [10, 20, 30, 50, 100]) {
   const imageCount = selected.filter((question) => ['看货号选图片', '看图片选货号'].includes(question.knowledgePoint)).length;
   const flavorCount = selected.filter((question) => ['内配/口味', '口味个数'].includes(question.knowledgePoint)).length;
   assert.equal(selected.length, size);
-  assert.equal(imageCount, Math.round(size * 0.7));
+  assert.equal(imageCount, Math.min(Math.round(size * 0.7), 47), '同产品图片识别只能考一次，最多47个不同月饼产品');
   assert.equal(flavorCount, Math.round(size * 0.1));
 }
 
@@ -70,10 +70,10 @@ assert.deepEqual(extended.slice(0, withoutNewImages.length), withoutNewImages, '
 assert.deepEqual(extended, realQuestions, '重新构建必须生成相同题目和答案');
 for (const size of [10, 20, 30, 50, 100, 300]) {
   const selected = _test.selectExamQuestions(dailyPool, { mode: 'product', bank: '日常年货题库' }, size);
-  const expectedSize = Math.min(size, dailyPool.length);
+  const expectedSize = Math.min(size, dailyPool.length - 25); // 25 products each have two reciprocal image questions.
   const imageCount = selected.filter(q => ['看货号选图片', '看图片选货号'].includes(q.knowledgePoint)).length;
   assert.equal(selected.length, expectedSize);
-  assert.equal(imageCount, Math.min(Math.round(expectedSize * 0.7), 50));
+  assert.equal(imageCount, Math.min(Math.round(expectedSize * 0.7), 25));
   assert.equal(new Set(selected.map(q => q.id)).size, expectedSize, '图片题不足时应从其他题补足且不重复');
 }
 console.log('Daily image exam selection verification passed');
