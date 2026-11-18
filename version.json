@@ -1,7 +1,7 @@
 {
-  "buildVersion": "20261116-daily-image1",
+  "buildVersion": "20261118-exam-submit1",
   "desktopVersion": "1.0.0",
-  "updatedAt": "2026-11-16T12:00:00+08:00",
-  "notes": "2601退出全部学习与考试题；日常年货新增25道货号选图片题，图片题共50道，练习与考试沿用月饼图片抽题规则",
+  "updatedAt": "2026-11-18T11:45:39+08:00",
+  "notes": "修复交卷超时：批量保存错题、精确查询提交记录，网络重试防重复，并支持计时结束后取回已保存成绩",
   "productHash": "37922361a05757efb6e134a4cf82b085bf29f8209d27eaf41fb125dad3dc3fa8"
 }

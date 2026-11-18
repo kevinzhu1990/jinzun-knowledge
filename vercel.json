@@ -13,6 +13,18 @@
     }
   ],
   "functions": {
+    "api/exam-start.js": {
+      "includeFiles": "{outputs/**/*.json,products.json,version.json,knowledge-core.js}",
+      "maxDuration": 60
+    },
+    "api/exam-submit.js": {
+      "includeFiles": "{outputs/**/*.json,products.json,version.json,knowledge-core.js}",
+      "maxDuration": 60
+    },
+    "api/mistakes.js": {
+      "includeFiles": "{outputs/**/*.json,products.json,version.json,knowledge-core.js}",
+      "maxDuration": 60
+    },
     "api/cloud.js": {
       "includeFiles": "{outputs/**/*.json,products.json,version.json,knowledge-core.js}",
       "maxDuration": 60
