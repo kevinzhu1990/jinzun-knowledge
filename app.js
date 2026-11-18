@@ -1,5 +1,5 @@
 const core = window.KnowledgeCore;
-const BUILD_VERSION = "20261118-exam-submit1";
+const BUILD_VERSION = "20261118-exam-capacity2";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;

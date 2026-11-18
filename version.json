@@ -1,7 +1,7 @@
 {
-  "buildVersion": "20261118-exam-submit1",
+  "buildVersion": "20261118-exam-capacity2",
   "desktopVersion": "1.0.0",
-  "updatedAt": "2026-11-18T11:45:39+08:00",
-  "notes": "修复交卷超时：批量保存错题、精确查询提交记录，网络重试防重复，并支持计时结束后取回已保存成绩",
+  "updatedAt": "2026-11-18T11:57:00+08:00",
+  "notes": "修复RecordExceedLimit：成绩和错题满表后自动续存，不删除历史；查询、排行和重试读取全部续表，续存失败明确提示容量和权限",
   "productHash": "37922361a05757efb6e134a4cf82b085bf29f8209d27eaf41fb125dad3dc3fa8"
 }
