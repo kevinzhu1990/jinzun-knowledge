@@ -82,19 +82,23 @@
     }
     return Object.fromEntries(Object.entries(merged).sort((a,b)=>Date.parse(b[1].updatedAt)-Date.parse(a[1].updatedAt)||a[0].localeCompare(b[0])).slice(0,300));
   }
-  // Dedupe the exam pool, not the learning catalogue: both picture directions
-  // remain available for study, but test the same product recognition only once.
+  // Only identical questions are duplicates. Reciprocal picture questions,
+  // reworded questions and different option sets remain separate exam items.
   function uniqueQuestions(questions) {
     const seen = new Set();
-    const text = value => String(value || '').normalize('NFKC').toLowerCase().replace(/[\s，。？！、：；“”‘’"'(),.!?:;（）]/g, '');
-    const image = value => String(value || '').trim().replace(/\\/g, '/').split(/[?#]/)[0];
+    const text = value => String(value || '').trim().replace(/\r\n?/g, '\n');
+    const image = value => String(value || '').trim().replace(/\\/g, '/');
     return questions.filter(question => {
       const keys = [];
       if (question.id) keys.push(`id:${question.id}`);
-      if (text(question.question)) keys.push(JSON.stringify(['stem', text(question.question), String(question.code || ''), image(question.questionImage)]));
-      if (['月饼题库', '日常年货题库'].includes(question.bank) && /^\d{4}$/.test(String(question.code || '')) && question.knowledgePoint) {
-        const point = ['看图片选货号', '看货号选图片'].includes(question.knowledgePoint) ? '图片货号识别' : question.knowledgePoint;
-        keys.push(JSON.stringify(['product', question.code, point]));
+      if (text(question.question)) {
+        const options = [...'ABCD'].map(letter => JSON.stringify([
+          text(question[`option${letter}`]), image(question[`option${letter}Image`]),
+        ])).sort();
+        const answer = [...String(question.answer || '')].filter(letter => 'ABCD'.includes(letter)).map(letter => JSON.stringify([
+          text(question[`option${letter}`]), image(question[`option${letter}Image`]),
+        ])).sort();
+        keys.push(JSON.stringify(['content', text(question.question), image(question.questionImage), text(question.type), options, answer]));
       }
       if (keys.some(key => seen.has(key))) return false;
       keys.forEach(key => seen.add(key));
