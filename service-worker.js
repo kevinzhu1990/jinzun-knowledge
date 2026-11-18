@@ -1,18 +1,18 @@
-const CACHE_VERSION = 'jinzun-20261118-exam-unique3';
+const CACHE_VERSION = 'jinzun-20261118-exam-exact4';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './knowledge-core.js?v=20261118-exam-unique3',
-  './products.json?v=20261118-exam-unique3',
-  './styles.css?v=20261118-exam-unique3',
-  './app.js?v=20261118-exam-unique3',
+  './knowledge-core.js?v=20261118-exam-exact4',
+  './products.json?v=20261118-exam-exact4',
+  './styles.css?v=20261118-exam-exact4',
+  './app.js?v=20261118-exam-exact4',
   './mooncake-filter.js?v=af8d1d9',
-  './manifest.webmanifest?v=20261118-exam-unique3',
+  './manifest.webmanifest?v=20261118-exam-exact4',
   './assets/brand/jinzun-logo.png',
   './assets/app-icons/icon-192.png',
   './assets/app-icons/icon-512.png',
-  './outputs/product_quiz/金尊产品知识库题库.json?v=20261118-exam-unique3',
-  './outputs/role_quiz/岗位学习考核题库.json?v=20261118-exam-unique3'
+  './outputs/product_quiz/金尊产品知识库题库.json?v=20261118-exam-exact4',
+  './outputs/role_quiz/岗位学习考核题库.json?v=20261118-exam-exact4'
 ];
 
 self.addEventListener('install', (event) => {
