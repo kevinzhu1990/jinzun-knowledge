@@ -525,6 +525,7 @@ async function handleAdminProducts(payload,user) {
   return {ok:true,affected,products:activeProducts(await loadQuestionChanges())};
 }
 
+const LEARNING_FIELD_NAMES = ['手机号','姓名','设备ID','学习进度','更新时间'];
 let progressTablePromise;
 async function learningTableId() {
   if (!progressTablePromise) progressTablePromise=(async()=>{
@@ -534,7 +535,7 @@ async function learningTableId() {
       const token=await getTenantToken();
       const data=await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables`,{
         method:'POST',headers:{'Content-Type':'application/json; charset=utf-8',Authorization:`Bearer ${token}`},
-        body:JSON.stringify({table:{name:'员工学习进度',default_view_name:'学习进度',fields:['手机号','设备ID','学习进度','更新时间'].map(field_name=>({field_name,type:1}))}})
+        body:JSON.stringify({table:{name:'员工学习进度',default_view_name:'学习进度',fields:LEARNING_FIELD_NAMES.map(field_name=>({field_name,type:1}))}})
       });
       cachedTables=null; cachedTablesExpireAt=0;
       return data?.data?.table?.table_id || data?.data?.table_id;
@@ -542,9 +543,11 @@ async function learningTableId() {
   })().catch(error=>{progressTablePromise=null;throw error;});
   return progressTablePromise;
 }
-async function handleLearningProgress(payload,user,dependencies={table:learningTableId,search:searchRecordsReliable,update:updateRecord,create:createRecord}) {
+const learningTableReady = () => ensureTableFields(learningTableId(), LEARNING_FIELD_NAMES);
+async function handleLearningProgress(payload,user,dependencies={table:learningTableReady,search:searchRecordsReliable,update:updateRecord,create:createRecord}) {
   const tableId=await dependencies.table();
   const phone=cleanPhone(user.phone);
+  const name=String(user.name || '').trim();
   const device=String(payload.deviceId || '').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,100);
   if (!device) throw httpError(400,'缺少设备标识');
   const records=await dependencies.search(tableId,'手机号',phone);
@@ -555,11 +558,17 @@ async function handleLearningProgress(payload,user,dependencies={table:learningT
     merged=core.mergeProgress(merged,progress);
   }
   merged=core.mergeProgress(merged,payload.progress);
-  if (payload.progress && Object.keys(payload.progress).length) {
-    const existing=records.find(record=>record['设备ID']===device);
-    const fields={'手机号':phone,'设备ID':device,'学习进度':JSON.stringify(merged),'更新时间':dt()};
+  const existing=records.find(record=>record['设备ID']===device);
+  const hasProgress=Boolean(payload.progress && Object.keys(payload.progress).length);
+  if (hasProgress) {
+    const fields={'手机号':phone,'设备ID':device,'学习进度':JSON.stringify(merged),'更新时间':dt(),...(name ? {'姓名':name} : {})};
     if (existing) await dependencies.update(tableId,existing.record_id,fields);
     else await dependencies.create(tableId,fields);
+  }
+  // Fill legacy rows from the verified account without changing their progress or timestamp.
+  if (name) for (const record of records) {
+    if (hasProgress && record.record_id === existing?.record_id) continue;
+    if (record['姓名'] !== name) await dependencies.update(tableId,record.record_id,{'姓名':name});
   }
   return {ok:true,progress:merged};
 }
