@@ -1,5 +1,5 @@
 const core = window.KnowledgeCore;
-const BUILD_VERSION = "20261118-exam-capacity2";
+const BUILD_VERSION = "20261118-exam-unique3";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -598,8 +598,9 @@ function suitableRolesForProduct(questions) {
 }
 
 function selectMooncakeQuizQuestions(pool, requestedSize) {
+  pool = core.uniqueQuestions(shuffle(pool));
   const size = Math.min(requestedSize, pool.length);
-  const imageTotal = Math.round(size * 0.7);
+  const imageTotal = Math.min(Math.round(size * 0.7), pool.filter(question => MOONCAKE_IMAGE_POINTS.has(question.knowledgePoint)).length);
   const flavorTotal = Math.round(size * 0.1);
   const otherTotal = size - imageTotal - flavorTotal;
   const selectedIds = new Set();
@@ -1424,7 +1425,7 @@ async function startQuiz() {
     }
     state.quiz = state.quizMode === "product" && ["月饼题库", "日常年货题库"].includes(els.productBankSelect.value)
       ? selectMooncakeQuizQuestions(pool, size)
-      : shuffle(pool).slice(0, Math.min(size, pool.length));
+      : core.uniqueQuestions(shuffle(pool)).slice(0, size);
   }
   if (!state.quiz.length) {
     els.quizSetupStatus.textContent = "当前筛选没有可用于考核的题目，请调整搜索或题库筛选。";
@@ -1432,7 +1433,7 @@ async function startQuiz() {
   }
   if (state.examType !== "formal") state.submissionId = crypto.randomUUID();
   els.quizSetupStatus.textContent = state.quiz.length < size
-    ? `当前题库只有 ${state.quiz.length} 题，本次将全部使用。`
+    ? `当前题库去重后可用 ${state.quiz.length} 题，本次使用这些题目。`
     : "";
   state.quizIndex = 0;
   state.score = 0;

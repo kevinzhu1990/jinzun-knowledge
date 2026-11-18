@@ -589,8 +589,9 @@ const takeExamQuestions = (pool, count, selectedIds) => {
 };
 
 function selectMooncakeExamQuestions(pool, requestedSize) {
+  pool = core.uniqueQuestions(shuffleServer(pool));
   const size = Math.min(requestedSize, pool.length);
-  const imageTotal = Math.round(size * 0.7);
+  const imageTotal = Math.min(Math.round(size * 0.7), pool.filter(question => MOONCAKE_IMAGE_POINTS.has(question.knowledgePoint)).length);
   const flavorTotal = Math.round(size * 0.1);
   const otherTotal = size - imageTotal - flavorTotal;
   const codeToImageTarget = Math.floor(imageTotal / 2);
@@ -617,7 +618,7 @@ function selectExamQuestions(pool, payload, requestedSize) {
   if (payload.mode === 'product' && ['月饼题库', '日常年货题库'].includes(payload.bank)) {
     return selectMooncakeExamQuestions(pool, requestedSize);
   }
-  return shuffleServer(pool).slice(0, Math.min(requestedSize, pool.length));
+  return core.uniqueQuestions(shuffleServer(pool)).slice(0, requestedSize);
 }
 
 const normalizeName = (value) => String(value || '').trim();

@@ -82,6 +82,25 @@
     }
     return Object.fromEntries(Object.entries(merged).sort((a,b)=>Date.parse(b[1].updatedAt)-Date.parse(a[1].updatedAt)||a[0].localeCompare(b[0])).slice(0,300));
   }
+  // Dedupe the exam pool, not the learning catalogue: both picture directions
+  // remain available for study, but test the same product recognition only once.
+  function uniqueQuestions(questions) {
+    const seen = new Set();
+    const text = value => String(value || '').normalize('NFKC').toLowerCase().replace(/[\s，。？！、：；“”‘’"'(),.!?:;（）]/g, '');
+    const image = value => String(value || '').trim().replace(/\\/g, '/').split(/[?#]/)[0];
+    return questions.filter(question => {
+      const keys = [];
+      if (question.id) keys.push(`id:${question.id}`);
+      if (text(question.question)) keys.push(JSON.stringify(['stem', text(question.question), String(question.code || ''), image(question.questionImage)]));
+      if (['月饼题库', '日常年货题库'].includes(question.bank) && /^\d{4}$/.test(String(question.code || '')) && question.knowledgePoint) {
+        const point = ['看图片选货号', '看货号选图片'].includes(question.knowledgePoint) ? '图片货号识别' : question.knowledgePoint;
+        keys.push(JSON.stringify(['product', question.code, point]));
+      }
+      if (keys.some(key => seen.has(key))) return false;
+      keys.forEach(key => seen.add(key));
+      return true;
+    });
+  }
   function revision(product) {
     let hash=2166136261;
     for (const c of JSON.stringify(['name','line','net','carton','contents','shelf','barcode','status'].map(k=>product[k]||''))) hash=Math.imul(hash^c.charCodeAt(0),16777619);
@@ -89,5 +108,5 @@
   }
   const versionsMatch=(a,b)=>Boolean(a&&b&&a.buildVersion===b.buildVersion&&a.productHash===b.productHash);
   const fingerprintSource=texts=>texts.map(text=>JSON.stringify(JSON.parse(text))).join('');
-  return {validateProduct,resolveProduct,projectQuestions,mergeProgress,revision,versionsMatch,fingerprintSource};
+  return {validateProduct,resolveProduct,projectQuestions,uniqueQuestions,mergeProgress,revision,versionsMatch,fingerprintSource};
 });
