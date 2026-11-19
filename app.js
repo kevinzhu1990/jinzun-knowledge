@@ -1,5 +1,5 @@
 const core = window.KnowledgeCore;
-const BUILD_VERSION = "20261119-exam-source6";
+const BUILD_VERSION = "20261119-exam-table7";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -53,6 +53,7 @@ const state = {
   companyRanking: [],
   ownFormalHistory: [],
   rankingSources: [],
+  examStorage: null,
   rankingLoading: false,
   rankingError: "",
   adminQuestionPage: 1,
@@ -2228,17 +2229,27 @@ function startMistakeQuiz() {
 }
 
 let rankSortMode = "score";
+let rankingMigrationTimer = null;
 
 async function loadRanking() {
   if (!state.currentUser || state.rankingLoading) return;
+  const phone = state.currentUser.phone;
+  clearTimeout(rankingMigrationTimer);
   state.rankingLoading = true;
   state.rankingError = "";
   renderRanking();
   try {
     const data = await cloudRequest("ranking", {});
+    if (state.currentUser?.phone !== phone) return;
     state.companyRanking = Array.isArray(data.ranking) ? data.ranking : [];
     state.ownFormalHistory = Array.isArray(data.ownHistory) ? data.ownHistory : [];
     state.rankingSources = Array.isArray(data.sources) ? data.sources : [];
+    state.examStorage = data.examStorage || null;
+    if (Number(state.examStorage?.pending) > 0 && !state.examStorage.error) {
+      rankingMigrationTimer = setTimeout(() => {
+        if (state.currentUser?.phone === phone) void loadRanking();
+      }, 1000);
+    }
   } catch (error) {
     state.rankingError = error.message || "公司正式考试记录暂时无法读取";
   } finally {
@@ -2289,8 +2300,11 @@ function renderRanking() {
 
   const sourceSummary = !state.rankingLoading && !state.rankingError && state.rankingSources?.length
     ? `<div class="feishu-source-summary"><strong>飞书成绩来源</strong><p>共 ${state.rankingSources.reduce((sum, source) => sum + Number(source.formalCount || 0), 0)} 次正式考试，来自 ${state.rankingSources.length} 张飞书表。这里直接读取飞书记录，不是本机缓存；续表成绩不会显示在原表，请点链接核对。打开后仍看不到时，请检查飞书视图筛选和查看权限。</p>${state.rankingSources.map(source => `<div>${renderFeishuSource(source)} <span>· ${Number(source.formalCount || 0)} 次正式考试</span></div>`).join("")}</div>` : "";
+  const examStorage = state.examStorage;
+  const storageStatus = !state.rankingLoading && !state.rankingError && examStorage?.source
+    ? `<div class="feishu-source-summary"><strong>考试成绩记录（新版）已启用</strong>${renderFeishuSource(examStorage.source)}<p>${examStorage.error ? `历史成绩补入未完成：${escapeHtml(examStorage.error)}。旧成绩仍保留，请稍后重新打开排行重试。` : Number(examStorage.pending) > 0 ? `本次补入 ${Number(examStorage.migrated || 0)} 条，还剩 ${Number(examStorage.pending)} 条历史成绩，系统将自动继续，请保持知识库页面打开。` : '后台可读取的历史正式考试成绩已补齐；旧表保留，重复记录不计入排名。'}</p></div>` : "";
   listEl.innerHTML = `
-    <section class="ranking-section"><div class="ranking-section-head"><div><h4>公司正式考试排行榜</h4><p>来自飞书正式考试成绩表及其续表。</p></div><div class="rank-sort-btns"><button class="rank-sort-btn" data-sort="score">按分数</button><button class="rank-sort-btn" data-sort="time">按用时</button></div></div>${sourceSummary}${rankingRows}</section>
+    <section class="ranking-section"><div class="ranking-section-head"><div><h4>公司正式考试排行榜</h4><p>来自飞书正式考试成绩表及其续表。</p></div><div class="rank-sort-btns"><button class="rank-sort-btn" data-sort="score">按分数</button><button class="rank-sort-btn" data-sort="time">按用时</button></div></div>${storageStatus}${sourceSummary}${rankingRows}</section>
     <section class="ranking-section"><div class="ranking-section-head"><div><h4>我的正式考试历史</h4><p>来自公司账号系统，换设备后仍可查看。</p></div></div><div class="history-list">${historyRows}</div></section>
     <section class="ranking-section"><div class="ranking-section-head"><div><h4>本机练习记录</h4><p>仅保存在当前设备浏览器，不计入公司排名。</p></div></div><div class="history-list">${practiceRows}</div></section>`;
 
@@ -2863,6 +2877,7 @@ async function refreshAuthenticatedQuestions() {
   try {
     await loadQuestionChanges();
     void syncLearningProgress();
+    void loadRanking();
     void loadProductManager();
     reconcileStoredQuestions();
     renderBankSelect();
@@ -3260,6 +3275,7 @@ async function init() {
     showAuth(!state.currentUser);
     void checkExamService();
     void syncLearningProgress();
+    void loadRanking();
     void loadProductManager();
     await registerInstallableApp();
     await checkLatestVersion({ silent: true });

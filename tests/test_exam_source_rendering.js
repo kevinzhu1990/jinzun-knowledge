@@ -26,4 +26,12 @@ assert.equal(vm.runInContext('renderFeishuSource({baseToken:"javascript:alert(1)
 context.state.rankingSources = [{ ...row.source, tableName: '<script>alert(1)</script>', formalCount: 2 }];
 vm.runInContext('renderRanking()', context);
 assert.ok(!list.innerHTML.includes('<script>'), 'Feishu table labels are escaped');
+context.state.examStorage = {source:{...row.source,tableName:'考试成绩记录（新版）'},migrated:10,pending:3,error:''};
+vm.runInContext('renderRanking()', context);
+assert.ok(list.innerHTML.includes('考试成绩记录（新版）'),'replacement table is visible even before all records finish copying');
+assert.ok(list.innerHTML.includes('3 条历史成绩'),'partial migration must show remaining work');
+context.state.examStorage.error='<script>Forbidden</script>';
+vm.runInContext('renderRanking()', context);
+assert.ok(list.innerHTML.includes('补入未完成'),'failed historical copies must not be labeled complete');
+assert.ok(!list.innerHTML.includes('<script>'));
 console.log('exam Feishu source link rendering tests passed');

@@ -16,7 +16,8 @@ def test_formal_and_practice_use_separate_feishu_tables():
     practice = function_block(API, "async function handlePracticeSubmitOnce", "async function handleStats")
     assert "searchRecordFamily('exams'," in formal
     assert "writeRecordFamily('exams'," in formal
-    assert "exams: { name: '考试成绩记录', ready: examTableReady" in API
+    assert "exams: { name: EXAM_TABLE_NAME, ready: examTableReady" in API
+    assert "const EXAM_TABLE_NAME = '考试成绩记录（新版）'" in API
     assert "practiceTableReady()" not in formal
     assert "'考核类型': '正式考试'" in formal
     assert "practiceTableReady()" in practice
