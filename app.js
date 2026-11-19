@@ -1,5 +1,5 @@
 const core = window.KnowledgeCore;
-const BUILD_VERSION = "20261118-learning-name5";
+const BUILD_VERSION = "20261119-exam-source6";
 const PRACTICE_AUTO_NEXT_DELAY_MS = 1200;
 const FORMAL_AUTO_NEXT_DELAY_MS = 350;
 let autoNextTimer = null;
@@ -46,11 +46,13 @@ const state = {
   examSessionToken: "",
   submissionId: "",
   serverRecordId: "",
+  serverRecordSource: null,
   serverDuration: null,
   examSubmitting: false,
   answers: new Map(),
   companyRanking: [],
   ownFormalHistory: [],
+  rankingSources: [],
   rankingLoading: false,
   rankingError: "",
   adminQuestionPage: 1,
@@ -1378,6 +1380,7 @@ async function startQuiz() {
   state.examSessionToken = "";
   state.submissionId = "";
   state.serverRecordId = "";
+  state.serverRecordSource = null;
   state.serverDuration = null;
   state.examSubmitting = false;
   state.answers = new Map();
@@ -1994,6 +1997,7 @@ async function submitFormalExam() {
   state.score = Number(data.correct || 0);
   state.quizWrong = Number(data.wrong || 0);
   state.serverRecordId = data.record_id;
+  state.serverRecordSource = data.source || null;
   state.serverDuration = Number.isFinite(Number(data.duration)) ? Number(data.duration) : null;
   state.wrongDetails = Array.isArray(data.wrong_details) ? data.wrong_details : [];
   state.wrongDetails.forEach((item) => saveMistake(item, item.selected || "未作答"));
@@ -2068,7 +2072,7 @@ async function finishQuiz() {
   const passMark = state.examType === "redline" ? 100 : 80;
   const timeStr = formatTime(state.serverDuration ?? timerSeconds);
   const examSyncSuccess = state.examType === "formal" && state.serverRecordId
-    ? `<p class="exam-sync-success" role="status">正式考试已同步到飞书</p>`
+    ? `<p class="exam-sync-success" role="status">正式考试已同步到飞书 ${renderFeishuSource(state.serverRecordSource)}</p>`
     : state.examType !== "formal" && practiceSyncSuccess
       ? `<p class="exam-sync-success" role="status">练习成绩已同步到飞书练习表</p>`
       : state.examType !== "formal" && practiceSyncError
@@ -2234,12 +2238,19 @@ async function loadRanking() {
     const data = await cloudRequest("ranking", {});
     state.companyRanking = Array.isArray(data.ranking) ? data.ranking : [];
     state.ownFormalHistory = Array.isArray(data.ownHistory) ? data.ownHistory : [];
+    state.rankingSources = Array.isArray(data.sources) ? data.sources : [];
   } catch (error) {
     state.rankingError = error.message || "公司正式考试记录暂时无法读取";
   } finally {
     state.rankingLoading = false;
     renderRanking();
   }
+}
+
+function renderFeishuSource(source) {
+  if (!source || !/^[a-zA-Z0-9_-]{1,100}$/.test(source.baseToken || "") || !/^[a-zA-Z0-9_-]{1,100}$/.test(source.tableId || "")) return "";
+  const url = `https://dcnz34opa4ey.feishu.cn/base/${encodeURIComponent(source.baseToken)}?table=${encodeURIComponent(source.tableId)}`;
+  return `<a class="feishu-source" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" title="记录ID：${escapeHtml(source.recordId || "")}">查看飞书原表 · ${escapeHtml(source.tableName || source.tableId)}</a>`;
 }
 
 function renderRanking() {
@@ -2260,6 +2271,7 @@ function renderRanking() {
       <div class="rank-info">
         <strong>${escapeHtml(row.name)}</strong>
         <span>${escapeHtml(row.role)} · 正式考试 ${Number(row.totalExams || 0)} 次</span>
+        ${renderFeishuSource(row.source)}
       </div>
       <div class="rank-mid">
         <span class="rank-bank">${escapeHtml(row.bank || "")}</span>
@@ -2269,14 +2281,16 @@ function renderRanking() {
     </div>
   `).join("") : `<div class="empty">还没有公司正式考试记录。</div>`;
   const historyRows = state.ownFormalHistory.length
-    ? state.ownFormalHistory.map((record) => `<div class="history-row"><strong>${Number(record.percent || 0)}分</strong><span>${escapeHtml(record.bank || "正式考试")}</span><span>${Number(record.total || 0)}题 · ${formatTime(Number(record.duration || 0))}</span><time>${escapeHtml(record.finishedAt || "")}</time></div>`).join("")
+    ? state.ownFormalHistory.map((record) => `<div class="history-row"><strong>${Number(record.percent || 0)}分</strong><span>${escapeHtml(record.bank || "正式考试")}${renderFeishuSource(record.source)}</span><span>${Number(record.total || 0)}题 · ${formatTime(Number(record.duration || 0))}</span><time>${escapeHtml(record.finishedAt || "")}</time></div>`).join("")
     : `<div class="empty">你还没有正式考试记录。</div>`;
   const practiceRows = localPractice.length
     ? localPractice.slice(0, 30).map((record) => `<div class="history-row"><strong>${Number(record.percent || 0)}分</strong><span>${escapeHtml(record.bank || "练习模式")}</span><span>${Number(record.total || 0)}题 · ${formatTime(Number(record.duration || 0))}</span><time>${escapeHtml(examTimeLabel(record.finishedAt))}</time></div>`).join("")
     : `<div class="empty">当前设备还没有练习记录。</div>`;
 
+  const sourceSummary = !state.rankingLoading && !state.rankingError && state.rankingSources?.length
+    ? `<div class="feishu-source-summary"><strong>飞书成绩来源</strong><p>共 ${state.rankingSources.reduce((sum, source) => sum + Number(source.formalCount || 0), 0)} 次正式考试，来自 ${state.rankingSources.length} 张飞书表。这里直接读取飞书记录，不是本机缓存；续表成绩不会显示在原表，请点链接核对。打开后仍看不到时，请检查飞书视图筛选和查看权限。</p>${state.rankingSources.map(source => `<div>${renderFeishuSource(source)} <span>· ${Number(source.formalCount || 0)} 次正式考试</span></div>`).join("")}</div>` : "";
   listEl.innerHTML = `
-    <section class="ranking-section"><div class="ranking-section-head"><div><h4>公司正式考试排行榜</h4><p>来自公司账号系统，仅统计正式考试。</p></div><div class="rank-sort-btns"><button class="rank-sort-btn" data-sort="score">按分数</button><button class="rank-sort-btn" data-sort="time">按用时</button></div></div>${rankingRows}</section>
+    <section class="ranking-section"><div class="ranking-section-head"><div><h4>公司正式考试排行榜</h4><p>来自飞书正式考试成绩表及其续表。</p></div><div class="rank-sort-btns"><button class="rank-sort-btn" data-sort="score">按分数</button><button class="rank-sort-btn" data-sort="time">按用时</button></div></div>${sourceSummary}${rankingRows}</section>
     <section class="ranking-section"><div class="ranking-section-head"><div><h4>我的正式考试历史</h4><p>来自公司账号系统，换设备后仍可查看。</p></div></div><div class="history-list">${historyRows}</div></section>
     <section class="ranking-section"><div class="ranking-section-head"><div><h4>本机练习记录</h4><p>仅保存在当前设备浏览器，不计入公司排名。</p></div></div><div class="history-list">${practiceRows}</div></section>`;
 

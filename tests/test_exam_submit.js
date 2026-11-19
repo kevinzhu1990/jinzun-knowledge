@@ -94,6 +94,10 @@ function fixture({ partialBatch = false, lostBatchResponse = false, fullTables =
   assert.equal(result.total, 50);
   assert.equal(result.wrong, 50);
   assert.equal(f.records.exams.length, 1, '成绩必须真实落库后才返回成功');
+  assert.ok(result.source, 'submission receipt must identify the actual Feishu storage location');
+  assert.equal(result.source.tableId, 'exams', 'submission receipt identifies the actual Feishu table');
+  assert.equal(result.source.recordId, result.record_id);
+  assert.equal(result.source.baseToken, 'test-base');
   assert.equal(f.records.mistakes.length, 50);
   const coldRequestCount = f.calls.length;
   const mistakeWrites = f.calls.filter(c => c.table === 'mistakes' && c.method === 'POST' && !c.path.endsWith('/search'));
@@ -103,6 +107,7 @@ function fixture({ partialBatch = false, lostBatchResponse = false, fullTables =
   assert.ok(f.calls.length * 1500 < 60000, '每次飞书请求模拟1.5秒时，冷启动50题交卷仍应在60秒内完成');
   const retry = await f.submit();
   assert.equal(retry.record_id, result.record_id);
+  assert.deepEqual(retry.source, result.source, 'duplicate recovery preserves the original storage location');
   assert.equal(f.records.exams.length, 1, '重试不能重复写入成绩');
   assert.equal(f.records.mistakes.length, 50, '重试不能重复写入错题');
   const expiredToken = f.session({ exp: Date.now() - 1000, deadlineAt: Date.now() - 31000 });
@@ -133,6 +138,7 @@ function fixture({ partialBatch = false, lostBatchResponse = false, fullTables =
     const saved = await capacity.submit();
     assert.equal(saved.ok, true, `满表时应续存而不是阻止交卷: ${JSON.stringify(saved)}`);
     assert.ok(saved.record_id);
+    assert.equal(capacity.records[saved.source.tableId][0].record_id, saved.record_id, 'receipt points at the real continuation row');
     assert.equal(Object.values(capacity.records).flat().filter(r => r.fields['考试会话ID'] === 'test-exam').length, 1);
     assert.equal(Object.values(capacity.records).flat().filter(r => r.fields['考试提交编号'] === 'test-submission' && r.fields['错题编号']).length, 50);
     assert.ok(capacity.records.mistakes.some(r => r.record_id === 'historic-mistake'), '历史记录不得删除');
@@ -142,6 +148,13 @@ function fixture({ partialBatch = false, lostBatchResponse = false, fullTables =
     const ranking = await cold.request('ranking');
     assert.equal(ranking.ownHistory.length, 1, '续表成绩必须出现在个人历史和排行中');
     assert.equal(ranking.ranking.length, 1);
+    assert.equal(ranking.ownHistory[0].source.tableId, saved.source.tableId, 'old grades get their actual source without resubmitting');
+    assert.equal(ranking.ranking[0].source.recordId, saved.record_id);
+    const source = ranking.sources.find(source => source.tableId === saved.source.tableId);
+    assert.equal(source.formalCount, 1);
+    assert.equal(source.tableName, cold.tables.find(table => table.table_id === saved.source.tableId).name);
+    assert.equal(source.baseToken, 'test-base');
+    assert.equal(JSON.stringify(ranking).includes(user.phone), false, 'provenance must not expose employee phone numbers');
   }
   const blocked = fixture({ fullTables: ['mistakes'], denyCreate: true });
   const denied = await blocked.submit();
@@ -154,5 +167,20 @@ function fixture({ partialBatch = false, lostBatchResponse = false, fullTables =
   const separatelySaved = await separateWorker.submit();
   assert.equal((await warm.submit()).record_id, separatelySaved.record_id, '缓存了旧表目录的服务器也必须发现其他服务器刚创建的续表，避免重复交卷');
   assert.equal(Object.values(warm.records).flat().filter(r => r.fields['考试会话ID'] === 'test-exam').length, 1);
+  const mixed = fixture();
+  await mixed.submit();
+  mixed.tables.push({table_id:'archive',name:'考试成绩记录-续表-1'});
+  mixed.records.archive = [
+    {record_id:'best',fields:{'手机号':user.phone,'姓名':user.name,'考核类型':'正式考试','分数':100,'用时秒数':60}},
+    {record_id:'other',fields:{'手机号':'13000000001','姓名':'其他员工','考核类型':'正式考试','分数':98,'用时秒数':70}},
+    {record_id:'practice',fields:{'手机号':user.phone,'考核类型':'练习模式','分数':100}},
+  ];
+  const mixedRanking = await mixed.request('ranking');
+  assert.equal(mixedRanking.ranking.length,2);
+  assert.equal(mixedRanking.ownHistory.length,2,'own history stays employee-isolated');
+  assert.equal(mixedRanking.ranking[0].source.tableId,'archive','best grade must retain its own actual source table');
+  assert.equal(mixedRanking.ranking[0].totalExams,2);
+  assert.deepEqual(mixedRanking.sources.map(s=>[s.tableId,s.formalCount]),[['exams',1],['archive',2]],'source totals include every formal attempt, not practice or best-score rows only');
+  assert.equal(mixed.calls.filter(c=>c.method==='DELETE').length,0);
   console.log(JSON.stringify({ ok: true, questions: 50, wrong: result.wrong, coldRequestCount, mistakeWriteRequests: mistakeWrites.length, simulatedNetworkMs: coldRequestCount * 1500, duplicateSafe: true, expiredRecovery: true, lostResponseSafe: true }));
 })().catch(error => { console.error(error); process.exitCode = 1; });

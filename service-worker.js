@@ -1,18 +1,18 @@
-const CACHE_VERSION = 'jinzun-20261118-learning-name5';
+const CACHE_VERSION = 'jinzun-20261119-exam-source6';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './knowledge-core.js?v=20261118-learning-name5',
-  './products.json?v=20261118-learning-name5',
-  './styles.css?v=20261118-learning-name5',
-  './app.js?v=20261118-learning-name5',
+  './knowledge-core.js?v=20261119-exam-source6',
+  './products.json?v=20261119-exam-source6',
+  './styles.css?v=20261119-exam-source6',
+  './app.js?v=20261119-exam-source6',
   './mooncake-filter.js?v=af8d1d9',
-  './manifest.webmanifest?v=20261118-learning-name5',
+  './manifest.webmanifest?v=20261119-exam-source6',
   './assets/brand/jinzun-logo.png',
   './assets/app-icons/icon-192.png',
   './assets/app-icons/icon-512.png',
-  './outputs/product_quiz/金尊产品知识库题库.json?v=20261118-learning-name5',
-  './outputs/role_quiz/岗位学习考核题库.json?v=20261118-learning-name5'
+  './outputs/product_quiz/金尊产品知识库题库.json?v=20261119-exam-source6',
+  './outputs/role_quiz/岗位学习考核题库.json?v=20261119-exam-source6'
 ];
 
 self.addEventListener('install', (event) => {

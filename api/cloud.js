@@ -363,11 +363,18 @@ async function recordFamilyTables(kind, fresh = false) {
 async function searchRecordFamily(kind, field, value) {
   // Never use a stale directory for idempotency: another worker can roll over.
   const tables = await recordFamilyTables(kind, true);
-  return (await Promise.all(tables.map(table => searchRecords(table, field, value)))).flat();
+  return (await Promise.all(tables.map(async table => (await searchRecords(table, field, value))
+    .map(record => ({...record, source: feishuRecordSource(table, record.record_id)}))))).flat();
+}
+
+function feishuRecordSource(tableId, recordId = '') {
+  return { baseToken: BASE_TOKEN, tableId, recordId,
+    tableName: cachedTables?.find(table => table.table_id === tableId)?.name || tableId };
 }
 
 async function listRecordFamily(kind) {
-  return (await Promise.all((await recordFamilyTables(kind, true)).map(table => listRecords(table)))).flat();
+  return (await Promise.all((await recordFamilyTables(kind, true)).map(async table => (await listRecords(table))
+    .map(record => ({...record, source: feishuRecordSource(table, record.record_id)}))))).flat();
 }
 
 async function createOverflowTable(kind) {
@@ -1202,6 +1209,7 @@ async function handleExamSubmitOnce(payload, user) {
       ok: true,
       duplicate: true,
       record_id: record.record_id,
+      source: record.source,
       score: num(record['分数']),
       correct: num(record['答对数']),
       wrong: num(record['答错数']),
@@ -1234,11 +1242,15 @@ async function handleExamSubmitOnce(payload, user) {
     '是否通过': percent >= 80 ? '通过' : '未通过', '用时秒数': duration,
     '考试提交编号': submissionId || examSessionId, '考试会话ID': examSessionId, '设备ID': String(payload.deviceId || '').slice(0, 500),
   };
-  const created = await writeRecordFamily('exams', tableId => createRecord(tableId, fields));
+  const created = await writeRecordFamily('exams', async tableId => {
+    const record = await createRecord(tableId, fields);
+    return {...record, source: feishuRecordSource(tableId, record?.record_id)};
+  });
   if (!created?.record_id) throw httpError(503, '考试记录未返回记录ID');
   return {
     ok: true,
     record_id: created.record_id,
+    source: created.source,
     mistake_record_ids: mistakeIds,
     wrong_details: wrongItems.map((item) => ({
       id: item.id, bank: item.bank, type: item.type, knowledgePoint: item.knowledgePoint,
@@ -1402,6 +1414,7 @@ async function handleRanking(user) {
     percent: num(record['分数']),
     duration: num(record['用时秒数']),
     finishedAt: record['提交时间'] || '',
+    source: record.source,
   }));
   const byPhone = new Map();
   for (const record of formal) {
@@ -1424,7 +1437,13 @@ async function handleRanking(user) {
     .sort((left, right) => new Date(right.finishedAt || 0).getTime() - new Date(left.finishedAt || 0).getTime())
     .slice(0, 50)
     .map(({ phone, name, role, ...record }) => record);
-  return { ok: true, ranking, ownHistory };
+  const sources = new Map();
+  for (const record of formal) {
+    const source = record.source;
+    if (!sources.has(source.tableId)) sources.set(source.tableId, {...source, recordId: '', formalCount: 0});
+    sources.get(source.tableId).formalCount += 1;
+  }
+  return { ok: true, ranking, ownHistory, sources: [...sources.values()] };
 }
 
 module.exports = async (req, res) => {
