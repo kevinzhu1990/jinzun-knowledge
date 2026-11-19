@@ -9,6 +9,7 @@ const baseProducts = require('../products.json');
 const BASE_TOKEN = process.env.LARK_BASE_TOKEN || '';
 const EMPLOYEE_TABLE_ID = process.env.LARK_EMPLOYEE_TABLE_ID || '';
 const EXAM_TABLE_ID = process.env.LARK_EXAM_TABLE_ID || '';
+const EXAM_TABLE_NAME = '考试成绩记录（新版）';
 const PRACTICE_TABLE_ID = process.env.LARK_PRACTICE_TABLE_ID || '';
 const MISTAKE_TABLE_ID = process.env.LARK_MISTAKE_TABLE_ID || '';
 const LARK_APP_ID = process.env.LARK_APP_ID || '';
@@ -94,15 +95,18 @@ class FeishuApiError extends Error {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function larkApi(path, options = {}) {
+  const { retry = true, deadlineAt = 0, ...fetchOptions } = options;
   for (let attempt = 0; attempt < 3; attempt += 1) {
+    const remainingMs = deadlineAt ? deadlineAt - Date.now() : 10000;
+    if (remainingMs <= 0) throw httpError(503, '本轮历史成绩补入时限已到，稍后继续');
     let response;
     try {
       response = await fetch(`https://open.feishu.cn/open-apis${path}`, {
-        ...options,
-        signal: AbortSignal.timeout(10000),
+        ...fetchOptions,
+        signal: AbortSignal.timeout(Math.min(10000, remainingMs)),
       });
     } catch (error) {
-      if (attempt === 2) throw error;
+      if (!retry || attempt === 2) throw error;
       await sleep(250 * (attempt + 1));
       continue;
     }
@@ -113,8 +117,8 @@ async function larkApi(path, options = {}) {
         data.msg || data.error?.message || `Feishu API error ${response.status}`,
         { code, status: response.status },
       );
-      const retryable = response.status === 429 || response.status >= 500;
-      if (!retryable || attempt === 2) throw error;
+      const retryable = response.status === 429 || response.status >= 500 || String(code) === '1254291';
+      if (!retry || !retryable || attempt === 2) throw error;
       await sleep(250 * (attempt + 1));
       continue;
     }
@@ -171,9 +175,33 @@ const employeeTableId = () => resolveTableId(EMPLOYEE_TABLE_ID, [
   '登录记录', '员工联系记录', '员工信息', '员工登录记录', '员工',
 ]);
 
-const examTableId = () => resolveTableId(EXAM_TABLE_ID, [
-  '考试成绩记录', '考试记录', '考试成绩', '学习考核记录', '考核记录',
-]);
+let examTablePromise;
+async function examTableId() {
+  if (!examTablePromise) examTablePromise = (async () => {
+    const find = tables => tables.find(table => table.name === EXAM_TABLE_NAME);
+    const existing = find(await listTables(true));
+    if (existing) return existing.table_id;
+    const token = await getTenantToken();
+    try {
+      const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables`, {
+        method: 'POST', retry: false,
+        headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({table: {name: EXAM_TABLE_NAME, default_view_name: '全部考试成绩',
+          fields: EXAM_FIELD_NAMES.map(field_name => ({field_name, type: examNumberFields.has(field_name) ? 2 : 1}))}}),
+      });
+      const id = data?.data?.table?.table_id || data?.data?.table_id;
+      if (!id) throw httpError(503, '新版考试成绩表未返回表ID');
+      cachedTables = null; cachedTablesExpireAt = 0;
+      return id;
+    } catch (error) {
+      // A lost create response must be resolved by name, not by creating more tables.
+      const recovered = find(await listTables(true));
+      if (recovered) return recovered.table_id;
+      throw new FeishuApiError(`新版考试成绩表创建失败：${error.message}`, {code: error.code, status: 503});
+    }
+  })().catch(error => {examTablePromise = null; throw error;});
+  return examTablePromise;
+}
 
 const mistakeTableId = () => resolveTableId(MISTAKE_TABLE_ID, [
   '错题记录', '错题', '学习错题记录',
@@ -186,7 +214,7 @@ const ACCOUNT_TEXT_FIELDS = [
 let accountFieldsReady = null;
 const EXAM_FIELD_NAMES = [
   '考试名称', '考核类型', '题库', '总题数', '答对数', '答错数', '分数',
-  '是否通过', '用时秒数', '提交时间', '考试提交编号', '考试会话ID', '设备ID', '姓名', '手机号', '岗位',
+  '是否通过', '用时秒数', '提交时间', '考试提交编号', '考试会话ID', '设备ID', '姓名', '手机号', '岗位', '来源记录ID',
 ];
 const PRACTICE_FIELD_NAMES = [
   '练习名称', '练习类型', '题库', '总题数', '答对数', '答错数', '分数',
@@ -344,27 +372,32 @@ const questionChangeTableReady = () => ensureTableFields(questionChangeTableId()
 
 // Full tables stay read-only archives. Never delete history to make a submission fit.
 const recordFamilies = {
-  exams: { name: '考试成绩记录', ready: examTableReady, fields: EXAM_FIELD_NAMES },
+  exams: { name: EXAM_TABLE_NAME, ready: examTableReady, fields: EXAM_FIELD_NAMES },
   mistakes: { name: '错题记录', ready: mistakeTableReady, fields: MISTAKE_FIELD_NAMES },
 };
 const examNumberFields = new Set(['总题数', '答对数', '答错数', '分数', '用时秒数']);
 const fullRecordTables = new Set();
 const overflowTablePromises = new Map();
 
-async function recordFamilyTables(kind, fresh = false) {
+async function recordFamilyTables(kind, fresh = false, includeLegacy = true) {
   const family = recordFamilies[kind];
   const baseId = await family.ready();
   const prefix = `${family.name}-续表-`;
   const tables = await listTables(fresh);
-  return [baseId, ...tables.filter(table => table.table_id !== baseId && table.name.startsWith(prefix))
+  const active = [baseId, ...tables.filter(table => table.table_id !== baseId && (table.name === family.name || table.name.startsWith(prefix)))
     .sort((a, b) => a.name.localeCompare(b.name)).map(table => table.table_id)];
+  if (kind !== 'exams' || !includeLegacy) return active;
+  const aliases = ['考试成绩记录','考试记录','考试成绩','学习考核记录','考核记录'].map(normalizeTableName);
+  return [...active, ...tables.filter(table => !active.includes(table.table_id) &&
+    (table.table_id === EXAM_TABLE_ID || aliases.includes(normalizeTableName(table.name)) || table.name.startsWith('考试成绩记录-续表-'))).map(table => table.table_id)];
 }
 
 async function searchRecordFamily(kind, field, value) {
   // Never use a stale directory for idempotency: another worker can roll over.
   const tables = await recordFamilyTables(kind, true);
-  return (await Promise.all(tables.map(async table => (await searchRecords(table, field, value))
+  const records = (await Promise.all(tables.map(async table => (await searchRecords(table, field, value))
     .map(record => ({...record, source: feishuRecordSource(table, record.record_id)}))))).flat();
+  return kind === 'exams' ? uniqueExamRecords(records) : records;
 }
 
 function feishuRecordSource(tableId, recordId = '') {
@@ -373,8 +406,69 @@ function feishuRecordSource(tableId, recordId = '') {
 }
 
 async function listRecordFamily(kind) {
-  return (await Promise.all((await recordFamilyTables(kind, true)).map(async table => (await listRecords(table))
+  const records = (await Promise.all((await recordFamilyTables(kind, true)).map(async table => (await listRecords(table))
     .map(record => ({...record, source: feishuRecordSource(table, record.record_id)}))))).flat();
+  return kind === 'exams' ? uniqueExamRecords(records) : records;
+}
+
+function examRecordKey(record) {
+  if (record['来源记录ID']) return String(record['来源记录ID']);
+  const phone = cleanPhone(record['手机号']);
+  if (record['考试会话ID']) return `session:${phone}:${record['考试会话ID']}`;
+  if (record['考试提交编号']) return `submission:${phone}:${record['考试提交编号']}`;
+  return `legacy:${record.source.tableId}:${record.record_id}`;
+}
+
+function uniqueExamRecords(records) {
+  const seen = new Set();
+  return records.filter(record => {
+    const key = examRecordKey(record);
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+}
+
+function migrationClientToken(tableId, key) {
+  const bytes = crypto.createHash('sha256').update(`${BASE_TOKEN}:${tableId}:${key}`).digest().subarray(0,16);
+  bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
+
+async function copyLegacyExamRecords(records) {
+  const active = new Set(await recordFamilyTables('exams', false, false));
+  const destination = await examTableId();
+  const deadlineAt = Date.now() + 15000;
+  const pending = records.filter(record => record['考核类型'] === '正式考试' && !active.has(record.source.tableId));
+  const copied = [];
+  let error = '';
+  // Serial and bounded: Feishu rejects concurrent writes on the same table.
+  for (const record of pending.slice(0,10)) {
+    if (Date.now() >= deadlineAt) break;
+    try {
+      const key = examRecordKey(record);
+      const fields = {'来源记录ID': key};
+      for (const field of EXAM_FIELD_NAMES) {
+        if (field === '来源记录ID' || record[field] == null || record[field] === '') continue;
+        const value = Array.isArray(record[field]) ? record[field].map(part => part.text || '').join('') : record[field];
+        if (examNumberFields.has(field)) {
+          if (!Number.isFinite(Number(value))) throw new Error(`历史记录${record.record_id}的${field}不是有效数值`);
+          fields[field] = Number(value);
+        } else fields[field] = String(value);
+      }
+      // All workers use the same canonical destination/key. Do not fan historical
+      // copies into independently created overflow tables on concurrent rollover.
+      const created = await createRecord(destination, fields, migrationClientToken(destination, key), deadlineAt);
+      if (!created?.record_id) throw httpError(503, '历史成绩补入未返回记录ID');
+      const saved = {...fields, record_id: created.record_id, source: feishuRecordSource(destination, created.record_id)};
+      copied.push(saved);
+    } catch (failure) {
+      if (Date.now() < deadlineAt) error = failure.code === '1254103' ? '新版主表容量已满，历史补入已暂停，旧成绩未删除' : failure.message;
+      break;
+    }
+  }
+  return {records: uniqueExamRecords([...copied,...records]), migrated: copied.length,
+    pending: pending.length - copied.length, error, source: feishuRecordSource(await examTableId())};
 }
 
 async function createOverflowTable(kind) {
@@ -416,11 +510,11 @@ async function writeRecordFamily(kind, write) {
     }
     return null;
   };
-  let saved = await tryTables(await recordFamilyTables(kind));
+  let saved = await tryTables(await recordFamilyTables(kind, false, false));
   if (saved) return saved.result;
   try {
     // Another worker may already have made a continuation table; discover it first.
-    saved = await tryTables(await recordFamilyTables(kind, true));
+    saved = await tryTables(await recordFamilyTables(kind, true, false));
     if (saved) return saved.result;
     const tableId = await createOverflowTable(kind);
     return await write(tableId);
@@ -999,10 +1093,10 @@ async function handleAdminQuestions(payload, user) {
   return { ok: true, change };
 }
 
-async function createRecord(tableId, fields) {
+async function createRecord(tableId, fields, clientToken = crypto.randomUUID(), deadlineAt = 0) {
   const token = await getTenantToken();
-  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records?client_token=${crypto.randomUUID()}`, {
-    method: 'POST',
+  const data = await larkApi(`/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records?client_token=${clientToken}`, {
+    method: 'POST', deadlineAt,
     headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ fields }),
   });
@@ -1404,7 +1498,8 @@ async function handleStats() {
 }
 
 async function handleRanking(user) {
-  const records = await listRecordFamily('exams');
+  const migration = await copyLegacyExamRecords(await listRecordFamily('exams'));
+  const records = migration.records;
   const formal = records.filter((record) => String(record['考核类型'] || '') === '正式考试').map((record) => ({
     name: record['姓名'] || '',
     phone: cleanPhone(record['手机号']),
@@ -1443,7 +1538,8 @@ async function handleRanking(user) {
     if (!sources.has(source.tableId)) sources.set(source.tableId, {...source, recordId: '', formalCount: 0});
     sources.get(source.tableId).formalCount += 1;
   }
-  return { ok: true, ranking, ownHistory, sources: [...sources.values()] };
+  const {records: migratedRecords, ...examStorage} = migration;
+  return { ok: true, ranking, ownHistory, sources: [...sources.values()], examStorage };
 }
 
 module.exports = async (req, res) => {
